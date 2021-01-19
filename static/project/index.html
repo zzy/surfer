@@ -1,0 +1,22 @@
+<html>
+
+  <head>
+    <title>all projects</title>
+  </head>
+
+  <body>
+    <h1>all projects</h1>
+    <ul>
+      {{#each projects as |p|}}
+        <li><b>{{p.user_id}}</b></li>
+        <ul>
+          <li>{{p._id}}</li>
+          <li>{{p.subject}}</li>
+          <li>{{p.website}}</li>
+        </ul>
+      {{/each}}
+    </ul>
+
+  </body>
+
+</html>

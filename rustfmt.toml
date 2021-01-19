@@ -1,0 +1,12 @@
+edition = "2018"
+
+indent_style = "Block"
+reorder_imports = false
+reorder_modules = false
+merge_derives = false
+use_small_heuristics = "Max"
+
+error_on_line_overflow = true
+error_on_unformatted = true
+
+ignore = []

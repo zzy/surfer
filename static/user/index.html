@@ -1,0 +1,21 @@
+<html>
+
+  <head>
+    <title>all users</title>
+  </head>
+
+  <body>
+    <h1>all users</h1>
+    <ul>
+      {{#each users as |u|}}
+        <li><b>{{u.username}}</b></li>
+        <ul>
+          <li>{{ u._id }}</li>
+          <li>{{ u.email }}</li>
+        </ul>
+      {{/each}}
+    </ul>
+
+  </body>
+
+</html>

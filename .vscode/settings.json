@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.html": "handlebars"
+    },
+    "html.format.endWithNewline": true,
+    "html.format.indentHandlebars": true,
+    "html.format.indentInnerHtml": true
+}

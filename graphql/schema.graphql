@@ -1,0 +1,61 @@
+schema {
+  query: QueryRoot
+  mutation: MutationRoot
+}
+
+# Directs the executor to query only when the field exists.
+directive @ifdef on FIELD
+
+type MutationRoot {
+  userRegister(newUser: NewUser!): User!
+  userChangePassword(
+    curPassword: String!
+    newPassword: String!
+    token: String!
+  ): User!
+  userUpdateProfile(newUser: NewUser!, token: String!): User!
+  addProject(newProject: NewProject!): Project!
+}
+
+input NewProject {
+  userId: ObjectId!
+  subject: String!
+  website: String!
+}
+
+input NewUser {
+  email: String!
+  username: String!
+  cred: String!
+}
+
+scalar ObjectId
+
+type Project {
+  id: ObjectId!
+  userId: ObjectId!
+  subject: String!
+  website: String!
+}
+
+type QueryRoot {
+  getUserByEmail(email: String!): User!
+  getUserByUsername(username: String!): User!
+  userSignIn(unknownUser: NewUser!): SignInfo!
+  allUsers(token: String!): [User!]!
+  allProjects: [Project!]!
+  allProjectsByUser(userId: ObjectId!): [Project!]!
+}
+
+type SignInfo {
+  email: String!
+  username: String!
+  token: String!
+}
+
+type User {
+  id: ObjectId!
+  email: String!
+  username: String!
+  projects: [Project!]!
+}
