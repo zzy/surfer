@@ -6,11 +6,11 @@ mod dbs;
 mod gql;
 
 mod users;
-mod projects;
+mod articles;
 
 use crate::util::{constant::CFG, common::Tpl};
-use crate::projects::routes::project_index;
-use crate::users::routes::user_index;
+use crate::articles::routes::articles_index;
+use crate::users::routes::users_index;
 
 #[async_std::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -22,8 +22,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     //environment variables defined in .env file
     app.at("/").get(index);
-    app.at("users").get(user_index);
-    app.at("projects").get(project_index);
+    app.at("users").get(users_index);
+    app.at("articles").get(articles_index);
 
     // app.at(ENV.get("GRAPHQL_PATH").unwrap()).post(async_graphql_tide::endpoint(schema));
     app.at(CFG.get("GRAPHQL_PATH").unwrap()).post(gql::graphql);

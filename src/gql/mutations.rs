@@ -6,9 +6,9 @@ use crate::users::{
     self,
     models::{User, NewUser},
 };
-use crate::projects::{
+use crate::articles::{
     self,
-    models::{Project, NewProject},
+    models::{Article, NewArticle},
 };
 
 pub struct MutationRoot;
@@ -44,9 +44,9 @@ impl MutationRoot {
         users::services::user_update_profile(db, new_user, &token).await
     }
 
-    // Add new project
-    async fn add_project(&self, ctx: &Context<'_>, new_project: NewProject) -> Project {
+    // Add new article
+    async fn add_article(&self, ctx: &Context<'_>, new_article: NewArticle) -> Article {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        projects::services::add_project(db, new_project).await
+        articles::services::add_article(db, new_article).await
     }
 }

@@ -7,7 +7,7 @@ use crate::users::{
     self,
     models::{User, NewUser, SignInfo},
 };
-use crate::projects::{self, models::Project};
+use crate::articles::{self, models::Article};
 
 pub struct QueryRoot;
 
@@ -36,19 +36,19 @@ impl QueryRoot {
         users::services::all_users(db, &token).await
     }
 
-    // Get all Projects
-    async fn all_projects(&self, ctx: &Context<'_>) -> GqlResult<Vec<Project>> {
+    // Get all articles
+    async fn all_articles(&self, ctx: &Context<'_>) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        projects::services::all_projects(db).await
+        articles::services::all_articles(db).await
     }
 
-    // Get all Projects of one User
-    async fn all_projects_by_user(
+    // Get all articles of one User
+    async fn all_articles_by_user(
         &self,
         ctx: &Context<'_>,
         user_id: ObjectId,
-    ) -> GqlResult<Vec<Project>> {
+    ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        projects::services::all_projects_by_user(db, user_id).await
+        articles::services::all_articles_by_user(db, user_id).await
     }
 }

@@ -6,6 +6,13 @@ schema {
 # Directs the executor to query only when the field exists.
 directive @ifdef on FIELD
 
+type Article {
+  id: ObjectId!
+  userId: ObjectId!
+  subject: String!
+  website: String!
+}
+
 type MutationRoot {
   userRegister(newUser: NewUser!): User!
   userChangePassword(
@@ -14,10 +21,10 @@ type MutationRoot {
     token: String!
   ): User!
   userUpdateProfile(newUser: NewUser!, token: String!): User!
-  addProject(newProject: NewProject!): Project!
+  addArticle(newArticle: NewArticle!): Article!
 }
 
-input NewProject {
+input NewArticle {
   userId: ObjectId!
   subject: String!
   website: String!
@@ -31,20 +38,13 @@ input NewUser {
 
 scalar ObjectId
 
-type Project {
-  id: ObjectId!
-  userId: ObjectId!
-  subject: String!
-  website: String!
-}
-
 type QueryRoot {
   getUserByEmail(email: String!): User!
   getUserByUsername(username: String!): User!
   userSignIn(unknownUser: NewUser!): SignInfo!
   allUsers(token: String!): [User!]!
-  allProjects: [Project!]!
-  allProjectsByUser(userId: ObjectId!): [Project!]!
+  allArticles: [Article!]!
+  allArticlesByUser(userId: ObjectId!): [Article!]!
 }
 
 type SignInfo {
@@ -57,5 +57,5 @@ type User {
   id: ObjectId!
   email: String!
   username: String!
-  projects: [Project!]!
+  articles: [Article!]!
 }

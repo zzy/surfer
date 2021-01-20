@@ -13,8 +13,8 @@ use crate::util::common::{gql_uri, Tpl};
 )]
 struct AllUsers;
 
-pub async fn user_index(_req: Request<State>) -> tide::Result {
-    let project_index: Tpl = Tpl::new("user/index").await;
+pub async fn users_index(_req: Request<State>) -> tide::Result {
+    let users_index: Tpl = Tpl::new("users/index").await;
 
     // make data and render it
     let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJlbWFpbCI6Im9rYTIyQGJ1ZHNob21lLmNvbSIsInVzZXJuYW1lIjoi5oiRMjJz6LCBMjRvazMyIiwiZXhwIjoxMDAwMDAwMDAwMH0.FUdYJeEL1eCfturVUoPYKaVG-m4e-Jl3YJviYg1b8O9hKw2rrH7HKZED0gDT4i5lKbI9VTfbI0Qu4Tt3apwpOw";
@@ -26,5 +26,5 @@ pub async fn user_index(_req: Request<State>) -> tide::Result {
 
     let resp_data = resp_body.data.expect("missing response data");
 
-    project_index.render(&resp_data).await
+    users_index.render(&resp_data).await
 }

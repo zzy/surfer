@@ -4,14 +4,14 @@ use bson::oid::ObjectId;
 use async_graphql::{Error, ErrorExtensions};
 
 use crate::util::constant::GqlResult;
-use crate::projects::models::{Project, NewProject};
+use crate::articles::models::{Article, NewArticle};
 
-pub async fn add_project(db: Database, new_project: NewProject) -> Project {
-    let coll = db.collection("projects");
+pub async fn add_article(db: Database, new_article: NewArticle) -> Article {
+    let coll = db.collection("articles");
 
     let exist_document = coll
         .find_one(
-            bson::doc! {"user_id": &new_project.user_id,  "subject": &new_project.subject},
+            bson::doc! {"user_id": &new_article.user_id,  "subject": &new_article.subject},
             None,
         )
         .await
@@ -19,9 +19,9 @@ pub async fn add_project(db: Database, new_project: NewProject) -> Project {
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let new_project_bson = bson::to_bson(&new_project).unwrap();
+        let new_article_bson = bson::to_bson(&new_article).unwrap();
 
-        if let bson::Bson::Document(document) = new_project_bson {
+        if let bson::Bson::Document(document) = new_article_bson {
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -31,23 +31,23 @@ pub async fn add_project(db: Database, new_project: NewProject) -> Project {
         };
     }
 
-    let project_document = coll
+    let article_document = coll
         .find_one(
-            bson::doc! {"user_id": &new_project.user_id,  "subject": &new_project.subject},
+            bson::doc! {"user_id": &new_article.user_id,  "subject": &new_article.subject},
             None,
         )
         .await
         .expect("Document not found")
         .unwrap();
 
-    let project: Project = bson::from_bson(bson::Bson::Document(project_document)).unwrap();
-    project
+    let article: Article = bson::from_bson(bson::Bson::Document(article_document)).unwrap();
+    article
 }
 
-pub async fn all_projects(db: Database) -> GqlResult<Vec<Project>> {
-    let coll = db.collection("projects");
+pub async fn all_articles(db: Database) -> GqlResult<Vec<Article>> {
+    let coll = db.collection("articles");
 
-    let mut projects: Vec<Project> = vec![];
+    let mut articles: Vec<Article> = vec![];
 
     // Query all documents in the collection.
     let mut cursor = coll.find(None, None).await.unwrap();
@@ -56,8 +56,8 @@ pub async fn all_projects(db: Database) -> GqlResult<Vec<Project>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let project = bson::from_bson(bson::Bson::Document(document)).unwrap();
-                projects.push(project);
+                let article = bson::from_bson(bson::Bson::Document(document)).unwrap();
+                articles.push(article);
             }
             Err(error) => {
                 println!("Error to find doc: {}", error);
@@ -65,17 +65,17 @@ pub async fn all_projects(db: Database) -> GqlResult<Vec<Project>> {
         }
     }
 
-    if projects.len() > 0 {
-        Ok(projects)
+    if articles.len() > 0 {
+        Ok(articles)
     } else {
-        Err(Error::new("7-all-projects").extend_with(|_, e| e.set("details", "No records")))
+        Err(Error::new("7-all-articles").extend_with(|_, e| e.set("details", "No records")))
     }
 }
 
-pub async fn all_projects_by_user(db: Database, user_id: ObjectId) -> GqlResult<Vec<Project>> {
-    let coll = db.collection("projects");
+pub async fn all_articles_by_user(db: Database, user_id: ObjectId) -> GqlResult<Vec<Article>> {
+    let coll = db.collection("articles");
 
-    let mut projects: Vec<Project> = vec![];
+    let mut articles: Vec<Article> = vec![];
 
     // Query all documents in the collection.
     let mut cursor = coll.find(bson::doc! {"user_id": user_id}, None).await.unwrap();
@@ -84,8 +84,8 @@ pub async fn all_projects_by_user(db: Database, user_id: ObjectId) -> GqlResult<
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let project = bson::from_bson(bson::Bson::Document(document)).unwrap();
-                projects.push(project);
+                let article = bson::from_bson(bson::Bson::Document(document)).unwrap();
+                articles.push(article);
             }
             Err(error) => {
                 println!("Error to find doc: {}", error);
@@ -93,5 +93,5 @@ pub async fn all_projects_by_user(db: Database, user_id: ObjectId) -> GqlResult<
         }
     }
 
-    Ok(projects)
+    Ok(articles)
 }

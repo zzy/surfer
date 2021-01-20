@@ -1,5 +1,5 @@
 use cookie::Cookie;
-use time::Duration;
+use time::{Duration, OffsetDateTime};
 
 #[async_std::main]
 async fn main() {
@@ -10,6 +10,7 @@ async fn main() {
         .path("/")
         .secure(true)
         .http_only(true)
+        .expires(OffsetDateTime::now_utc())
         .max_age(Duration::minutes(60))
         .finish();
     println!("{:#?}\n", cookie);

@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use bson::oid::ObjectId;
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Project {
+pub struct Article {
     pub _id: ObjectId,
     pub user_id: ObjectId,
     pub subject: String,
@@ -10,7 +10,7 @@ pub struct Project {
 }
 
 #[async_graphql::Object]
-impl Project {
+impl Article {
     pub async fn id(&self) -> ObjectId {
         self._id.clone()
     }
@@ -29,7 +29,7 @@ impl Project {
 }
 
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
-pub struct NewProject {
+pub struct NewArticle {
     pub user_id: ObjectId,
     pub subject: String,
     pub website: String,
