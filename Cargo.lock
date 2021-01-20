@@ -566,6 +566,7 @@ dependencies = [
  "base64 0.13.0",
  "bson",
  "chrono",
+ "cookie",
  "dotenv",
  "futures",
  "graphql_client",
@@ -579,6 +580,7 @@ dependencies = [
  "serde_json",
  "surf",
  "tide",
+ "time 0.2.24",
 ]
 
 [[package]]
