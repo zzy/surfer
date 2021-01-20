@@ -20,7 +20,7 @@ impl DataSource {
             .await
             .expect("Failed to parse options!");
         // Manually set an option.
-        client_options.app_name = Some("tide-handlebars-graphql-mongodb".to_string());
+        client_options.app_name = Some("blog-rs".to_string());
 
         // Get a handle to the deployment.
         let client = Client::with_options(client_options).expect("Failed to initialize database!");
