@@ -26,7 +26,7 @@ impl DataSource {
         let client = Client::with_options(client_options).expect("Failed to initialize database!");
 
         // Get a handle to a database.
-        let db_budshome = client.database(CFG.get("MONGODB_BUDSHOME").unwrap());
+        let db_budshome = client.database(CFG.get("MONGODB_BLOG").unwrap());
 
         // return mongodb datasource.
         DataSource { client: client, db_budshome: db_budshome }

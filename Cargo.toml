@@ -1,5 +1,5 @@
 [package]
-name = "tide-handlebars-graphql-mongodb"
+name = "blog-rs"
 version = "0.1.0"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
@@ -13,7 +13,7 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.4.3"
 
-async-graphql = "2.5.0"
+async-graphql = "2.5.1"
 mongodb = { version = "1.1.1", default-features = false, features = ["async-std-runtime"] }
 bson = "1.1.0"
 chrono = "0.4.19"

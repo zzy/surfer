@@ -181,9 +181,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82833e5a5a5c77b8f9ecbc003db996df7432e8afffd6ad8de2fb0dc1436d1f35"
+checksum = "22d4f25567e154225dc45689d9751de8c353df4ff9e278507d997c56f16939dd"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -555,6 +555,30 @@ dependencies = [
  "fastrand",
  "futures-lite",
  "once_cell",
+]
+
+[[package]]
+name = "blog-rs"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "async-std",
+ "base64 0.13.0",
+ "bson",
+ "chrono",
+ "dotenv",
+ "futures",
+ "graphql_client",
+ "handlebars",
+ "jsonwebtoken",
+ "lazy_static",
+ "mongodb",
+ "regex",
+ "ring",
+ "serde",
+ "serde_json",
+ "surf",
+ "tide",
 ]
 
 [[package]]
@@ -1246,9 +1270,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4060f4657be78b8e766215b02b18a2e862d83745545de804638e2b545e81aee6"
+checksum = "c9495705279e7140bf035dde1f6e750c162df8b625267cd52cc44e0b156732c8"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -2346,7 +2370,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c026d7df8b298d90ccbbc5190bd04d85e159eaf5576caeacf8741da93ccbd2e5"
 dependencies = [
- "getrandom 0.2.1",
+ "getrandom 0.2.2",
 ]
 
 [[package]]
@@ -2969,30 +2993,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tide-handlebars-graphql-mongodb"
-version = "0.1.0"
-dependencies = [
- "async-graphql",
- "async-std",
- "base64 0.13.0",
- "bson",
- "chrono",
- "dotenv",
- "futures",
- "graphql_client",
- "handlebars",
- "jsonwebtoken",
- "lazy_static",
- "mongodb",
- "regex",
- "ring",
- "serde",
- "serde_json",
- "surf",
- "tide",
-]
-
-[[package]]
 name = "time"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3304,7 +3304,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.1",
+ "getrandom 0.2.2",
  "serde",
 ]
 

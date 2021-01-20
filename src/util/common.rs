@@ -7,6 +7,14 @@ use tide::{
 
 use crate::util::constant::CFG;
 
+pub async fn gql_uri() -> String {
+    let address = CFG.get("ADDRESS").unwrap();
+    let port = CFG.get("PORT").unwrap();
+    let gql_path = CFG.get("GRAPHQL_PATH").unwrap();
+
+    format!("http://{}:{}/{}", address, port, gql_path)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub email: String,

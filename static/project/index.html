@@ -7,12 +7,12 @@
   <body>
     <h1>all projects</h1>
     <ul>
-      {{#each projects as |p|}}
-        <li><b>{{p.user_id}}</b></li>
+      {{#each allProjects as |p|}}
+        <li><b>{{p.subject}}</b></li>
         <ul>
-          <li>{{p._id}}</li>
-          <li>{{p.subject}}</li>
-          <li>{{p.website}}</li>
+          <li>{{p.id}}</li>
+          <li>{{p.userId}}</li>
+          <li><a href="{{p.website}}" target="_blank">{{p.website}}</a></li>
         </ul>
       {{/each}}
     </ul>
