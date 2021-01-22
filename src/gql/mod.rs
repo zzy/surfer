@@ -1,13 +1,17 @@
 pub mod queries;
 pub mod mutations;
 
+use tide::{
+    http::mime,
+    {Request, Response, Body, StatusCode},
+};
+
+use async_graphql::{
+    http::{playground_source, GraphQLPlaygroundConfig, receive_json},
+    {Schema, EmptySubscription},
+};
+
 use crate::State;
-
-use tide::http::mime;
-use tide::{Request, Response, Body, StatusCode};
-
-use async_graphql::http::{playground_source, GraphQLPlaygroundConfig, receive_json};
-use async_graphql::{Schema, EmptySubscription};
 
 use crate::util::constant::CFG;
 use crate::dbs::mongo;

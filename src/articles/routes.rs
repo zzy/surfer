@@ -5,9 +5,6 @@ use chrono::Local;
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
 
-type ObjectId = String;
-type DateTime = chrono::DateTime<Local>;
-
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
@@ -38,6 +35,9 @@ pub async fn articles_list(_req: Request<State>) -> tide::Result {
     response_derives = "Debug"
 )]
 struct ArticleNew;
+
+type ObjectId = String;
+type DateTime = chrono::DateTime<Local>;
 
 pub async fn article_new(_req: Request<State>) -> tide::Result {
     let articles_index: Tpl = Tpl::new("articles/new").await;

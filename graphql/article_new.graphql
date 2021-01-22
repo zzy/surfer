@@ -18,7 +18,8 @@ mutation ArticleNew(
     userId
     subject
     slug
-    content
+    createdAt
+    updatedAt
     published
   }
 }
