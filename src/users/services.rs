@@ -7,7 +7,7 @@ use crate::util::{
     constant::{CFG, GqlResult},
     common::{Claims, token_data},
 };
-use crate::users::models::{User, NewUser, SignInfo};
+use crate::users::models::{User, UserNew, SignInfo};
 
 // get user info by email
 pub async fn get_user_by_email(db: Database, email: &str) -> GqlResult<User> {
@@ -46,27 +46,27 @@ pub async fn get_user_by_username(db: Database, username: &str) -> GqlResult<Use
     }
 }
 
-pub async fn user_register(db: Database, mut new_user: NewUser) -> GqlResult<User> {
+pub async fn user_register(db: Database, mut user_new: UserNew) -> GqlResult<User> {
     let coll = db.collection("users");
 
-    new_user.email = new_user.email.to_lowercase();
-    new_user.username = new_user.username.to_lowercase();
+    user_new.email = user_new.email.to_lowercase();
+    user_new.username = user_new.username.to_lowercase();
 
-    if self::get_user_by_email(db.clone(), &new_user.email).await.is_ok() {
+    if self::get_user_by_email(db.clone(), &user_new.email).await.is_ok() {
         Err(Error::new("email exists").extend_with(|_, e| e.set("details", "1_EMAIL_EXIStS")))
-    } else if self::get_user_by_username(db.clone(), &new_user.username).await.is_ok() {
+    } else if self::get_user_by_username(db.clone(), &user_new.username).await.is_ok() {
         Err(Error::new("username exists").extend_with(|_, e| e.set("details", "2_USERNAME_EXISTS")))
     } else {
-        new_user.cred = super::cred::cred_encode(&new_user.username, &new_user.cred).await;
-        let new_user_bson = bson::to_bson(&new_user).unwrap();
+        user_new.cred = super::cred::cred_encode(&user_new.username, &user_new.cred).await;
+        let user_new_bson = bson::to_bson(&user_new).unwrap();
 
-        if let bson::Bson::Document(document) = new_user_bson {
+        if let bson::Bson::Document(document) = user_new_bson {
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
                 .expect("Failed to insert into a MongoDB collection!");
 
-            self::get_user_by_email(db.clone(), &new_user.email).await
+            self::get_user_by_email(db.clone(), &user_new.email).await
         } else {
             Err(Error::new("5-register").extend_with(|_, e| {
                 e.set("details", "Error converting the BSON object into a MongoDB document")
@@ -75,7 +75,7 @@ pub async fn user_register(db: Database, mut new_user: NewUser) -> GqlResult<Use
     }
 }
 
-pub async fn user_sign_in(db: Database, unknown_user: NewUser) -> GqlResult<SignInfo> {
+pub async fn user_sign_in(db: Database, unknown_user: UserNew) -> GqlResult<SignInfo> {
     unknown_user.email.to_lowercase();
     unknown_user.username.to_lowercase();
 
@@ -122,7 +122,7 @@ pub async fn user_sign_in(db: Database, unknown_user: NewUser) -> GqlResult<Sign
     }
 }
 
-pub async fn all_users(db: Database, token: &str) -> GqlResult<Vec<User>> {
+pub async fn users_list(db: Database, token: &str) -> GqlResult<Vec<User>> {
     let token_data = token_data(token).await;
     if token_data.is_ok() {
         let coll = db.collection("users");
@@ -159,8 +159,8 @@ pub async fn all_users(db: Database, token: &str) -> GqlResult<Vec<User>> {
 // Change user password
 pub async fn user_change_password(
     db: Database,
-    cur_password: &str,
-    new_password: &str,
+    pwd_cur: &str,
+    pwd_new: &str,
     token: &str,
 ) -> GqlResult<User> {
     let token_data = token_data(token).await;
@@ -168,8 +168,8 @@ pub async fn user_change_password(
         let email = data.claims.email;
         let user_res = self::get_user_by_email(db.clone(), &email).await;
         if let Ok(mut user) = user_res {
-            if super::cred::cred_verify(&user.username, cur_password, &user.cred).await {
-                user.cred = super::cred::cred_encode(&user.username, new_password).await;
+            if super::cred::cred_verify(&user.username, pwd_cur, &user.cred).await {
+                user.cred = super::cred::cred_encode(&user.username, pwd_new).await;
 
                 let coll = db.collection("users");
                 coll.update_one(
@@ -196,7 +196,7 @@ pub async fn user_change_password(
 }
 
 // update user profile
-pub async fn user_update_profile(db: Database, new_user: NewUser, token: &str) -> GqlResult<User> {
+pub async fn user_update_profile(db: Database, user_new: UserNew, token: &str) -> GqlResult<User> {
     let token_data = token_data(token).await;
     if let Ok(data) = token_data {
         let email = data.claims.email;
@@ -204,8 +204,8 @@ pub async fn user_update_profile(db: Database, new_user: NewUser, token: &str) -
         if let Ok(mut user) = user_res {
             let coll = db.collection("users");
 
-            user.email = new_user.email.to_lowercase();
-            user.username = new_user.username.to_lowercase();
+            user.email = user_new.email.to_lowercase();
+            user.username = user_new.username.to_lowercase();
 
             let user_bson = bson::to_bson(&user).unwrap();
             let user_doc = user_bson.as_document().unwrap().to_owned();

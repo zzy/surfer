@@ -8,11 +8,11 @@
   <body>
     <h1>all users</h1>
     <ul>
-      {{#each allUsers as |u|}}
-        <li><b>{{u.username}}</b></li>
+      {{#each usersList as |ul|}}
+        <li><b>{{ul.username}}</b></li>
         <ul>
-          <li>{{ u.id }}</li>
-          <li>{{ u.email }}</li>
+          <li>{{ ul.id }}</li>
+          <li>{{ ul.email }}</li>
         </ul>
       {{/each}}
     </ul>

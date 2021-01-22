@@ -1,0 +1,24 @@
+mutation ArticleNew(
+  $userId: ObjectId!
+  $subject: String!,
+  $content: String!
+  $createdAt: DateTime!,
+  $updatedAt: DateTime!,
+  ) {
+  articleNew(
+    articleNew: {
+      userId: $userId
+      subject: $subject,
+      content: $content,
+      createdAt: $createdAt,
+      updatedAt: $updatedAt,
+    }
+  ) {
+    id
+    userId
+    subject
+    slug
+    content
+    published
+  }
+}

@@ -12,12 +12,25 @@ lazy_static! {
         let mut map = HashMap::new();
 
         map.insert(
+            "PROTOCOL",
+            dotenv::var("PROTOCOL").expect("Expected PROTOCOL to be set in env!"),
+        );
+        map.insert(
             "ADDRESS",
             dotenv::var("ADDRESS").expect("Expected ADDRESS to be set in env!"),
         );
         map.insert(
             "PORT",
             dotenv::var("PORT").expect("Expected PORT to be set in env!"),
+        );
+
+        map.insert(
+            "SITE_KEY",
+            dotenv::var("SITE_KEY").expect("Expected SITE_KEY to be set in env!"),
+        );
+        map.insert(
+            "CLAIM_EXP",
+            dotenv::var("CLAIM_EXP").expect("Expected CLAIM_EXP to be set in env!"),
         );
 
         map.insert(
@@ -36,15 +49,6 @@ lazy_static! {
         map.insert(
             "MONGODB_BLOG",
             dotenv::var("MONGODB_BLOG").expect("Expected MONGODB_BLOG to be set in env!"),
-        );
-
-        map.insert(
-            "SITE_KEY",
-            dotenv::var("SITE_KEY").expect("Expected SITE_KEY to be set in env!"),
-        );
-        map.insert(
-            "CLAIM_EXP",
-            dotenv::var("CLAIM_EXP").expect("Expected CLAIM_EXP to be set in env!"),
         );
 
         map

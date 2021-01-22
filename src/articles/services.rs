@@ -2,16 +2,18 @@ use futures::stream::StreamExt;
 use mongodb::Database;
 use bson::oid::ObjectId;
 use async_graphql::{Error, ErrorExtensions};
+use unicode_segmentation::UnicodeSegmentation;
+use pinyin::ToPinyin;
 
-use crate::util::constant::GqlResult;
-use crate::articles::models::{Article, NewArticle};
+use crate::util::{constant::GqlResult, common::base_uri};
+use crate::articles::models::{Article, ArticleNew};
 
-pub async fn add_article(db: Database, new_article: NewArticle) -> Article {
+pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
     let coll = db.collection("articles");
 
     let exist_document = coll
         .find_one(
-            bson::doc! {"user_id": &new_article.user_id,  "subject": &new_article.subject},
+            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -19,9 +21,24 @@ pub async fn add_article(db: Database, new_article: NewArticle) -> Article {
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let new_article_bson = bson::to_bson(&new_article).unwrap();
+        let subject_low = article_new.subject.to_lowercase();
+        let mut subject_seg: Vec<&str> = subject_low.unicode_words().collect();
+        for n in 0..subject_seg.len() {
+            let seg = subject_seg[n];
+            if !seg.is_ascii() {
+                let seg_py = seg.chars().next().unwrap().to_pinyin().unwrap().plain();
+                subject_seg[n] = seg_py;
+            }
+        }
+        let sub_slug = subject_seg.join("-");
+        let slug = format!("{}/articles/{}", base_uri().await, sub_slug);
 
-        if let bson::Bson::Document(document) = new_article_bson {
+        article_new.slug = slug;
+        article_new.published = false;
+
+        let article_new_bson = bson::to_bson(&article_new).unwrap();
+
+        if let bson::Bson::Document(document) = article_new_bson {
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -33,7 +50,7 @@ pub async fn add_article(db: Database, new_article: NewArticle) -> Article {
 
     let article_document = coll
         .find_one(
-            bson::doc! {"user_id": &new_article.user_id,  "subject": &new_article.subject},
+            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -44,7 +61,7 @@ pub async fn add_article(db: Database, new_article: NewArticle) -> Article {
     article
 }
 
-pub async fn all_articles(db: Database) -> GqlResult<Vec<Article>> {
+pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
     let coll = db.collection("articles");
 
     let mut articles: Vec<Article> = vec![];
@@ -72,7 +89,7 @@ pub async fn all_articles(db: Database) -> GqlResult<Vec<Article>> {
     }
 }
 
-pub async fn all_articles_by_user(db: Database, user_id: ObjectId) -> GqlResult<Vec<Article>> {
+pub async fn articles_by_user(db: Database, user_id: ObjectId) -> GqlResult<Vec<Article>> {
     let coll = db.collection("articles");
 
     let mut articles: Vec<Article> = vec![];

@@ -5,7 +5,7 @@ use crate::dbs::mongo::DataSource;
 use crate::util::constant::GqlResult;
 use crate::users::{
     self,
-    models::{User, NewUser, SignInfo},
+    models::{User, UserNew, SignInfo},
 };
 use crate::articles::{self, models::Article};
 
@@ -25,30 +25,30 @@ impl QueryRoot {
         users::services::get_user_by_username(db, &username).await
     }
 
-    async fn user_sign_in(&self, ctx: &Context<'_>, unknown_user: NewUser) -> GqlResult<SignInfo> {
+    async fn user_sign_in(&self, ctx: &Context<'_>, unknown_user: UserNew) -> GqlResult<SignInfo> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         users::services::user_sign_in(db, unknown_user).await
     }
 
     // Get all Users,
-    async fn all_users(&self, ctx: &Context<'_>, token: String) -> GqlResult<Vec<User>> {
+    async fn users_list(&self, ctx: &Context<'_>, token: String) -> GqlResult<Vec<User>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        users::services::all_users(db, &token).await
+        users::services::users_list(db, &token).await
     }
 
     // Get all articles
-    async fn all_articles(&self, ctx: &Context<'_>) -> GqlResult<Vec<Article>> {
+    async fn articles_list(&self, ctx: &Context<'_>) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        articles::services::all_articles(db).await
+        articles::services::articles_list(db).await
     }
 
     // Get all articles of one User
-    async fn all_articles_by_user(
+    async fn articles_by_user(
         &self,
         ctx: &Context<'_>,
         user_id: ObjectId,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        articles::services::all_articles_by_user(db, user_id).await
+        articles::services::articles_by_user(db, user_id).await
     }
 }

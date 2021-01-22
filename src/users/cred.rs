@@ -38,7 +38,7 @@ pub async fn cred_encode(username: &str, password: &str) -> String {
     base64::encode(&cred)
 }
 
-pub async fn cred_verify(username: &str, attempted_password: &str, actual_cred: &str) -> bool {
+pub async fn cred_verify(username: &str, pwd_try: &str, actual_cred: &str) -> bool {
     let salt = salt(username).await;
     let actual_cred_decode = base64::decode(actual_cred.as_bytes()).unwrap();
 
@@ -46,7 +46,7 @@ pub async fn cred_verify(username: &str, attempted_password: &str, actual_cred: 
         PBKDF2_ALG,
         NonZeroU32::new(100_000).unwrap(),
         &salt,
-        attempted_password.as_bytes(),
+        pwd_try.as_bytes(),
         &actual_cred_decode,
     )
     .is_ok()

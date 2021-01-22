@@ -9,8 +9,8 @@ mod users;
 mod articles;
 
 use crate::util::{constant::CFG, common::Tpl};
-use crate::articles::routes::articles_index;
-use crate::users::routes::users_index;
+use crate::articles::routes::{articles_list, article_new};
+use crate::users::routes::users_list;
 
 #[async_std::main]
 async fn main() -> Result<(), std::io::Error> {
@@ -22,8 +22,13 @@ async fn main() -> Result<(), std::io::Error> {
 
     //environment variables defined in .env file
     app.at("/").get(index);
-    app.at("users").get(users_index);
-    app.at("articles").get(articles_index);
+
+    let mut users = app.at("users");
+    users.at("list").get(users_list);
+
+    let mut articles = app.at("articles");
+    articles.at("list").get(articles_list);
+    articles.at("new").get(article_new);
 
     // app.at(ENV.get("GRAPHQL_PATH").unwrap()).post(async_graphql_tide::endpoint(schema));
     app.at(CFG.get("GRAPHQL_PATH").unwrap()).post(gql::graphql);

@@ -1,8 +1,0 @@
-query AllArticles {
-  allArticles {
-    id
-    userId
-    subject
-    website
-  }
-}

@@ -7,12 +7,18 @@ use tide::{
 
 use crate::util::constant::CFG;
 
-pub async fn gql_uri() -> String {
+pub async fn base_uri() -> String {
+    let protocal = CFG.get("PROTOCOL").unwrap();
     let address = CFG.get("ADDRESS").unwrap();
     let port = CFG.get("PORT").unwrap();
+
+    format!("{}://{}:{}", protocal, address, port)
+}
+
+pub async fn gql_uri() -> String {
     let gql_path = CFG.get("GRAPHQL_PATH").unwrap();
 
-    format!("http://{}:{}/{}", address, port, gql_path)
+    format!("{}/{}", self::base_uri().await, gql_path)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

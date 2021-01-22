@@ -10,30 +10,28 @@ type Article {
   id: ObjectId!
   userId: ObjectId!
   subject: String!
-  website: String!
+  slug: String!
+  content: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  published: Boolean!
 }
 
-type MutationRoot {
-  userRegister(newUser: NewUser!): User!
-  userChangePassword(
-    curPassword: String!
-    newPassword: String!
-    token: String!
-  ): User!
-  userUpdateProfile(newUser: NewUser!, token: String!): User!
-  addArticle(newArticle: NewArticle!): Article!
-}
-
-input NewArticle {
+input ArticleNew {
   userId: ObjectId!
   subject: String!
-  website: String!
+  content: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
-input NewUser {
-  email: String!
-  username: String!
-  cred: String!
+scalar DateTime
+
+type MutationRoot {
+  userRegister(userNew: UserNew!): User!
+  userChangePassword(pwdCur: String!, pwdNew: String!, token: String!): User!
+  userUpdateProfile(userNew: UserNew!, token: String!): User!
+  articleNew(articleNew: ArticleNew!): Article!
 }
 
 scalar ObjectId
@@ -41,10 +39,10 @@ scalar ObjectId
 type QueryRoot {
   getUserByEmail(email: String!): User!
   getUserByUsername(username: String!): User!
-  userSignIn(unknownUser: NewUser!): SignInfo!
-  allUsers(token: String!): [User!]!
-  allArticles: [Article!]!
-  allArticlesByUser(userId: ObjectId!): [Article!]!
+  userSignIn(unknownUser: UserNew!): SignInfo!
+  usersList(token: String!): [User!]!
+  articlesList: [Article!]!
+  articlesByUser(userId: ObjectId!): [Article!]!
 }
 
 type SignInfo {
@@ -57,5 +55,14 @@ type User {
   id: ObjectId!
   email: String!
   username: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  banned: Boolean!
   articles: [Article!]!
+}
+
+input UserNew {
+  email: String!
+  username: String!
+  cred: String!
 }

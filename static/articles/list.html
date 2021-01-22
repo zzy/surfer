@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>all articles</title>
+  </head>
+
+  <body>
+    <h1>all articles</h1>
+    <ul>
+      {{#each articlesList as |al|}}
+        <li><b>{{al.subject}}</b></li>
+        <ul>
+          <li>{{al.id}}</li>
+          <li>{{al.userId}}</li>
+          <li><a href="{{al.slug}}" target="_blank">{{al.slug}}</a></li>
+        </ul>
+      {{/each}}
+    </ul>
+
+  </body>
+
+</html>

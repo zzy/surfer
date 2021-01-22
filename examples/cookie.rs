@@ -1,5 +1,6 @@
 use cookie::Cookie;
 use time::{Duration, OffsetDateTime};
+use chrono::{Utc, Local, TimeZone};
 
 #[async_std::main]
 async fn main() {
@@ -15,4 +16,13 @@ async fn main() {
         .finish();
     println!("{:#?}\n", cookie);
     println!("{:#?}\n", cookie.name_value());
+
+    let now = Local::now();
+    println!("{}", &now);
+    println!("{}", Utc::now());
+
+    let dt = Utc.ymd(1970, 1, 1).and_hms_milli(0, 0, 1, 444);
+    let dt = Utc.ymd(2001, 9, 9).and_hms_milli(1, 46, 40, 555);
+
+    println!("{:?}", OffsetDateTime::now_utc());
 }

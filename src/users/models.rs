@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
-use bson::oid::ObjectId;
+use bson::{oid::ObjectId, DateTime};
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
-use crate::articles::{models::Article, services::all_articles_by_user};
+use crate::articles::{models::Article, services::articles_by_user};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
@@ -11,6 +11,9 @@ pub struct User {
     pub email: String,
     pub username: String,
     pub cred: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub banned: bool,
 }
 
 #[async_graphql::Object]
@@ -27,13 +30,25 @@ impl User {
         self.username.as_str()
     }
 
+    pub async fn created_at(&self) -> DateTime {
+        self.created_at
+    }
+
+    pub async fn updated_at(&self) -> DateTime {
+        self.updated_at
+    }
+
+    pub async fn banned(&self) -> bool {
+        self.banned
+    }
+
     pub async fn articles(&self, ctx: &async_graphql::Context<'_>) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        all_articles_by_user(db, self._id.clone()).await
+        articles_by_user(db, self._id.clone()).await
     }
 }
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
-pub struct NewUser {
+pub struct UserNew {
     pub email: String,
     pub username: String,
     pub cred: String,
