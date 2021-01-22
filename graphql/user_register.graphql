@@ -1,0 +1,24 @@
+mutation UserRegister(
+  $email: String!
+  $username: String!
+  $cred: String!
+  $createdAt: DateTime!
+  $updatedAt: DateTime!
+  ) {
+  userRegister(
+    userNew: {
+      email: $email
+      username: $username
+      cred: $cred
+      createdAt: $createdAt
+      updatedAt: $updatedAt
+    }
+  ) {
+    id
+    email
+    username
+    createdAt
+    updatedAt
+    banned
+  }
+}

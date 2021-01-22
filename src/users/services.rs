@@ -58,6 +58,8 @@ pub async fn user_register(db: Database, mut user_new: UserNew) -> GqlResult<Use
         Err(Error::new("username exists").extend_with(|_, e| e.set("details", "2_USERNAME_EXISTS")))
     } else {
         user_new.cred = super::cred::cred_encode(&user_new.username, &user_new.cred).await;
+        user_new.banned = false;
+
         let user_new_bson = bson::to_bson(&user_new).unwrap();
 
         if let bson::Bson::Document(document) = user_new_bson {

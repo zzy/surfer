@@ -39,15 +39,15 @@ struct ArticleNew;
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
 
-pub async fn article_new(_req: Request<State>) -> tide::Result {
-    let articles_index: Tpl = Tpl::new("articles/new").await;
+pub async fn article_register(_req: Request<State>) -> tide::Result {
+    let article_new_tpl: Tpl = Tpl::new("articles/new").await;
 
     let now = Local::now();
 
     // make data and render it
     let build_query = ArticleNew::build_query(article_new::Variables {
         user_id: "6007bf330013859f00f96fca".to_string(),
-        subject: "测试项目19 what hahah the fuck".to_string(),
+        subject: "测试项目100 what hahah the fuck".to_string(),
         content:
             "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
                 .to_string(),
@@ -61,5 +61,5 @@ pub async fn article_new(_req: Request<State>) -> tide::Result {
 
     let resp_data = resp_body.data.expect("missing response data");
 
-    articles_index.render(&resp_data).await
+    article_new_tpl.render(&resp_data).await
 }

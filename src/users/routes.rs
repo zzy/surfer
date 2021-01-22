@@ -1,6 +1,7 @@
 use graphql_client::{GraphQLQuery, Response};
 use tide::Request;
 use bson::oid::ObjectId;
+use chrono::Local;
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
@@ -27,4 +28,37 @@ pub async fn users_list(_req: Request<State>) -> tide::Result {
     let resp_data = resp_body.data.expect("missing response data");
 
     users_list_tpl.render(&resp_data).await
+}
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/user_register.graphql",
+    response_derives = "Debug"
+)]
+struct UserRegister;
+
+type DateTime = chrono::DateTime<Local>;
+
+pub async fn user_register(_req: Request<State>) -> tide::Result {
+    let user_new_tpl: Tpl = Tpl::new("users/new").await;
+
+    let now = Local::now();
+
+    // make data and render it
+    let build_query = UserRegister::build_query(user_register::Variables {
+        email: "test@budshome.com".to_string(),
+        username: "haha".to_string(),
+        cred: "budshome".to_string(),
+        created_at: now,
+        updated_at: now,
+    });
+    let query = serde_json::json!(build_query);
+
+    let resp_body: Response<serde_json::Value> =
+        surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
+
+    let resp_data = resp_body.data.expect("missing response data");
+
+    user_new_tpl.render(&resp_data).await
 }

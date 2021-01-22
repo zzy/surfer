@@ -5,8 +5,8 @@ use crate::State;
 use crate::util::{constant::CFG, common::Tpl};
 
 use crate::gql::{graphiql, graphql};
-use crate::articles::routes::{articles_list, article_new};
-use crate::users::routes::users_list;
+use crate::articles::routes::{articles_list, article_register};
+use crate::users::routes::{users_list, user_register};
 
 pub async fn push_routes(mut app_state: Server<State>) -> Server<State> {
     // let mut app_routes = app_state;
@@ -19,10 +19,11 @@ pub async fn push_routes(mut app_state: Server<State>) -> Server<State> {
 
     let mut users = app_state.at("users");
     users.at("list").get(users_list);
+    users.at("register").get(user_register);
 
     let mut articles = app_state.at("articles");
     articles.at("list").get(articles_list);
-    articles.at("new").get(article_new);
+    articles.at("new").get(article_register);
 
     app_state
 }

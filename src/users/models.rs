@@ -54,6 +54,7 @@ pub struct UserNew {
     pub cred: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
+    #[graphql(skip)]
     pub banned: bool,
 }
 

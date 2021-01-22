@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>all users</title>
+  </head>
+
+  <body>
+    <h1>all users</h1>
+    <ul>
+      {{#each usersList as |ul|}}
+        <li><b>{{ul.username}}</b></li>
+        <ul>
+          <li>{{ ul.id }}</li>
+          <li>{{ ul.email }}</li>
+        </ul>
+      {{/each}}
+    </ul>
+
+  </body>
+
+</html>
