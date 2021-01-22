@@ -26,7 +26,8 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
         for n in 0..subject_seg.len() {
             let seg = subject_seg[n];
             if !seg.is_ascii() {
-                let seg_py = seg.chars().next().unwrap().to_pinyin().unwrap().plain();
+                let seg_py =
+                    seg.chars().next().unwrap().to_pinyin().unwrap().plain();
                 subject_seg[n] = seg_py;
             }
         }
@@ -44,7 +45,9 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
                 .await
                 .expect("Failed to insert into a MongoDB collection!");
         } else {
-            println!("Error converting the BSON object into a MongoDB document");
+            println!(
+                "Error converting the BSON object into a MongoDB document"
+            );
         };
     }
 
@@ -57,7 +60,8 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
         .expect("Document not found")
         .unwrap();
 
-    let article: Article = bson::from_bson(bson::Bson::Document(article_document)).unwrap();
+    let article: Article =
+        bson::from_bson(bson::Bson::Document(article_document)).unwrap();
     article
 }
 
@@ -73,7 +77,8 @@ pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let article =
+                    bson::from_bson(bson::Bson::Document(document)).unwrap();
                 articles.push(article);
             }
             Err(error) => {
@@ -85,23 +90,29 @@ pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
     if articles.len() > 0 {
         Ok(articles)
     } else {
-        Err(Error::new("7-all-articles").extend_with(|_, e| e.set("details", "No records")))
+        Err(Error::new("7-all-articles")
+            .extend_with(|_, e| e.set("details", "No records")))
     }
 }
 
-pub async fn articles_by_user(db: Database, user_id: ObjectId) -> GqlResult<Vec<Article>> {
+pub async fn articles_by_user(
+    db: Database,
+    user_id: ObjectId,
+) -> GqlResult<Vec<Article>> {
     let coll = db.collection("articles");
 
     let mut articles: Vec<Article> = vec![];
 
     // Query all documents in the collection.
-    let mut cursor = coll.find(bson::doc! {"user_id": user_id}, None).await.unwrap();
+    let mut cursor =
+        coll.find(bson::doc! {"user_id": user_id}, None).await.unwrap();
 
     // Iterate over the results of the cursor.
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let article =
+                    bson::from_bson(bson::Bson::Document(document)).unwrap();
                 articles.push(article);
             }
             Err(error) => {

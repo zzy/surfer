@@ -16,7 +16,11 @@ pub struct MutationRoot;
 #[async_graphql::Object]
 impl MutationRoot {
     // Add new user
-    async fn user_register(&self, ctx: &Context<'_>, user_new: UserNew) -> GqlResult<User> {
+    async fn user_register(
+        &self,
+        ctx: &Context<'_>,
+        user_new: UserNew,
+    ) -> GqlResult<User> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         users::services::user_register(db, user_new).await
     }
@@ -30,7 +34,8 @@ impl MutationRoot {
         token: String,
     ) -> GqlResult<User> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        users::services::user_change_password(db, &pwd_cur, &pwd_new, &token).await
+        users::services::user_change_password(db, &pwd_cur, &pwd_new, &token)
+            .await
     }
 
     // update user profile
@@ -45,7 +50,11 @@ impl MutationRoot {
     }
 
     // Add new article
-    async fn article_new(&self, ctx: &Context<'_>, article_new: ArticleNew) -> Article {
+    async fn article_new(
+        &self,
+        ctx: &Context<'_>,
+        article_new: ArticleNew,
+    ) -> Article {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         articles::services::article_new(db, article_new).await
     }

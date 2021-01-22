@@ -42,7 +42,10 @@ impl User {
         self.banned
     }
 
-    pub async fn articles(&self, ctx: &async_graphql::Context<'_>) -> GqlResult<Vec<Article>> {
+    pub async fn articles(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         articles_by_user(db, self._id.clone()).await
     }

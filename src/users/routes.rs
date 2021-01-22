@@ -19,7 +19,9 @@ pub async fn users_list(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJlbWFpbCI6Im9rYTIyQGJ1ZHNob21lLmNvbSIsInVzZXJuYW1lIjoi5oiRMjJz6LCBMjRvazMyIiwiZXhwIjoxMDAwMDAwMDAwMH0.FUdYJeEL1eCfturVUoPYKaVG-m4e-Jl3YJviYg1b8O9hKw2rrH7HKZED0gDT4i5lKbI9VTfbI0Qu4Tt3apwpOw";
-    let build_query = UsersList::build_query(users_list::Variables { token: token.to_string() });
+    let build_query = UsersList::build_query(users_list::Variables {
+        token: token.to_string(),
+    });
     let query = serde_json::json!(build_query);
 
     let resp_body: Response<serde_json::Value> =

@@ -19,7 +19,11 @@ async fn main() -> Result<(), std::io::Error> {
     app_state = push_routes(app_state).await;
 
     app_state
-        .listen(format!("{}:{}", CFG.get("ADDRESS").unwrap(), CFG.get("PORT").unwrap()))
+        .listen(format!(
+            "{}:{}",
+            CFG.get("ADDRESS").unwrap(),
+            CFG.get("PORT").unwrap()
+        ))
         .await?;
 
     Ok(())

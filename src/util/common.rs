@@ -1,5 +1,7 @@
 use serde::{Serialize, Deserialize};
-use jsonwebtoken::{decode, TokenData, Algorithm, DecodingKey, Validation, errors::Error};
+use jsonwebtoken::{
+    decode, TokenData, Algorithm, DecodingKey, Validation, errors::Error,
+};
 use tide::{
     Response, StatusCode, Body,
     {http::mime::HTML},
@@ -65,7 +67,9 @@ impl Tpl {
     {
         let mut resp = Response::new(StatusCode::Ok);
         resp.set_content_type(HTML);
-        resp.set_body(Body::from_string(self.reg.render(&self.name, data).unwrap()));
+        resp.set_body(Body::from_string(
+            self.reg.render(&self.name, data).unwrap(),
+        ));
 
         Ok(resp.into())
     }

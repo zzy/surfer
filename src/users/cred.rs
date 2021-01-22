@@ -8,11 +8,12 @@ static PBKDF2_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
 async fn salt(username: &str) -> Vec<u8> {
     let salt_component: [u8; 16] = [
         // This value was generated from a secure PRNG.
-        0xd6, 0x26, 0x98, 0xda, 0xf4, 0xdc, 0x50, 0x52, 0x24, 0xf2, 0x27, 0xd1, 0xfe, 0x39, 0x01,
-        0x8a,
+        0xd6, 0x26, 0x98, 0xda, 0xf4, 0xdc, 0x50, 0x52, 0x24, 0xf2, 0x27, 0xd1,
+        0xfe, 0x39, 0x01, 0x8a,
     ];
 
-    let mut salt = Vec::with_capacity(salt_component.len() + username.as_bytes().len());
+    let mut salt =
+        Vec::with_capacity(salt_component.len() + username.as_bytes().len());
 
     salt.extend(salt_component.as_ref());
     salt.extend(username.as_bytes());
@@ -38,7 +39,11 @@ pub async fn cred_encode(username: &str, password: &str) -> String {
     base64::encode(&cred)
 }
 
-pub async fn cred_verify(username: &str, pwd_try: &str, actual_cred: &str) -> bool {
+pub async fn cred_verify(
+    username: &str,
+    pwd_try: &str,
+    actual_cred: &str,
+) -> bool {
     let salt = salt(username).await;
     let actual_cred_decode = base64::decode(actual_cred.as_bytes()).unwrap();
 
