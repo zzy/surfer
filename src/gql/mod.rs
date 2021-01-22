@@ -44,9 +44,7 @@ pub async fn graphql(req: Request<State>) -> tide::Result {
 
 pub async fn graphiql(_: Request<State>) -> tide::Result {
     let mut resp = Response::new(StatusCode::Ok);
-    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(
-        CFG.get("GRAPHQL_PATH").unwrap(),
-    )));
+    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(CFG.get("GRAPHQL_VER").unwrap())));
     resp.set_content_type(mime::HTML);
 
     Ok(resp.into())

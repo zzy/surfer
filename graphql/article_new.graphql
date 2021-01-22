@@ -1,17 +1,17 @@
 mutation ArticleNew(
   $userId: ObjectId!
-  $subject: String!,
+  $subject: String!
   $content: String!
-  $createdAt: DateTime!,
-  $updatedAt: DateTime!,
+  $createdAt: DateTime!
+  $updatedAt: DateTime!
   ) {
   articleNew(
     articleNew: {
       userId: $userId
-      subject: $subject,
-      content: $content,
-      createdAt: $createdAt,
-      updatedAt: $updatedAt,
+      subject: $subject
+      content: $content
+      createdAt: $createdAt
+      updatedAt: $updatedAt
     }
   ) {
     id

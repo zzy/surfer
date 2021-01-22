@@ -1,4 +1,6 @@
-query UsersList($token: String!) {
+query UsersList(
+  $token: String!
+  ) {
   usersList(
     token: $token
   ) {

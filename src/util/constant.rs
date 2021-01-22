@@ -34,12 +34,16 @@ lazy_static! {
         );
 
         map.insert(
-            "GRAPHQL_PATH",
-            dotenv::var("GRAPHQL_PATH").expect("Expected GRAPHQL_PATH to be set in env!"),
+            "GRAPHQL_URI",
+            dotenv::var("GRAPHQL_URI").expect("Expected GRAPHQL_URI to be set in env!"),
         );
         map.insert(
-            "GRAPHIQL_PATH",
-            dotenv::var("GRAPHIQL_PATH").expect("Expected GRAPHIQL_PATH to be set in env!"),
+            "GRAPHQL_VER",
+            dotenv::var("GRAPHQL_VER").expect("Expected GRAPHQL_VER to be set in env!"),
+        );
+        map.insert(
+            "GRAPHIQL_VER",
+            dotenv::var("GRAPHIQL_VER").expect("Expected GRAPHIQL_VER to be set in env!"),
         );
 
         map.insert(

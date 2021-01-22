@@ -75,9 +75,9 @@ pub async fn user_register(db: Database, mut user_new: UserNew) -> GqlResult<Use
     }
 }
 
-pub async fn user_sign_in(db: Database, unknown_user: UserNew) -> GqlResult<SignInfo> {
-    unknown_user.email.to_lowercase();
-    unknown_user.username.to_lowercase();
+pub async fn user_sign_in(db: Database, mut unknown_user: UserNew) -> GqlResult<SignInfo> {
+    unknown_user.email = unknown_user.email.to_lowercase();
+    unknown_user.username = unknown_user.username.to_lowercase();
 
     let user_res;
     match regex::Regex::new(r"(@)").unwrap().is_match(&unknown_user.email) {

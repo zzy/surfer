@@ -52,6 +52,9 @@ pub struct UserNew {
     pub email: String,
     pub username: String,
     pub cred: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub banned: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

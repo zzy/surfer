@@ -16,9 +16,10 @@ pub async fn base_uri() -> String {
 }
 
 pub async fn gql_uri() -> String {
-    let gql_path = CFG.get("GRAPHQL_PATH").unwrap();
+    let gql_uri = CFG.get("GRAPHQL_URI").unwrap();
+    let gql_path = CFG.get("GRAPHQL_VER").unwrap();
 
-    format!("{}/{}", self::base_uri().await, gql_path)
+    format!("{}/{}/{}", self::base_uri().await, gql_uri, gql_path)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
