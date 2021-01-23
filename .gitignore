@@ -6,4 +6,3 @@
 **/*.rs.bk
 
 .env
-/examples/

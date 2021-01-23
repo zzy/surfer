@@ -2,7 +2,6 @@ use graphql_client::{GraphQLQuery, Response};
 use tide::Request;
 use chrono::Local;
 
-use crate::State;
 use crate::util::common::{gql_uri, Tpl};
 
 #[derive(GraphQLQuery)]

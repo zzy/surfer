@@ -3,7 +3,6 @@ use tide::Request;
 use bson::oid::ObjectId;
 use chrono::Local;
 
-use crate::State;
 use crate::util::common::{gql_uri, Tpl};
 
 #[derive(GraphQLQuery)]

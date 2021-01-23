@@ -1,7 +1,6 @@
 use tide::{self, Server, Request};
 use serde_json::json;
 
-use crate::State;
 use crate::util::{constant::CFG, common::Tpl};
 
 use crate::gql::{graphiql, graphql};
@@ -9,7 +8,8 @@ use crate::articles::routes::{articles_list, article_register};
 use crate::users::routes::{users_list, user_register};
 
 pub async fn push_routes(mut app_state: Server<State>) -> Server<State> {
-    // let mut app_routes = app_state;
+    app_state.at("/static").serve_dir("static").unwrap();
+
     app_state.at("/").get(index);
 
     let mut gql = app_state.at(CFG.get("GRAPHQL_URI").unwrap());
