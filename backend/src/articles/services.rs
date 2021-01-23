@@ -5,7 +5,7 @@ use async_graphql::{Error, ErrorExtensions};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
-use crate::util::{constant::GqlResult, common::base_uri};
+use crate::util::{constant::GqlResult, common::web_base_uri};
 use crate::articles::models::{Article, ArticleNew};
 
 pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
@@ -32,7 +32,7 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
             }
         }
         let sub_slug = subject_seg.join("-");
-        let slug = format!("{}/articles/{}", base_uri().await, sub_slug);
+        let slug = format!("{}/articles/{}", web_base_uri().await, sub_slug);
 
         article_new.slug = slug;
         article_new.published = false;

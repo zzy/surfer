@@ -594,6 +594,8 @@ name = "blog-frontend"
 version = "0.0.1"
 dependencies = [
  "async-std",
+ "chrono",
+ "cookie",
  "dotenv",
  "graphql_client",
  "handlebars",
@@ -603,6 +605,7 @@ dependencies = [
  "serde_json",
  "surf",
  "tide",
+ "time 0.2.24",
 ]
 
 [[package]]

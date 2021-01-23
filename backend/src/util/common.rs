@@ -5,12 +5,12 @@ use jsonwebtoken::{
 
 use crate::util::constant::CFG;
 
-pub async fn base_uri() -> String {
-    let protocal = CFG.get("PROTOCOL").unwrap();
-    let address = CFG.get("ADDRESS").unwrap();
-    let port = CFG.get("PORT").unwrap();
+pub async fn web_base_uri() -> String {
+    let web_prot = CFG.get("WEB_PROT").unwrap();
+    let web_addr = CFG.get("WEB_ADDR").unwrap();
+    let web_port = CFG.get("WEB_PORT").unwrap();
 
-    format!("{}://{}:{}", protocal, address, port)
+    format!("{}://{}:{}", web_prot, web_addr, web_port)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

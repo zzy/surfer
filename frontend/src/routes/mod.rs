@@ -1,31 +1,31 @@
 use tide::{self, Server, Request};
 use serde_json::json;
 
-use crate::util::{constant::CFG, common::Tpl};
+pub mod users;
+pub mod articles;
 
-use crate::gql::{graphiql, graphql};
-use crate::articles::routes::{articles_list, article_register};
-use crate::users::routes::{users_list, user_register};
+use crate::State;
+use crate::util::common::Tpl;
 
-pub async fn push_routes(mut app_state: Server<State>) -> Server<State> {
-    app_state.at("/static").serve_dir("static").unwrap();
+use crate::routes::{
+    users::{users_list, user_register},
+    articles::{articles_list, article_new},
+};
 
-    app_state.at("/").get(index);
+pub async fn push_res(mut app: Server<State>) -> Server<State> {
+    app.at("/static").serve_dir("static").unwrap();
 
-    let mut gql = app_state.at(CFG.get("GRAPHQL_URI").unwrap());
-    // app.at(ENV.get("GRAPHQL_VER").unwrap()).post(async_graphql_tide::endpoint(schema));
-    gql.at(CFG.get("GRAPHQL_VER").unwrap()).post(graphql);
-    gql.at(CFG.get("GRAPHIQL_VER").unwrap()).get(graphiql);
+    app.at("/").get(index);
 
-    let mut users = app_state.at("users");
+    let mut users = app.at("users");
     users.at("list").get(users_list);
     users.at("register").get(user_register);
 
-    let mut articles = app_state.at("articles");
+    let mut articles = app.at("articles");
     articles.at("list").get(articles_list);
-    articles.at("new").get(article_register);
+    articles.at("new").get(article_new);
 
-    app_state
+    app
 }
 
 async fn index(_req: Request<State>) -> tide::Result {

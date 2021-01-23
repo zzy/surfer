@@ -1,9 +1,12 @@
 use graphql_client::{GraphQLQuery, Response};
 use tide::Request;
-use bson::oid::ObjectId;
 use chrono::Local;
 
+use crate::State;
 use crate::util::common::{gql_uri, Tpl};
+
+type ObjectId = String;
+type DateTime = chrono::DateTime<Local>;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -39,8 +42,6 @@ pub async fn users_list(_req: Request<State>) -> tide::Result {
 )]
 struct UserRegister;
 
-type DateTime = chrono::DateTime<Local>;
-
 pub async fn user_register(_req: Request<State>) -> tide::Result {
     let user_new_tpl: Tpl = Tpl::new("users/new").await;
 
@@ -48,8 +49,8 @@ pub async fn user_register(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = UserRegister::build_query(user_register::Variables {
-        email: "test@budshome.com".to_string(),
-        username: "haha".to_string(),
+        email: "test2@budshome.com".to_string(),
+        username: "haha2".to_string(),
         cred: "budshome".to_string(),
         created_at: now,
         updated_at: now,

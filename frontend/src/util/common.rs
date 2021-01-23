@@ -1,7 +1,4 @@
-use serde::{Serialize, Deserialize};
-use jsonwebtoken::{
-    decode, TokenData, Algorithm, DecodingKey, Validation, errors::Error,
-};
+use serde::Serialize;
 use tide::{
     Response, StatusCode, Body,
     {http::mime::HTML},
@@ -9,38 +6,14 @@ use tide::{
 
 use crate::util::constant::CFG;
 
-pub async fn base_uri() -> String {
-    let protocal = CFG.get("PROTOCOL").unwrap();
-    let address = CFG.get("ADDRESS").unwrap();
-    let port = CFG.get("PORT").unwrap();
-
-    format!("{}://{}:{}", protocal, address, port)
-}
-
 pub async fn gql_uri() -> String {
-    let gql_uri = CFG.get("GRAPHQL_URI").unwrap();
-    let gql_path = CFG.get("GRAPHQL_VER").unwrap();
+    let gql_prot = CFG.get("GQL_PROT").unwrap();
+    let gql_addr = CFG.get("GQL_ADDR").unwrap();
+    let gql_port = CFG.get("GQL_PORT").unwrap();
+    let gql_uri = CFG.get("GQL_URI").unwrap();
+    let gql_path = CFG.get("GQL_VER").unwrap();
 
-    format!("{}/{}/{}", self::base_uri().await, gql_uri, gql_path)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub email: String,
-    pub username: String,
-    pub exp: usize,
-}
-
-pub async fn token_data(token: &str) -> Result<TokenData<Claims>, Error> {
-    let site_key = CFG.get("SITE_KEY").unwrap().as_bytes();
-
-    let data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(site_key),
-        &Validation::new(Algorithm::HS512),
-    );
-
-    data
+    format!("{}://{}:{}/{}/{}", gql_prot, gql_addr, gql_port, gql_uri, gql_path)
 }
 
 pub struct Tpl {
@@ -51,7 +24,7 @@ pub struct Tpl {
 impl Tpl {
     pub async fn new(rel_path: &str) -> Tpl {
         let tpl_name = &rel_path.replace("/", "_");
-        let abs_path = format!("./static/{}.html", rel_path);
+        let abs_path = format!("./templates/{}.html", rel_path);
 
         // create the handlebars registry
         let mut hbs_reg = handlebars::Handlebars::new();

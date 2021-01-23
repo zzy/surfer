@@ -35,11 +35,11 @@ cd blog-rs
 Put the environment variables into a `.env` file:
 
 ```
-ADDRESS=127.0.0.1
+ADDR=127.0.0.1
 PORT=8080
 
-GRAPHQL_VER=graphql
-GRAPHIQL_VER=graphiql
+GQL_VER=graphql
+GIQL_VER=graphiql
 
 MONGODB_URI=mongodb://mongo:mongo@127.0.0.1:27017
 MONGODB_BLOG=blog

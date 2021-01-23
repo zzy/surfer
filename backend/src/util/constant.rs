@@ -12,12 +12,25 @@ lazy_static! {
         let mut map = HashMap::new();
 
         map.insert(
-            "ADDRESS",
-            dotenv::var("ADDRESS").expect("Expected ADDRESS to be set in env!"),
+            "ADDR",
+            dotenv::var("ADDR").expect("Expected ADDR to be set in env!"),
         );
         map.insert(
             "PORT",
             dotenv::var("PORT").expect("Expected PORT to be set in env!"),
+        );
+
+        map.insert(
+            "WEB_PROT",
+            dotenv::var("WEB_PROT").expect("Expected WEB_PROT to be set in env!"),
+        );
+        map.insert(
+            "WEB_ADDR",
+            dotenv::var("WEB_ADDR").expect("Expected WEB_ADDR to be set in env!"),
+        );
+        map.insert(
+            "WEB_PORT",
+            dotenv::var("WEB_PORT").expect("Expected WEB_PORT to be set in env!"),
         );
 
         map.insert(
@@ -30,16 +43,16 @@ lazy_static! {
         );
 
         map.insert(
-            "GRAPHQL_URI",
-            dotenv::var("GRAPHQL_URI").expect("Expected GRAPHQL_URI to be set in env!"),
+            "GQL_URI",
+            dotenv::var("GQL_URI").expect("Expected GQL_URI to be set in env!"),
         );
         map.insert(
-            "GRAPHQL_VER",
-            dotenv::var("GRAPHQL_VER").expect("Expected GRAPHQL_VER to be set in env!"),
+            "GQL_VER",
+            dotenv::var("GQL_VER").expect("Expected GQL_VER to be set in env!"),
         );
         map.insert(
-            "GRAPHIQL_VER",
-            dotenv::var("GRAPHIQL_VER").expect("Expected GRAPHIQL_VER to be set in env!"),
+            "GIQL_VER",
+            dotenv::var("GIQL_VER").expect("Expected GIQL_VER to be set in env!"),
         );
 
         map.insert(

@@ -2,8 +2,8 @@
 *~
 *.swp
 
-/target/
+target
 **/*.rs.bk
 
 .env
-/examples/
+examples
