@@ -20,6 +20,10 @@ pub async fn tpl_dir() -> String {
     format!("./{}/", "templates")
 }
 
+pub async fn rhai_dir() -> String {
+    format!("./{}/", "rhai")
+}
+
 pub struct Tpl<'tpl> {
     pub name: String,
     pub reg: handlebars::Handlebars<'tpl>,

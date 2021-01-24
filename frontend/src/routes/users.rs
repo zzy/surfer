@@ -3,7 +3,7 @@ use tide::Request;
 use chrono::Local;
 
 use crate::State;
-use crate::util::common::{gql_uri, tpl_dir, Tpl};
+use crate::util::common::{gql_uri, rhai_dir, Tpl};
 
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
@@ -80,8 +80,8 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
     user_tpl
         .reg
         .register_script_helper_file(
-            "website",
-            format!("{}{}", tpl_dir().await, "users/goals.rhai"),
+            "website-svg",
+            format!("{}{}", rhai_dir().await, "website-svg.rhai"),
         )
         .unwrap();
 
