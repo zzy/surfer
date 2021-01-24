@@ -7,6 +7,9 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 ## Features
 
 - [x] User management, and salt and hash a password with PBKDF2 - 使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算
+- [x] Article management: write and read
+- [ ] Tags
+- [ ] Archives
 - [ ] ...
 
 ## Stacks
@@ -18,6 +21,7 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 - [Surf](https://crates.io/crates/surf)
 - [graphql_client](https://crates.io/crates/graphql_client)
 - [handlebars-rust](https://crates.io/crates/handlebars)
+- [rhai](https://crates.io/crates/rhai) - Embedded Scripting for Rust
 - [jsonwebtoken](https://crates.io/crates/jsonwebtoken)
 - [cookie-rs](https://crates.io/crates/cookie)
 

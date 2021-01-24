@@ -1407,6 +1407,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "quick-error 2.0.0",
+ "rhai",
  "serde",
  "serde_json",
 ]
@@ -1587,6 +1588,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
 dependencies = [
  "cfg-if 1.0.0",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2475,6 +2479,18 @@ checksum = "52e44394d2086d010551b14b53b1f24e31647570cd1deb0379e2c21b329aba00"
 dependencies = [
  "hostname",
  "quick-error 1.2.3",
+]
+
+[[package]]
+name = "rhai"
+version = "0.18.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce6b581cc1ca2445d3eb409358dc703f296ac1cc22b0b064c02a15be82d515ad"
+dependencies = [
+ "instant",
+ "num-traits",
+ "serde",
+ "smallvec",
 ]
 
 [[package]]

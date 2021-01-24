@@ -3,7 +3,7 @@ use tide::Request;
 use chrono::Local;
 
 use crate::State;
-use crate::util::common::{gql_uri, Tpl};
+use crate::util::common::{gql_uri, tpl_dir, Tpl};
 
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
@@ -76,7 +76,14 @@ pub async fn user_register(_req: Request<State>) -> tide::Result {
 struct UserByUsername;
 
 pub async fn user_index(req: Request<State>) -> tide::Result {
-    let user_new_tpl: Tpl = Tpl::new("users/index").await;
+    let mut user_tpl: Tpl = Tpl::new("users/index").await;
+    user_tpl
+        .reg
+        .register_script_helper_file(
+            "website",
+            format!("{}{}", tpl_dir().await, "users/goals.rhai"),
+        )
+        .unwrap();
 
     let username = req.param("username").unwrap();
 
@@ -92,5 +99,5 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
 
     let resp_data = resp_body.data.expect("missing response data");
 
-    user_new_tpl.render(&resp_data).await
+    user_tpl.render(&resp_data).await
 }

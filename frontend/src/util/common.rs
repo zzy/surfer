@@ -16,15 +16,19 @@ pub async fn gql_uri() -> String {
     format!("{}://{}:{}/{}/{}", gql_prot, gql_addr, gql_port, gql_uri, gql_path)
 }
 
-pub struct Tpl {
-    pub name: String,
-    pub reg: handlebars::Handlebars<'static>,
+pub async fn tpl_dir() -> String {
+    format!("./{}/", "templates")
 }
 
-impl Tpl {
-    pub async fn new(rel_path: &str) -> Tpl {
+pub struct Tpl<'tpl> {
+    pub name: String,
+    pub reg: handlebars::Handlebars<'tpl>,
+}
+
+impl<'tpl> Tpl<'tpl> {
+    pub async fn new(rel_path: &str) -> Tpl<'tpl> {
         let tpl_name = &rel_path.replace("/", "_");
-        let abs_path = format!("./templates/{}.html", rel_path);
+        let abs_path = format!("{}{}.html", tpl_dir().await, rel_path);
 
         // create the handlebars registry
         let mut hbs_reg = handlebars::Handlebars::new();
