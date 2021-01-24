@@ -8,7 +8,7 @@ use crate::State;
 use crate::util::common::Tpl;
 
 use crate::routes::{
-    users::{users_list, user_register},
+    users::{users_list, user_register, user_index},
     articles::{articles_list, article_new},
 };
 
@@ -25,6 +25,7 @@ pub async fn push_res(mut app: Server<State>) -> Server<State> {
     app.at("/").serve_dir("static").unwrap();
 
     app.at("/").get(index);
+    app.at("/:username").get(user_index);
 
     let mut users = app.at("users");
     users.at("list").get(users_list);

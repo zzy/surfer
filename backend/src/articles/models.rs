@@ -11,7 +11,7 @@ pub struct Article {
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub published: bool,
-    pub top:bool,
+    pub top: bool,
     pub recommended: bool,
 }
 
@@ -70,7 +70,7 @@ pub struct ArticleNew {
     #[graphql(skip)]
     pub published: bool,
     #[graphql(skip)]
-    pub top:bool,
+    pub top: bool,
     #[graphql(skip)]
     pub recommended: bool,
 }

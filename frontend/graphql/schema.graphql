@@ -15,6 +15,8 @@ type Article {
   createdAt: DateTime!
   updatedAt: DateTime!
   published: Boolean!
+  top: Boolean!
+  recommended: Boolean!
 }
 
 input ArticleNew {
@@ -37,8 +39,8 @@ type MutationRoot {
 scalar ObjectId
 
 type QueryRoot {
-  getUserByEmail(email: String!): User!
-  getUserByUsername(username: String!): User!
+  userByEmail(email: String!): User!
+  userByUsername(username: String!): User!
   userSignIn(unknownUser: UserNew!): SignInfo!
   usersList(token: String!): [User!]!
   articlesList: [Article!]!
@@ -55,6 +57,8 @@ type User {
   id: ObjectId!
   email: String!
   username: String!
+  blogName: String!
+  website: String!
   createdAt: DateTime!
   updatedAt: DateTime!
   banned: Boolean!
@@ -65,4 +69,8 @@ input UserNew {
   email: String!
   username: String!
   cred: String!
+  blogName: String!
+  website: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }

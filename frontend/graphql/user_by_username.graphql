@@ -1,0 +1,29 @@
+query UserByUsername(
+  $username: String!
+  ) {
+  userByUsername(
+      username: $username
+  ) {
+    id
+    email
+    username
+    blogName
+    website
+    createdAt
+    updatedAt
+    banned
+
+    articles {
+      id
+      userId
+      subject
+      slug
+      content
+      createdAt
+      updatedAt
+      published
+      top
+      recommended
+    }
+  }
+}

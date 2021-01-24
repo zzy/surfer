@@ -49,12 +49,42 @@ pub async fn user_register(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = UserRegister::build_query(user_register::Variables {
-        email: "test2@budshome.com".to_string(),
-        username: "haha2".to_string(),
+        email: "test@budshome.com".to_string(),
+        username: "haha".to_string(),
         cred: "budshome".to_string(),
+        blog_name: "默默爸".to_string(),
+        website: "https://github.com/zzy".to_string(),
         created_at: now,
         updated_at: now,
     });
+    let query = serde_json::json!(build_query);
+
+    let resp_body: Response<serde_json::Value> =
+        surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
+
+    let resp_data = resp_body.data.expect("missing response data");
+
+    user_new_tpl.render(&resp_data).await
+}
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/user_by_username.graphql",
+    response_derives = "Debug"
+)]
+struct UserByUsername;
+
+pub async fn user_index(req: Request<State>) -> tide::Result {
+    let user_new_tpl: Tpl = Tpl::new("users/index").await;
+
+    let username = req.param("username").unwrap();
+
+    // make data and render it
+    let build_query =
+        UserByUsername::build_query(user_by_username::Variables {
+            username: username.to_string(),
+        });
     let query = serde_json::json!(build_query);
 
     let resp_body: Response<serde_json::Value> =

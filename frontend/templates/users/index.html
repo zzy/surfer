@@ -2,7 +2,7 @@
 <html lang="zh">
 
   <head>
-    <title>{{ title }} - https://github.com/zzy/blog-rs</title>
+    <title>{{ userByUsername.username }} - https://github.com/zzy/blog-rs</title>
 
     <link rel="icon" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.png">
@@ -18,6 +18,13 @@
   </head>
 
   <body>
+
+{{#with userByUsername as |user|}}
+<ul>{{user.slug}}</ul>
+{{#each user.articles as |article|}}
+{{article.slug}}
+{{/each}}
+{{/with}}
 
     <div class="container">
       <header class="blog-header py-3">

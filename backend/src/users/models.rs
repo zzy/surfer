@@ -11,6 +11,8 @@ pub struct User {
     pub email: String,
     pub username: String,
     pub cred: String,
+    pub blog_name: String,
+    pub website: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub banned: bool,
@@ -28,6 +30,14 @@ impl User {
 
     pub async fn username(&self) -> &str {
         self.username.as_str()
+    }
+
+    pub async fn blog_name(&self) -> &str {
+        self.blog_name.as_str()
+    }
+
+    pub async fn website(&self) -> &str {
+        self.website.as_str()
     }
 
     pub async fn created_at(&self) -> DateTime {
@@ -55,6 +65,8 @@ pub struct UserNew {
     pub email: String,
     pub username: String,
     pub cred: String,
+    pub blog_name: String,
+    pub website: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     #[graphql(skip)]

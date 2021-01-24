@@ -10,7 +10,7 @@ use crate::util::{
 use crate::users::models::{User, UserNew, SignInfo};
 
 // get user info by email
-pub async fn get_user_by_email(db: Database, email: &str) -> GqlResult<User> {
+pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
     let coll = db.collection("users");
 
     let exist_document = coll.find_one(bson::doc! {"email": email}, None).await;
@@ -31,10 +31,7 @@ pub async fn get_user_by_email(db: Database, email: &str) -> GqlResult<User> {
 }
 
 // get user info by username
-pub async fn get_user_by_username(
-    db: Database,
-    username: &str,
-) -> GqlResult<User> {
+pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
     let coll = db.collection("users");
 
     let exist_document =
@@ -64,10 +61,10 @@ pub async fn user_register(
     user_new.email = user_new.email.to_lowercase();
     user_new.username = user_new.username.to_lowercase();
 
-    if self::get_user_by_email(db.clone(), &user_new.email).await.is_ok() {
+    if self::user_by_email(db.clone(), &user_new.email).await.is_ok() {
         Err(Error::new("email exists")
             .extend_with(|_, e| e.set("details", "1_EMAIL_EXIStS")))
-    } else if self::get_user_by_username(db.clone(), &user_new.username)
+    } else if self::user_by_username(db.clone(), &user_new.username)
         .await
         .is_ok()
     {
@@ -86,7 +83,7 @@ pub async fn user_register(
                 .await
                 .expect("Failed to insert into a MongoDB collection!");
 
-            self::get_user_by_email(db.clone(), &user_new.email).await
+            self::user_by_email(db.clone(), &user_new.email).await
         } else {
             Err(Error::new("5-register").extend_with(|_, e| {
                 e.set(
@@ -109,11 +106,11 @@ pub async fn user_sign_in(
     match regex::Regex::new(r"(@)").unwrap().is_match(&unknown_user.email) {
         true => {
             user_res =
-                self::get_user_by_email(db.clone(), &unknown_user.email).await;
+                self::user_by_email(db.clone(), &unknown_user.email).await;
         }
         false => {
             user_res =
-                self::get_user_by_username(db.clone(), &unknown_user.username)
+                self::user_by_username(db.clone(), &unknown_user.username)
                     .await;
         }
     }
@@ -225,7 +222,7 @@ pub async fn user_change_password(
     let token_data = token_data(token).await;
     if let Ok(data) = token_data {
         let email = data.claims.email;
-        let user_res = self::get_user_by_email(db.clone(), &email).await;
+        let user_res = self::user_by_email(db.clone(), &email).await;
         if let Ok(mut user) = user_res {
             if super::cred::cred_verify(&user.username, pwd_cur, &user.cred)
                 .await
@@ -268,7 +265,7 @@ pub async fn user_update_profile(
     let token_data = token_data(token).await;
     if let Ok(data) = token_data {
         let email = data.claims.email;
-        let user_res = self::get_user_by_email(db.clone(), &email).await;
+        let user_res = self::user_by_email(db.clone(), &email).await;
         if let Ok(mut user) = user_res {
             let coll = db.collection("users");
 

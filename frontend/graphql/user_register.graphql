@@ -2,6 +2,8 @@ mutation UserRegister(
   $email: String!
   $username: String!
   $cred: String!
+  $blogName: String!
+  $website: String!
   $createdAt: DateTime!
   $updatedAt: DateTime!
   ) {
@@ -10,6 +12,8 @@ mutation UserRegister(
       email: $email
       username: $username
       cred: $cred
+      blogName: $blogName
+      website: $website
       createdAt: $createdAt
       updatedAt: $updatedAt
     }
@@ -17,6 +21,8 @@ mutation UserRegister(
     id
     email
     username
+    blogName
+    website
     createdAt
     updatedAt
     banned
