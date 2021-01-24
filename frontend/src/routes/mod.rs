@@ -12,6 +12,15 @@ use crate::routes::{
     articles::{articles_list, article_new},
 };
 
+async fn index(_req: Request<State>) -> tide::Result {
+    let index: Tpl = Tpl::new("index").await;
+
+    // make data and render it
+    let data = json!({"title": "blog-rs", "app_name": "默默爸"});
+
+    index.render(&data).await
+}
+
 pub async fn push_res(mut app: Server<State>) -> Server<State> {
     app.at("/").serve_dir("static").unwrap();
 
@@ -26,13 +35,4 @@ pub async fn push_res(mut app: Server<State>) -> Server<State> {
     articles.at("new").get(article_new);
 
     app
-}
-
-async fn index(_req: Request<State>) -> tide::Result {
-    let index: Tpl = Tpl::new("index").await;
-
-    // make data and render it
-    let data = json!({"app_name": "blog-rs", "author": "zzy"});
-
-    index.render(&data).await
 }

@@ -11,6 +11,8 @@ pub struct Article {
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub published: bool,
+    pub top:bool,
+    pub recommended: bool,
 }
 
 #[async_graphql::Object]
@@ -46,6 +48,14 @@ impl Article {
     pub async fn published(&self) -> bool {
         self.published
     }
+
+    pub async fn top(&self) -> bool {
+        self.top
+    }
+
+    pub async fn recommended(&self) -> bool {
+        self.recommended
+    }
 }
 
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
@@ -59,4 +69,8 @@ pub struct ArticleNew {
     pub updated_at: DateTime,
     #[graphql(skip)]
     pub published: bool,
+    #[graphql(skip)]
+    pub top:bool,
+    #[graphql(skip)]
+    pub recommended: bool,
 }

@@ -36,6 +36,8 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
 
         article_new.slug = slug;
         article_new.published = false;
+        article_new.top = false;
+        article_new.recommended = false;
 
         let article_new_bson = bson::to_bson(&article_new).unwrap();
 
