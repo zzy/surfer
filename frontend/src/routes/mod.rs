@@ -13,7 +13,7 @@ use crate::routes::{
 };
 
 pub async fn push_res(mut app: Server<State>) -> Server<State> {
-    app.at("/static").serve_dir("static").unwrap();
+    app.at("/").serve_dir("static").unwrap();
 
     app.at("/").get(index);
 

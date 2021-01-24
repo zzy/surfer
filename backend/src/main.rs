@@ -13,7 +13,8 @@ async fn main() -> Result<(), std::io::Error> {
     tide::log::start();
 
     // Initialize the application with state.
-    let mut app = tide::with_state(State {});
+    let app_state = State {};
+    let mut app = tide::with_state(app_state);
 
     //environment variables defined in .env file
     let mut gql = app.at(CFG.get("GQL_URI").unwrap());

@@ -10,7 +10,8 @@ async fn main() -> Result<(), std::io::Error> {
     tide::log::start();
 
     // Initialize the application with state.
-    let mut app = tide::with_state(State {});
+    let app_state = State {};
+    let mut app = tide::with_state(app_state);
     app = push_res(app).await;
 
     app.listen(format!(
