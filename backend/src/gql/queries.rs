@@ -5,7 +5,7 @@ use crate::dbs::mongo::DataSource;
 use crate::util::constant::GqlResult;
 use crate::users::{
     self,
-    models::{User, UserNew, SignInfo},
+    models::{User, SignInfo},
 };
 use crate::articles::{self, models::Article};
 
@@ -13,6 +13,16 @@ pub struct QueryRoot;
 
 #[async_graphql::Object]
 impl QueryRoot {
+    // get user info by id
+    async fn user_by_id(
+        &self,
+        ctx: &Context<'_>,
+        id: ObjectId,
+    ) -> GqlResult<User> {
+        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
+        users::services::user_by_id(db, &id).await
+    }
+
     // get user info by email
     async fn user_by_email(
         &self,
@@ -36,10 +46,11 @@ impl QueryRoot {
     async fn user_sign_in(
         &self,
         ctx: &Context<'_>,
-        unknown_user: UserNew,
+        autograph: String,
+        password: String,
     ) -> GqlResult<SignInfo> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        users::services::user_sign_in(db, unknown_user).await
+        users::services::user_sign_in(db, &autograph, &password).await
     }
 
     // Get all Users,

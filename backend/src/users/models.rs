@@ -73,7 +73,7 @@ pub struct UserNew {
     pub banned: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SignInfo {
     pub email: String,
     pub username: String,

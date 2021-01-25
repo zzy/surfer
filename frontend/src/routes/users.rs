@@ -45,17 +45,17 @@ pub async fn users_list(_req: Request<State>) -> tide::Result {
 struct UserRegister;
 
 pub async fn user_register(_req: Request<State>) -> tide::Result {
-    let user_new_tpl: Tpl = Tpl::new("users/new").await;
+    let user_new_tpl: Tpl = Tpl::new("users/register").await;
 
     let now = Local::now();
 
     // make data and render it
     let build_query = UserRegister::build_query(user_register::Variables {
-        email: "test@budshome.com".to_string(),
-        username: "haha".to_string(),
-        cred: "budshome".to_string(),
+        email: "test2@budshome.com".to_string(),
+        username: "test2".to_string(),
+        cred: "test".to_string(),
         blog_name: "默默爸".to_string(),
-        website: "https://github.com/zzy".to_string(),
+        website: "https://budshome.com".to_string(),
         created_at: now,
         updated_at: now,
     });

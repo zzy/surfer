@@ -7,6 +7,7 @@ use pinyin::ToPinyin;
 
 use crate::util::{constant::GqlResult, common::web_base_uri};
 use crate::articles::models::{Article, ArticleNew};
+use crate::users::services::user_by_id;
 
 pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
     let coll = db.collection("articles");
@@ -32,7 +33,9 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
             }
         }
         let sub_slug = subject_seg.join("-");
-        let slug = format!("{}/articles/{}", web_base_uri().await, sub_slug);
+        let user = user_by_id(db.clone(), &article_new.user_id).await.unwrap();
+        let slug =
+            format!("{}/{}/{}", web_base_uri().await, user.username, sub_slug);
 
         article_new.slug = slug;
         article_new.published = false;

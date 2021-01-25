@@ -1,13 +1,36 @@
+use bson::oid::ObjectId;
 use futures::stream::StreamExt;
 use mongodb::Database;
 use async_graphql::{Error, ErrorExtensions};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use regex::Regex;
 
 use crate::util::{
     constant::{CFG, GqlResult},
     common::{Claims, token_data},
 };
 use crate::users::models::{User, UserNew, SignInfo};
+
+// get user info by id
+pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
+    let coll = db.collection("users");
+
+    let exist_document = coll.find_one(bson::doc! {"_id": id}, None).await;
+
+    if let Ok(user_document_exist) = exist_document {
+        if let Some(user_document) = user_document_exist {
+            let user: User =
+                bson::from_bson(bson::Bson::Document(user_document)).unwrap();
+            Ok(user)
+        } else {
+            Err(Error::new("2-id")
+                .extend_with(|_, e| e.set("details", "id not found")))
+        }
+    } else {
+        Err(Error::new("1-id")
+            .extend_with(|_, e| e.set("details", "Error searching mongodb")))
+    }
+}
 
 // get user info by email
 pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
@@ -97,32 +120,24 @@ pub async fn user_register(
 
 pub async fn user_sign_in(
     db: Database,
-    mut unknown_user: UserNew,
+    autograph: &str,
+    password: &str,
 ) -> GqlResult<SignInfo> {
-    unknown_user.email = unknown_user.email.to_lowercase();
-    unknown_user.username = unknown_user.username.to_lowercase();
+    let autograph = &autograph.to_lowercase();
 
     let user_res;
-    match regex::Regex::new(r"(@)").unwrap().is_match(&unknown_user.email) {
-        true => {
-            user_res =
-                self::user_by_email(db.clone(), &unknown_user.email).await;
-        }
-        false => {
-            user_res =
-                self::user_by_username(db.clone(), &unknown_user.username)
-                    .await;
-        }
+    let is_email = Regex::new(r"(@)")?.is_match(autograph);
+    if is_email {
+        user_res = self::user_by_email(db.clone(), autograph).await;
+    } else {
+        user_res = self::user_by_username(db.clone(), autograph).await;
     }
 
     if let Ok(user) = user_res {
-        if super::cred::cred_verify(
-            &user.username,
-            &unknown_user.cred,
-            &user.cred,
-        )
-        .await
-        {
+        let is_verified =
+            super::cred::cred_verify(&user.username, password, &user.cred)
+                .await;
+        if is_verified {
             let mut header = Header::default();
             // header.kid = Some("signing_key".to_owned());
             header.alg = Algorithm::HS512;

@@ -46,8 +46,8 @@ pub async fn article_new(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = ArticleNew::build_query(article_new::Variables {
-        user_id: "6007bf330013859f00f96fca".to_string(),
-        subject: "香洲半岛项目2021 what hahah the fuck".to_string(),
+        user_id: "600edab000539cdd002c7b47".to_string(),
+        subject: "香洲半岛项目2021 ... You signed in with another tab or wi...ur session.".to_string(),
         content:
             "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
                 .to_string(),
