@@ -9,7 +9,6 @@ lazy_static! {
 
         let mut map = HashMap::new();
 
-
         map.insert(
             "ADDR",
             dotenv::var("ADDR").expect("Expected ADDR to be set in env!"),

@@ -5,7 +5,7 @@ pub mod users;
 pub mod articles;
 
 use crate::State;
-use crate::util::common::Tpl;
+use crate::util::common::{rhai_dir, Tpl};
 
 use crate::routes::{
     users::{users_list, user_register, user_index},
@@ -13,10 +13,13 @@ use crate::routes::{
 };
 
 async fn index(_req: Request<State>) -> tide::Result {
-    let index: Tpl = Tpl::new("index").await;
+    let mut index: Tpl = Tpl::new("index").await;
+    index.reg.register_script_helper_file(
+        "blog-name",
+        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
+    )?;
 
-    // make data and render it
-    let data = json!({"title": "blog-rs", "app_name": "默默爸"});
+    let data = json!({"app_name": "blog-rs"});
 
     index.render(&data).await
 }

@@ -1,6 +1,8 @@
 use graphql_client::{GraphQLQuery, Response};
+use serde_json::json;
 use tide::Request;
 use chrono::Local;
+use std::collections::BTreeMap;
 
 use crate::State;
 use crate::util::common::{gql_uri, rhai_dir, Tpl};
@@ -77,13 +79,14 @@ struct UserByUsername;
 
 pub async fn user_index(req: Request<State>) -> tide::Result {
     let mut user_tpl: Tpl = Tpl::new("users/index").await;
-    user_tpl
-        .reg
-        .register_script_helper_file(
-            "website-svg",
-            format!("{}{}", rhai_dir().await, "website-svg.rhai"),
-        )
-        .unwrap();
+    user_tpl.reg.register_script_helper_file(
+        "website-svg",
+        format!("{}{}", rhai_dir().await, "website-svg.rhai"),
+    )?;
+    user_tpl.reg.register_script_helper_file(
+        "blog-name",
+        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
+    )?;
 
     let username = req.param("username").unwrap();
 
@@ -99,5 +102,10 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
 
     let resp_data = resp_body.data.expect("missing response data");
 
-    user_tpl.render(&resp_data).await
+    let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
+    let a = json!("很好哈");
+    data.insert("data1", &a);
+    data.insert("user", &resp_data["userByUsername"]);
+
+    user_tpl.render(&data).await
 }

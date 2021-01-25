@@ -2,7 +2,7 @@
 <html lang="zh">
 
   <head>
-    <title>{{ userByUsername.username }} - https://github.com/zzy/blog-rs</title>
+    <title>{{ blog-name user.username }} - budshome.com</title>
 
     <link rel="icon" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.png">
@@ -18,13 +18,13 @@
   </head>
 
   <body>
+{{data1}}
 
-    {{#with userByUsername as |user|}}
       <ul>{{user.slug}}</ul>
       {{#each user.articles as |article|}}
         {{article.slug}}
       {{/each}}
-    {{/with}}
+
 
     <div class="container">
       <header class="blog-header py-3">
@@ -33,10 +33,10 @@
             <a class="link-secondary" href="#">Subscribe</a>
           </div>
           <div class="col-4 text-center">
-            <a class="blog-header-logo text-dark" href="{{ userByUsername.website }}" target="_blank">
-              {{ userByUsername.username }}
+            <a class="blog-header-logo text-dark" href="{{ user.website }}" target="_blank">
+              {{ blog-name user.username }}
               <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
-                <path d="{{ website-svg userByUsername.website }}" />
+                <path d="{{ website-svg user.website }}" />
               </svg>
             </a>
           </div>
