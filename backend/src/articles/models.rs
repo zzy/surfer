@@ -7,6 +7,7 @@ pub struct Article {
     pub username: String,
     pub subject: String,
     pub slug: String,
+    pub uri: String,
     pub content: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -31,6 +32,10 @@ impl Article {
 
     pub async fn slug(&self) -> &str {
         self.slug.as_str()
+    }
+
+    pub async fn uri(&self) -> &str {
+        self.uri.as_str()
     }
 
     pub async fn content(&self) -> &str {
@@ -64,6 +69,8 @@ pub struct ArticleNew {
     pub subject: String,
     #[graphql(skip)]
     pub slug: String,
+    #[graphql(skip)]
+    pub uri: String,
     pub content: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,

@@ -30,15 +30,16 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
                 subject_seg[n] = seg_py;
             }
         }
-        let sub_slug = subject_seg.join("-");
-        let slug = format!(
+        let slug = subject_seg.join("-");
+        let uri = format!(
             "{}/{}/{}",
             web_base_uri().await,
             &article_new.username,
-            &sub_slug
+            &slug
         );
 
         article_new.slug = slug;
+        article_new.uri = uri;
         article_new.published = false;
         article_new.top = false;
         article_new.recommended = false;

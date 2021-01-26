@@ -1,11 +1,31 @@
 query UsersList(
   $token: String!
-  ) {
+) {
   usersList(
     token: $token
   ) {
     id
     email
     username
+    nickname
+    blogName
+    website
+    banned
+    createdAt
+    updatedAt
+
+    articles {
+      id
+      username
+      subject
+      slug
+      uri
+      content
+      published
+      top
+      recommended
+      createdAt
+      updatedAt
+    }
   }
 }

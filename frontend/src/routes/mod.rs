@@ -1,33 +1,22 @@
-use tide::{self, Server, Request};
+use tide::{self, Server};
 
+pub mod home;
 pub mod users;
 pub mod articles;
 
 use crate::State;
-use crate::util::common::{rhai_dir, Tpl};
 
-use crate::routes::{
-    users::{users_list, user_register, user_index},
-    articles::{articles_list, article_new},
-};
-
-async fn index(_req: Request<State>) -> tide::Result {
-    let mut index: Tpl = Tpl::new("index").await;
-    index.reg.register_script_helper_file(
-        "blog-name",
-        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
-    )?;
-
-    let data = ();
-
-    index.render(&data).await
-}
+use crate::routes::home::{index, user_index, article_index};
+use crate::routes::users::{users_list, user_register};
+use crate::routes::articles::{articles_list, article_new};
 
 pub async fn push_res(mut app: Server<State>) -> Server<State> {
-    app.at("/").serve_dir("static").unwrap();
+    app.at("/static").serve_dir("static").unwrap();
 
-    app.at("/").get(index);
-    app.at("/:username").get(user_index);
+    let mut home = app.at("");
+    home.at("/").get(index);
+    home.at("/:username").get(user_index);
+    home.at("/:username/:slug").get(article_index);
 
     let mut users = app.at("users");
     users.at("list").get(users_list);

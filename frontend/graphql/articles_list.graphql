@@ -4,6 +4,7 @@ query ArticlesList {
     username
     subject
     slug
+    uri
     content
     createdAt
     updatedAt

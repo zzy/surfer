@@ -4,19 +4,19 @@
   <head>
     <title>all articles</title>
 
-    <link rel="icon" href="favicon.svg">
-    <link rel="shortcut icon" href="favicon.png">
+    <link rel="icon" href="/static/favicon.svg">
+    <link rel="shortcut icon" href="/static/favicon.png">
   </head>
 
   <body>
     <h1>all articles</h1>
     <ul>
-      {{#each articlesList as |al|}}
-        <li><b>{{al.subject}}</b></li>
+      {{#each articlesList as |article|}}
+        <li><b>{{article.subject}}</b></li>
         <ul>
-          <li>{{al.id}}</li>
-          <li>{{al.userId}}</li>
-          <li><a href="{{al.slug}}" target="_blank">{{al.slug}}</a></li>
+          <li>{{article.id}}</li>
+          <li>{{article.username}}</li>
+          <li><a href="{{article.uri}}" target="_blank">{{article.slug}}</a></li>
         </ul>
       {{/each}}
     </ul>

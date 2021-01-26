@@ -11,6 +11,7 @@ type Article {
   username: String!
   subject: String!
   slug: String!
+  uri: String!
   content: String!
   createdAt: DateTime!
   updatedAt: DateTime!

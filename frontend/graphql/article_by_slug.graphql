@@ -1,0 +1,21 @@
+query ArticleBySlug(
+  $username: String!
+  $slug: String!
+) {
+  articleBySlug(
+    username: $username
+    slug: $slug
+  ) {
+    id
+    username
+    subject
+    slug
+    uri
+    content
+    published
+    top
+    recommended
+    createdAt
+    updatedAt
+  }
+}
