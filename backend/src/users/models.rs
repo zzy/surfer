@@ -3,13 +3,14 @@ use bson::{oid::ObjectId, DateTime};
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
-use crate::articles::{models::Article, services::articles_by_user};
+use crate::articles::{models::Article, services::articles_by_username};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
     pub _id: ObjectId,
     pub email: String,
     pub username: String,
+    pub nickname: String,
     pub cred: String,
     pub blog_name: String,
     pub website: String,
@@ -29,6 +30,10 @@ impl User {
     }
 
     pub async fn username(&self) -> &str {
+        self.username.as_str()
+    }
+
+    pub async fn nickname(&self) -> &str {
         self.username.as_str()
     }
 
@@ -57,13 +62,14 @@ impl User {
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        articles_by_user(db, self._id.clone()).await
+        articles_by_username(db, &self.username).await
     }
 }
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
 pub struct UserNew {
     pub email: String,
     pub username: String,
+    pub nickname: String,
     pub cred: String,
     pub blog_name: String,
     pub website: String,

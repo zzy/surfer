@@ -1,8 +1,8 @@
+use std::collections::BTreeMap;
+use tide::Request;
 use graphql_client::{GraphQLQuery, Response};
 use serde_json::json;
-use tide::Request;
 use chrono::Local;
-use std::collections::BTreeMap;
 
 use crate::State;
 use crate::util::common::{gql_uri, rhai_dir, Tpl};
@@ -51,11 +51,12 @@ pub async fn user_register(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = UserRegister::build_query(user_register::Variables {
-        email: "test2@budshome.com".to_string(),
-        username: "test2".to_string(),
+        email: "test3@budshome.com".to_string(),
+        username: "test3".to_string(),
+        nickname: "默默爸 TeSt 3".to_string(),
         cred: "test".to_string(),
-        blog_name: "默默爸".to_string(),
-        website: "https://budshome.com".to_string(),
+        blog_name: "默默爸 TeSt 3".to_string(),
+        website: "https://github.com/zzy".to_string(),
         created_at: now,
         updated_at: now,
     });

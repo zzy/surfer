@@ -1,20 +1,18 @@
 use futures::stream::StreamExt;
-use mongodb::Database;
-use bson::oid::ObjectId;
 use async_graphql::{Error, ErrorExtensions};
+use mongodb::Database;
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::{constant::GqlResult, common::web_base_uri};
 use crate::articles::models::{Article, ArticleNew};
-use crate::users::services::user_by_id;
 
 pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
     let coll = db.collection("articles");
 
     let exist_document = coll
         .find_one(
-            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            bson::doc! {"username": &article_new.username,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -33,9 +31,12 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
             }
         }
         let sub_slug = subject_seg.join("-");
-        let user = user_by_id(db.clone(), &article_new.user_id).await.unwrap();
-        let slug =
-            format!("{}/{}/{}", web_base_uri().await, user.username, sub_slug);
+        let slug = format!(
+            "{}/{}/{}",
+            web_base_uri().await,
+            &article_new.username,
+            &sub_slug
+        );
 
         article_new.slug = slug;
         article_new.published = false;
@@ -58,7 +59,7 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
 
     let article_document = coll
         .find_one(
-            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            bson::doc! {"username": &article_new.username,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -100,24 +101,52 @@ pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
     }
 }
 
-pub async fn articles_by_user(
+pub async fn articles_by_username(
     db: Database,
-    user_id: ObjectId,
+    username: &str,
 ) -> GqlResult<Vec<Article>> {
     let coll = db.collection("articles");
 
     let mut articles: Vec<Article> = vec![];
 
     // Query all documents in the collection.
-    let mut cursor =
-        coll.find(bson::doc! {"user_id": user_id}, None).await.unwrap();
+    let mut cursor = coll.find(bson::doc! {"username": username}, None).await?;
 
     // Iterate over the results of the cursor.
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let article = bson::from_bson(bson::Bson::Document(document))?;
+                articles.push(article);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    Ok(articles)
+}
+
+pub async fn article_by_slug(
+    db: Database,
+    username: &str,
+    slug: &str,
+) -> GqlResult<Vec<Article>> {
+    let coll = db.collection("articles");
+
+    let mut articles: Vec<Article> = vec![];
+
+    // Query all documents in the collection.
+    let mut cursor = coll
+        .find(bson::doc! {"username": username, "slug": slug}, None)
+        .await?;
+
+    // Iterate over the results of the cursor.
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(document) => {
+                let article = bson::from_bson(bson::Bson::Document(document))?;
                 articles.push(article);
             }
             Err(error) => {

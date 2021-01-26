@@ -72,13 +72,24 @@ impl QueryRoot {
         articles::services::articles_list(db).await
     }
 
-    // Get all articles of one User
-    async fn articles_by_user(
+    // Get all articles of one username
+    async fn articles_by_username(
         &self,
         ctx: &Context<'_>,
-        user_id: ObjectId,
+        username: String,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        articles::services::articles_by_user(db, user_id).await
+        articles::services::articles_by_username(db, &username).await
+    }
+
+    // Get all articles of one article's slug
+    async fn article_by_slug(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+        slug: String,
+    ) -> GqlResult<Vec<Article>> {
+        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
+        articles::services::article_by_slug(db, &username, &slug).await
     }
 }

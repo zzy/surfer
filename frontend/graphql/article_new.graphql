@@ -1,5 +1,5 @@
 mutation ArticleNew(
-  $userId: ObjectId!
+  $username: String!
   $subject: String!
   $content: String!
   $createdAt: DateTime!
@@ -7,7 +7,7 @@ mutation ArticleNew(
   ) {
   articleNew(
     articleNew: {
-      userId: $userId
+      username: $username
       subject: $subject
       content: $content
       createdAt: $createdAt
@@ -15,11 +15,14 @@ mutation ArticleNew(
     }
   ) {
     id
-    userId
+    username
     subject
     slug
+    content
     createdAt
     updatedAt
     published
+    top
+    recommended
   }
 }

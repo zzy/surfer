@@ -4,7 +4,7 @@ use bson::{oid::ObjectId, DateTime};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Article {
     pub _id: ObjectId,
-    pub user_id: ObjectId,
+    pub username: String,
     pub subject: String,
     pub slug: String,
     pub content: String,
@@ -21,8 +21,8 @@ impl Article {
         self._id.clone()
     }
 
-    pub async fn user_id(&self) -> ObjectId {
-        self.user_id.clone()
+    pub async fn username(&self) -> &str {
+        self.username.as_str()
     }
 
     pub async fn subject(&self) -> &str {
@@ -60,7 +60,7 @@ impl Article {
 
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
 pub struct ArticleNew {
-    pub user_id: ObjectId,
+    pub username: String,
     pub subject: String,
     #[graphql(skip)]
     pub slug: String,

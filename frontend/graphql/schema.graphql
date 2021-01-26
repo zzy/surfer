@@ -8,7 +8,7 @@ directive @ifdef on FIELD
 
 type Article {
   id: ObjectId!
-  userId: ObjectId!
+  username: String!
   subject: String!
   slug: String!
   content: String!
@@ -20,7 +20,7 @@ type Article {
 }
 
 input ArticleNew {
-  userId: ObjectId!
+  username: String!
   subject: String!
   content: String!
   createdAt: DateTime!
@@ -39,12 +39,14 @@ type MutationRoot {
 scalar ObjectId
 
 type QueryRoot {
+  userById(id: ObjectId!): User!
   userByEmail(email: String!): User!
   userByUsername(username: String!): User!
-  userSignIn(unknownUser: UserNew!): SignInfo!
+  userSignIn(autograph: String!, password: String!): SignInfo!
   usersList(token: String!): [User!]!
   articlesList: [Article!]!
-  articlesByUser(userId: ObjectId!): [Article!]!
+  articlesByUsername(username: String!): [Article!]!
+  articleBySlug(username: String!, slug: String!): [Article!]!
 }
 
 type SignInfo {
@@ -57,6 +59,7 @@ type User {
   id: ObjectId!
   email: String!
   username: String!
+  nickname: String!
   blogName: String!
   website: String!
   createdAt: DateTime!
@@ -68,6 +71,7 @@ type User {
 input UserNew {
   email: String!
   username: String!
+  nickname: String!
   cred: String!
   blogName: String!
   website: String!

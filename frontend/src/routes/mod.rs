@@ -1,5 +1,4 @@
 use tide::{self, Server, Request};
-use serde_json::json;
 
 pub mod users;
 pub mod articles;
@@ -19,7 +18,7 @@ async fn index(_req: Request<State>) -> tide::Result {
         format!("{}{}", rhai_dir().await, "blog-name.rhai"),
     )?;
 
-    let data = json!({"app_name": "blog-rs"});
+    let data = ();
 
     index.render(&data).await
 }

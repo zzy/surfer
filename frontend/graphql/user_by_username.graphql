@@ -7,15 +7,16 @@ query UserByUsername(
     id
     email
     username
+    nickname
     blogName
     website
+    banned
     createdAt
     updatedAt
-    banned
 
     articles {
       id
-      userId
+      username
       subject
       slug
       content

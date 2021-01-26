@@ -24,7 +24,7 @@ pub async fn articles_list(_req: Request<State>) -> tide::Result {
     let query = serde_json::json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
-        surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
+        surf::post(&gql_uri().await).body(query).recv_json().await?;
 
     let resp_data = resp_body.data.expect("missing response data");
 
@@ -46,8 +46,8 @@ pub async fn article_new(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = ArticleNew::build_query(article_new::Variables {
-        user_id: "600edab000539cdd002c7b47".to_string(),
-        subject: "香洲半岛项目2021 ... You signed in with another tab or wi...ur session.".to_string(),
+        username: "test".to_string(),
+        subject: "香洲半岛项目2021 ... You sig---er tab or wi...ur session.".to_string(),
         content:
             "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
                 .to_string(),
@@ -57,7 +57,7 @@ pub async fn article_new(_req: Request<State>) -> tide::Result {
     let query = serde_json::json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
-        surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
+        surf::post(&gql_uri().await).body(query).recv_json().await?;
 
     let resp_data = resp_body.data.expect("missing response data");
 

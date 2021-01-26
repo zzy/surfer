@@ -1,6 +1,7 @@
 mutation UserRegister(
   $email: String!
   $username: String!
+  $nickname: String!
   $cred: String!
   $blogName: String!
   $website: String!
@@ -11,6 +12,7 @@ mutation UserRegister(
     userNew: {
       email: $email
       username: $username
+      nickname: $nickname
       cred: $cred
       blogName: $blogName
       website: $website
@@ -21,6 +23,7 @@ mutation UserRegister(
     id
     email
     username
+    nickname
     blogName
     website
     createdAt

@@ -1,9 +1,14 @@
 query ArticlesList {
   articlesList {
     id
-    userId
+    username
     subject
     slug
+    content
+    createdAt
+    updatedAt
     published
+    top
+    recommended
   }
 }

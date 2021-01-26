@@ -2,7 +2,7 @@
 <html lang="zh">
 
   <head>
-    <title>{{ blog-name user.username }} - budshome.com</title>
+    <title>{{ blog-name user.blogName }} - budshome.com</title>
 
     <link rel="icon" href="favicon.svg">
     <link rel="shortcut icon" href="favicon.png">
@@ -34,7 +34,7 @@
           </div>
           <div class="col-4 text-center">
             <a class="blog-header-logo text-dark" href="{{ user.website }}" target="_blank">
-              {{ blog-name user.username }}
+              {{ blog-name user.blogName }}
               <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
                 <path d="{{ website-svg user.website }}" />
               </svg>

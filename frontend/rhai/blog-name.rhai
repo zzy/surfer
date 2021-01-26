@@ -5,4 +5,3 @@ if blog_name == () {
 } else {
     blog_name
 }
-
