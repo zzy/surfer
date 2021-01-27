@@ -88,7 +88,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         username: String,
         slug: String,
-    ) -> GqlResult<Vec<Article>> {
+    ) -> GqlResult<Article> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         articles::services::article_by_slug(db, &username, &slug).await
     }

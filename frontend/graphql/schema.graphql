@@ -47,7 +47,7 @@ type QueryRoot {
   usersList(token: String!): [User!]!
   articlesList: [Article!]!
   articlesByUsername(username: String!): [Article!]!
-  articleBySlug(username: String!, slug: String!): [Article!]!
+  articleBySlug(username: String!, slug: String!): Article!
 }
 
 type SignInfo {

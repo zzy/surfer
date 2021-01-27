@@ -54,7 +54,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         article_new: ArticleNew,
-    ) -> Article {
+    ) -> GqlResult<Article> {
         let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
         articles::services::article_new(db, article_new).await
     }

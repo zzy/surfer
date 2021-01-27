@@ -5,7 +5,7 @@ use serde_json::json;
 use chrono::Local;
 
 use crate::State;
-use crate::util::common::{gql_uri, rhai_dir, Tpl};
+use crate::util::common::{gql_uri, rhai_dir, tpl_dir, Tpl};
 
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
@@ -73,6 +73,12 @@ struct ArticleBySlug;
 
 pub async fn article_index(req: Request<State>) -> tide::Result {
     let mut article_tpl: Tpl = Tpl::new("articles/index").await;
+
+    article_tpl.reg.register_template_file(
+        "base",
+        format!("{}{}", tpl_dir().await, "base.html"),
+    )?;
+
     article_tpl.reg.register_script_helper_file(
         "website-svg",
         format!("{}{}", rhai_dir().await, "website-svg.rhai"),
@@ -96,12 +102,14 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
 
     let resp_data = resp_body.data.expect("missing response data");
-    println!("{:?}", &resp_data);
+    println!("{:?}", &resp_data["articleBySlug"]);
 
     let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
     let a = json!("很好哈");
+    let b = json!("base".to_string());
+    data.insert("parent", &b);
     data.insert("data1", &a);
-    data.insert("user", &resp_data["userByUsername"]);
+    data.insert("article", &resp_data["articleBySlug"]);
 
     article_tpl.render(&data).await
 }

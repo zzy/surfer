@@ -7,7 +7,10 @@ use pinyin::ToPinyin;
 use crate::util::{constant::GqlResult, common::web_base_uri};
 use crate::articles::models::{Article, ArticleNew};
 
-pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
+pub async fn article_new(
+    db: Database,
+    mut article_new: ArticleNew,
+) -> GqlResult<Article> {
     let coll = db.collection("articles");
 
     let exist_document = coll
@@ -69,7 +72,7 @@ pub async fn article_new(db: Database, mut article_new: ArticleNew) -> Article {
 
     let article: Article =
         bson::from_bson(bson::Bson::Document(article_document)).unwrap();
-    article
+    Ok(article)
 }
 
 pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
@@ -133,28 +136,17 @@ pub async fn article_by_slug(
     db: Database,
     username: &str,
     slug: &str,
-) -> GqlResult<Vec<Article>> {
+) -> GqlResult<Article> {
     let coll = db.collection("articles");
 
-    let mut articles: Vec<Article> = vec![];
-
     // Query all documents in the collection.
-    let mut cursor = coll
-        .find(bson::doc! {"username": username, "slug": slug}, None)
-        .await?;
+    let article_document = coll
+        .find_one(bson::doc! {"username": username, "slug": slug}, None)
+        .await
+        .expect("Document not found")
+        .unwrap();
 
-    // Iterate over the results of the cursor.
-    while let Some(result) = cursor.next().await {
-        match result {
-            Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document))?;
-                articles.push(article);
-            }
-            Err(error) => {
-                println!("Error to find doc: {}", error);
-            }
-        }
-    }
-
-    Ok(articles)
+    let article: Article =
+        bson::from_bson(bson::Bson::Document(article_document)).unwrap();
+    Ok(article)
 }

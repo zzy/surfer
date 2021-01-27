@@ -16,12 +16,12 @@ pub async fn gql_uri() -> String {
     format!("{}://{}:{}/{}/{}", gql_prot, gql_addr, gql_port, gql_uri, gql_path)
 }
 
-pub async fn tpl_dir() -> String {
-    format!("./{}/", "templates")
-}
-
 pub async fn rhai_dir() -> String {
     format!("./{}/", "rhai")
+}
+
+pub async fn tpl_dir() -> String {
+    format!("./{}/", "templates")
 }
 
 pub struct Tpl<'tpl> {
