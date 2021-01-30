@@ -1,4 +1,4 @@
-# blog-rs
+# blog-rust
 
 Clean boilerplate for graphql services using tide, async-graphql, surf, graphql-client, handlebars-rust, jsonwebtoken, and mongodb.
 
@@ -32,8 +32,8 @@ In brief, for **SEO**.
 ## How to Build & Run?
 
 ``` Bash
-git clone https://github.com/zzy/blog-rs.git
-cd blog-rs
+git clone https://github.com/zzy/blog-rust.git
+cd blog-rust
 ```
 
 Put the environment variables into a `.env` file:
@@ -65,4 +65,4 @@ GraphiQL: connect to http://127.0.0.1:8080/graphiql with browser.
 
 ## Contributing
 
-You are welcome in contributing to the blog-rs project.
+You are welcome in contributing to the blog-rust project.

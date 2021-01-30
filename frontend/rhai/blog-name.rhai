@@ -1,7 +1,7 @@
 let blog_name = params[0];
 
 if blog_name == () {
-    "blog-rs"
+    "blog-rust"
 } else {
     blog_name
 }

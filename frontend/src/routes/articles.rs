@@ -1,6 +1,7 @@
 use graphql_client::{GraphQLQuery, Response};
 use tide::Request;
 use chrono::Local;
+use serde_json::json;
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
@@ -21,7 +22,7 @@ pub async fn articles_list(_req: Request<State>) -> tide::Result {
 
     // make data and render it
     let build_query = ArticlesList::build_query(articles_list::Variables {});
-    let query = serde_json::json!(build_query);
+    let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await?;
@@ -54,7 +55,7 @@ pub async fn article_new(_req: Request<State>) -> tide::Result {
         created_at: now,
         updated_at: now,
     });
-    let query = serde_json::json!(build_query);
+    let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await?;

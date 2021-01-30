@@ -18,4 +18,16 @@ query ArticleBySlug(
     createdAt
     updatedAt
   }
+  userByUsername(
+    username: $username
+  ) {
+    id
+    email
+    username
+    blogName
+    website
+    createdAt
+    updatedAt
+    banned
+  }
 }

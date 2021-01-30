@@ -1,8 +1,11 @@
-use serde::Serialize;
+use std::collections::BTreeMap;
 use tide::{
     Response, StatusCode, Body,
     {http::mime::HTML},
 };
+use handlebars::Handlebars;
+use serde::Serialize;
+use serde_json::json;
 
 use crate::util::constant::CFG;
 
@@ -17,16 +20,16 @@ pub async fn gql_uri() -> String {
 }
 
 pub async fn rhai_dir() -> String {
-    format!("./{}/", "rhai")
+    format!("./{}/", "./rhai")
 }
 
 pub async fn tpl_dir() -> String {
-    format!("./{}/", "templates")
+    format!("./{}/", "./templates")
 }
 
 pub struct Tpl<'tpl> {
     pub name: String,
-    pub reg: handlebars::Handlebars<'tpl>,
+    pub reg: Handlebars<'tpl>,
 }
 
 impl<'tpl> Tpl<'tpl> {
@@ -35,7 +38,7 @@ impl<'tpl> Tpl<'tpl> {
         let abs_path = format!("{}{}.html", tpl_dir().await, rel_path);
 
         // create the handlebars registry
-        let mut hbs_reg = handlebars::Handlebars::new();
+        let mut hbs_reg = Handlebars::new();
         // register template from a file and assign a name to it
         hbs_reg.register_template_file(tpl_name, abs_path).unwrap();
 
@@ -53,5 +56,33 @@ impl<'tpl> Tpl<'tpl> {
         ));
 
         Ok(resp.into())
+    }
+
+    pub async fn reg_head(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "head",
+                format!("{}{}", tpl_dir().await, "./head.html"),
+            )
+            .unwrap();
+
+        data.insert("head", json!("head"));
+    }
+
+    pub async fn reg_footer(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "footer",
+                format!("{}{}", tpl_dir().await, "./footer.html"),
+            )
+            .unwrap();
+
+        data.insert("footer", json!("footer"));
     }
 }

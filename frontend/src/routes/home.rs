@@ -48,7 +48,7 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
         UserByUsername::build_query(user_by_username::Variables {
             username: username.to_string(),
         });
-    let query = serde_json::json!(build_query);
+    let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
@@ -78,6 +78,10 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         "base",
         format!("{}{}", tpl_dir().await, "base.html"),
     )?;
+    // article_tpl.reg.register_template_file(
+    //     "base2",
+    //     format!("{}{}", tpl_dir().await, "base2.html"),
+    // )?;
 
     article_tpl.reg.register_script_helper_file(
         "website-svg",
@@ -96,20 +100,31 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         username: username.to_string(),
         slug: slug.to_string(),
     });
-    let query = serde_json::json!(build_query);
+    let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
 
     let resp_data = resp_body.data.expect("missing response data");
-    println!("{:?}", &resp_data["articleBySlug"]);
+    println!("{:?}", &resp_data);
 
-    let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
     let a = json!("很好哈");
-    let b = json!("base".to_string());
-    data.insert("parent", &b);
-    data.insert("data1", &a);
-    data.insert("article", &resp_data["articleBySlug"]);
+    let a2 = json!("不太好哈");
+    let b = json!("base");
+    // let b2 = json!("base2");
+
+    data.insert("parent", b);
+    // data.insert("base2", &b2);
+
+    data.insert("data1", a);
+    data.insert("data2", a2);
+
+    data.insert("article", resp_data["articleBySlug"].clone());
+    data.insert("user", resp_data["userByUsername"].clone());
+
+    article_tpl.reg_footer(&mut data).await;
+    article_tpl.reg_head(&mut data).await;
 
     article_tpl.render(&data).await
 }
