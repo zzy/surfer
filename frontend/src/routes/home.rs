@@ -5,17 +5,14 @@ use serde_json::json;
 use chrono::Local;
 
 use crate::State;
-use crate::util::common::{gql_uri, rhai_dir, tpl_dir, Tpl};
+use crate::util::common::{gql_uri, tpl_dir, Tpl};
 
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
 
 pub async fn index(_req: Request<State>) -> tide::Result {
     let mut index: Tpl = Tpl::new("index").await;
-    index.reg.register_script_helper_file(
-        "blog-name",
-        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
-    )?;
+    index.reg_script_blog_name().await;
 
     let data = ();
 
@@ -32,14 +29,8 @@ struct UserByUsername;
 
 pub async fn user_index(req: Request<State>) -> tide::Result {
     let mut user_tpl: Tpl = Tpl::new("users/index").await;
-    user_tpl.reg.register_script_helper_file(
-        "website-svg",
-        format!("{}{}", rhai_dir().await, "website-svg.rhai"),
-    )?;
-    user_tpl.reg.register_script_helper_file(
-        "blog-name",
-        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
-    )?;
+    user_tpl.reg_script_website_svg().await;
+    user_tpl.reg_script_blog_name().await;
 
     let username = req.param("username").unwrap();
 
@@ -83,14 +74,8 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     //     format!("{}{}", tpl_dir().await, "base2.html"),
     // )?;
 
-    article_tpl.reg.register_script_helper_file(
-        "website-svg",
-        format!("{}{}", rhai_dir().await, "website-svg.rhai"),
-    )?;
-    article_tpl.reg.register_script_helper_file(
-        "blog-name",
-        format!("{}{}", rhai_dir().await, "blog-name.rhai"),
-    )?;
+
+
 
     let username = req.param("username").unwrap();
     let slug = req.param("slug").unwrap();
@@ -123,8 +108,13 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     data.insert("article", resp_data["articleBySlug"].clone());
     data.insert("user", resp_data["userByUsername"].clone());
 
-    article_tpl.reg_footer(&mut data).await;
+    article_tpl.reg_script_website_svg().await;
+    article_tpl.reg_script_blog_name().await;
+
     article_tpl.reg_head(&mut data).await;
+    article_tpl.reg_header(&mut data).await;
+    article_tpl.reg_nav(&mut data).await;
+    article_tpl.reg_footer(&mut data).await;
 
     article_tpl.render(&data).await
 }

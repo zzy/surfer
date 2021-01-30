@@ -65,11 +65,39 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "head",
-                format!("{}{}", tpl_dir().await, "./head.html"),
+                format!("{}{}", tpl_dir().await, "common/head.html"),
             )
             .unwrap();
 
         data.insert("head", json!("head"));
+    }
+
+    pub async fn reg_header(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "header",
+                format!("{}{}", tpl_dir().await, "common/header.html"),
+            )
+            .unwrap();
+
+        data.insert("header", json!("header"));
+    }
+
+    pub async fn reg_nav(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "nav",
+                format!("{}{}", tpl_dir().await, "common/nav.html"),
+            )
+            .unwrap();
+
+        data.insert("nav", json!("nav"));
     }
 
     pub async fn reg_footer(
@@ -79,10 +107,28 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "footer",
-                format!("{}{}", tpl_dir().await, "./footer.html"),
+                format!("{}{}", tpl_dir().await, "common/footer.html"),
             )
             .unwrap();
 
         data.insert("footer", json!("footer"));
+    }
+
+    pub async fn reg_script_website_svg(&mut self) {
+        self.reg
+            .register_script_helper_file(
+                "website-svg",
+                format!("{}{}", rhai_dir().await, "website-svg.rhai"),
+            )
+            .unwrap();
+    }
+
+    pub async fn reg_script_blog_name(&mut self) {
+        self.reg
+            .register_script_helper_file(
+                "blog-name",
+                format!("{}{}", rhai_dir().await, "blog-name.rhai"),
+            )
+            .unwrap();
     }
 }
