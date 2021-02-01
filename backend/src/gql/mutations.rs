@@ -16,7 +16,7 @@ use crate::categories::{
 };
 use crate::topics::{
     self,
-    models::{Topic, TopicNew},
+    models::{Topic, TopicNew, TopicArticle, TopicArticleNew},
 };
 
 pub struct MutationRoot;
@@ -95,5 +95,15 @@ impl MutationRoot {
     ) -> GqlResult<Topic> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         topics::services::topic_new(db, topic_new).await
+    }
+
+    // Add new topic_article
+    async fn topic_article_new(
+        &self,
+        ctx: &Context<'_>,
+        topic_article_new: TopicArticleNew,
+    ) -> GqlResult<TopicArticle> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topic_article_new(db, topic_article_new).await
     }
 }
