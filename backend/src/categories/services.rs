@@ -65,6 +65,45 @@ pub async fn category_new(
     Ok(category)
 }
 
+// Create new category_user
+pub async fn category_user_new(
+    db: Database,
+    category_user_new: CategoryUserNew,
+) -> GqlResult<CategoryUser> {
+    let coll = db.collection("categories_users");
+
+    let exist_document = coll
+        .find_one(bson::doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
+        .await
+        .unwrap();
+    if let Some(_document) = exist_document {
+        println!("MongoDB document is exist!");
+    } else {
+        let category_user_new_bson = bson::to_bson(&category_user_new).unwrap();
+
+        if let bson::Bson::Document(document) = category_user_new_bson {
+            // Insert into a MongoDB collection
+            coll.insert_one(document, None)
+                .await
+                .expect("Failed to insert into a MongoDB collection!");
+        } else {
+            println!(
+                "Error converting the BSON object into a MongoDB document"
+            );
+        };
+    }
+
+    let category_user_document = coll
+        .find_one(bson::doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
+        .await
+        .expect("Document not found")
+        .unwrap();
+
+    let category_user: CategoryUser =
+        bson::from_bson(bson::Bson::Document(category_user_document)).unwrap();
+    Ok(category_user)
+}
+
 // get all categories
 pub async fn categories_list(db: Database) -> GqlResult<Vec<Category>> {
     let coll = db.collection("categories");

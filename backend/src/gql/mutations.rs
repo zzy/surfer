@@ -12,7 +12,7 @@ use crate::articles::{
 };
 use crate::categories::{
     self,
-    models::{Category, CategoryNew},
+    models::{Category, CategoryNew, CategoryUser, CategoryUserNew},
 };
 use crate::topics::{
     self,
@@ -75,6 +75,16 @@ impl MutationRoot {
     ) -> GqlResult<Category> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         categories::services::category_new(db, category_new).await
+    }
+
+    // Add new category
+    async fn category_user_new(
+        &self,
+        ctx: &Context<'_>,
+        category_user_new: CategoryUserNew,
+    ) -> GqlResult<CategoryUser> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        categories::services::category_user_new(db, category_user_new).await
     }
 
     // Add new topic
