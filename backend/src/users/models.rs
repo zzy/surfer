@@ -3,7 +3,8 @@ use bson::{oid::ObjectId, DateTime};
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
-use crate::articles::{models::Article, services::articles_by_username};
+use crate::articles::{models::Article, services::articles_by_user_id};
+use crate::categories::services::categories_list;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
@@ -17,6 +18,7 @@ pub struct User {
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub banned: bool,
+    pub introduction: String,
 }
 
 #[async_graphql::Object]
@@ -57,14 +59,34 @@ impl User {
         self.banned
     }
 
+    pub async fn introduction(&self) -> &str {
+        self.introduction.as_str()
+    }
+
     pub async fn articles(
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();
-        articles_by_username(db, &self.username).await
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        articles_by_user_id(db, &self._id).await
+    }
+
+    pub async fn categories(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<Vec<String>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let categories_list = categories_list(db).await?;
+
+        let mut categories = Vec::new();
+        for category in categories_list {
+            categories.push(category.name);
+        }
+
+        Ok(categories)
     }
 }
+
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
 pub struct UserNew {
     pub email: String,
@@ -77,6 +99,7 @@ pub struct UserNew {
     pub updated_at: DateTime,
     #[graphql(skip)]
     pub banned: bool,
+    pub introduction: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -43,7 +43,7 @@ type QueryRoot {
   userById(id: ObjectId!): User!
   userByEmail(email: String!): User!
   userByUsername(username: String!): User!
-  userSignIn(autograph: String!, password: String!): SignInfo!
+  userSignIn(signature: String!, password: String!): SignInfo!
   usersList(token: String!): [User!]!
   articlesList: [Article!]!
   articlesByUsername(username: String!): [Article!]!

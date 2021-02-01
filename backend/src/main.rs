@@ -4,6 +4,8 @@ mod gql;
 
 mod users;
 mod articles;
+mod categories;
+mod topics;
 
 use crate::util::constant::CFG;
 use crate::gql::{build_schema, graphql, graphiql};

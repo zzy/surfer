@@ -12,9 +12,18 @@ type DateTime = chrono::DateTime<Local>;
 
 pub async fn index(_req: Request<State>) -> tide::Result {
     let mut index: Tpl = Tpl::new("index").await;
-    index.reg_script_blog_name().await;
 
-    let data = ();
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+    let navs = json!(vec!["test1", "test2", "test3"]);
+    data.insert("navs", navs);
+
+    index.reg_head(&mut data).await;
+    index.reg_header(&mut data).await;
+    index.reg_nav(&mut data).await;
+    index.reg_footer(&mut data).await;
+
+    index.reg_script_blog_name().await;
+    index.reg_script_website_svg().await;
 
     index.render(&data).await
 }
@@ -69,13 +78,6 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         "base",
         format!("{}{}", tpl_dir().await, "base.html"),
     )?;
-    // article_tpl.reg.register_template_file(
-    //     "base2",
-    //     format!("{}{}", tpl_dir().await, "base2.html"),
-    // )?;
-
-
-
 
     let username = req.param("username").unwrap();
     let slug = req.param("slug").unwrap();
@@ -96,10 +98,10 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
     let a = json!("很好哈");
     let a2 = json!("不太好哈");
-    let b = json!("base");
+    let base = json!("base");
     // let b2 = json!("base2");
 
-    data.insert("parent", b);
+    data.insert("base", base);
     // data.insert("base2", &b2);
 
     data.insert("data1", a);

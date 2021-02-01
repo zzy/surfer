@@ -1,6 +1,6 @@
-use bson::oid::ObjectId;
 use futures::stream::StreamExt;
 use mongodb::Database;
+use bson::oid::ObjectId;
 use async_graphql::{Error, ErrorExtensions};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use regex::Regex;
@@ -15,21 +15,15 @@ use crate::users::models::{User, UserNew, SignInfo};
 pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
     let coll = db.collection("users");
 
-    let exist_document = coll.find_one(bson::doc! {"_id": id}, None).await;
+    let user_document = coll
+        .find_one(bson::doc! {"_id": id}, None)
+        .await
+        .expect("Document not found")
+        .unwrap();
 
-    if let Ok(user_document_exist) = exist_document {
-        if let Some(user_document) = user_document_exist {
-            let user: User =
-                bson::from_bson(bson::Bson::Document(user_document)).unwrap();
-            Ok(user)
-        } else {
-            Err(Error::new("2-id")
-                .extend_with(|_, e| e.set("details", "id not found")))
-        }
-    } else {
-        Err(Error::new("1-id")
-            .extend_with(|_, e| e.set("details", "Error searching mongodb")))
-    }
+    let user: User =
+        bson::from_bson(bson::Bson::Document(user_document)).unwrap();
+    Ok(user)
 }
 
 // get user info by email
@@ -81,8 +75,8 @@ pub async fn user_register(
 ) -> GqlResult<User> {
     let coll = db.collection("users");
 
-    user_new.email = user_new.email.to_lowercase();
-    user_new.username = user_new.username.to_lowercase();
+    user_new.email.make_ascii_lowercase();
+    user_new.username.make_ascii_lowercase();
 
     if self::user_by_email(db.clone(), &user_new.email).await.is_ok() {
         Err(Error::new("email exists")
@@ -120,17 +114,17 @@ pub async fn user_register(
 
 pub async fn user_sign_in(
     db: Database,
-    autograph: &str,
+    signature: &str,
     password: &str,
 ) -> GqlResult<SignInfo> {
-    let autograph = &autograph.to_lowercase();
+    let signature = &signature.to_lowercase();
 
     let user_res;
-    let is_email = Regex::new(r"(@)")?.is_match(autograph);
+    let is_email = Regex::new(r"(@)")?.is_match(signature);
     if is_email {
-        user_res = self::user_by_email(db.clone(), autograph).await;
+        user_res = self::user_by_email(db.clone(), signature).await;
     } else {
-        user_res = self::user_by_username(db.clone(), autograph).await;
+        user_res = self::user_by_username(db.clone(), signature).await;
     }
 
     if let Ok(user) = user_res {
