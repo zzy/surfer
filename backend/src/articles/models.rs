@@ -3,8 +3,8 @@ use bson::{oid::ObjectId, DateTime};
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
-use crate::categories::services::category_by_id;
-use crate::topics::services::topics_by_article_id;
+use crate::categories::{self, models::Category};
+use crate::topics::{self, models::Topic};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Article {
@@ -77,29 +77,20 @@ impl Article {
         self.updated_at
     }
 
-    pub async fn category_name(
+    pub async fn category(
         &self,
         ctx: &async_graphql::Context<'_>,
-    ) -> GqlResult<String> {
+    ) -> GqlResult<Category> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        let category = category_by_id(db.clone(), &self.category_id).await?;
-
-        Ok(category.name)
+        categories::services::category_by_id(db, &self.category_id).await
     }
 
     pub async fn topics(
         &self,
         ctx: &async_graphql::Context<'_>,
-    ) -> GqlResult<Vec<String>> {
+    ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        let topics_list = topics_by_article_id(db, &self._id).await?;
-
-        let mut topics = Vec::new();
-        for topic in topics_list {
-            topics.push(topic.name);
-        }
-
-        Ok(topics)
+        topics::services::topics_by_article_id(db, &self._id).await
     }
 }
 

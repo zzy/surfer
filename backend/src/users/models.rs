@@ -4,7 +4,6 @@ use bson::{oid::ObjectId, DateTime};
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
 use crate::articles::{models::Article, services::articles_by_user_id};
-use crate::categories::services::categories_list;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct User {
@@ -69,21 +68,6 @@ impl User {
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         articles_by_user_id(db, &self._id).await
-    }
-
-    pub async fn categories(
-        &self,
-        ctx: &async_graphql::Context<'_>,
-    ) -> GqlResult<Vec<String>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        let categories_list = categories_list(db).await?;
-
-        let mut categories = Vec::new();
-        for category in categories_list {
-            categories.push(category.name);
-        }
-
-        Ok(categories)
     }
 }
 

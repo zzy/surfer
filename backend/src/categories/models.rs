@@ -12,8 +12,6 @@ pub struct Category {
     pub description: String,
     pub slug: String,
     pub uri: String,
-    // pub created_at: DateTime,
-    // pub updated_at: DateTime,
 }
 
 #[async_graphql::Object]
@@ -38,14 +36,6 @@ impl Category {
         self.uri.as_str()
     }
 
-    // pub async fn created_at(&self) -> DateTime {
-    //     self.created_at
-    // }
-
-    // pub async fn updated_at(&self) -> DateTime {
-    //     self.updated_at
-    // }
-
     pub async fn articles(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -63,6 +53,32 @@ pub struct CategoryNew {
     pub slug: String,
     #[graphql(skip)]
     pub uri: String,
-    // pub created_at: DateTime,
-    // pub updated_at: DateTime,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CategoryUser {
+    pub _id: ObjectId,
+    pub user_id: ObjectId,
+    pub category_id: ObjectId,
+}
+
+#[async_graphql::Object]
+impl CategoryUser {
+    pub async fn id(&self) -> ObjectId {
+        self._id.clone()
+    }
+
+    pub async fn user_id(&self) -> ObjectId {
+        self.user_id.clone()
+    }
+
+    pub async fn category_id(&self) -> ObjectId {
+        self.category_id.clone()
+    }
+}
+
+#[derive(Serialize, Deserialize, async_graphql::InputObject)]
+pub struct CategoryUserNew {
+    pub user_id: ObjectId,
+    pub category_id: ObjectId,
 }

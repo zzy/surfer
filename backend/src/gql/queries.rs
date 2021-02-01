@@ -124,6 +124,26 @@ impl QueryRoot {
         categories::services::categories_list(db).await
     }
 
+    // Get all categories by user_id
+    async fn categories_by_user_id(
+        &self,
+        ctx: &Context<'_>,
+        user_id: ObjectId,
+    ) -> GqlResult<Vec<Category>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        categories::services::categories_by_user_id(db, &user_id).await
+    }
+
+    // Get all categories by username
+    async fn categories_by_username(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+    ) -> GqlResult<Vec<Category>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        categories::services::categories_by_username(db, &username).await
+    }
+
     // Get category by its id
     async fn category_by_id(
         &self,
