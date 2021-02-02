@@ -1,6 +1,6 @@
 use futures::stream::StreamExt;
 use mongodb::Database;
-use bson::oid::ObjectId;
+use bson::{doc, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use regex::Regex;
@@ -16,7 +16,7 @@ pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
     let coll = db.collection("users");
 
     let user_document = coll
-        .find_one(bson::doc! {"_id": id}, None)
+        .find_one(doc! {"_id": id}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -30,7 +30,7 @@ pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
 pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
     let coll = db.collection("users");
 
-    let exist_document = coll.find_one(bson::doc! {"email": email}, None).await;
+    let exist_document = coll.find_one(doc! {"email": email}, None).await;
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
@@ -52,7 +52,7 @@ pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
     let coll = db.collection("users");
 
     let exist_document =
-        coll.find_one(bson::doc! {"username": username}, None).await;
+        coll.find_one(doc! {"username": username}, None).await;
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
@@ -241,8 +241,8 @@ pub async fn user_change_password(
 
                 let coll = db.collection("users");
                 coll.update_one(
-                    bson::doc! {"_id": &user._id},
-                    bson::doc! {"$set": {"cred": &user.cred}},
+                    doc! {"_id": &user._id},
+                    doc! {"$set": {"cred": &user.cred}},
                     None,
                 )
                 .await
@@ -285,7 +285,7 @@ pub async fn user_update_profile(
             let user_doc = user_bson.as_document().unwrap().to_owned();
 
             coll.find_one_and_replace(
-                bson::doc! {"_id": &user._id},
+                doc! {"_id": &user._id},
                 user_doc,
                 None,
             )

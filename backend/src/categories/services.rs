@@ -1,7 +1,7 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::Database;
-use bson::oid::ObjectId;
+use bson::{doc, oid::ObjectId};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
@@ -18,7 +18,7 @@ pub async fn category_new(
     let coll = db.collection("categories");
 
     let exist_document = coll
-        .find_one(bson::doc! {"name": &category_new.name}, None)
+        .find_one(doc! {"name": &category_new.name}, None)
         .await
         .unwrap();
     if let Some(_document) = exist_document {
@@ -55,7 +55,7 @@ pub async fn category_new(
     }
 
     let category_document = coll
-        .find_one(bson::doc! {"name": &category_new.name}, None)
+        .find_one(doc! {"name": &category_new.name}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -73,7 +73,7 @@ pub async fn category_user_new(
     let coll = db.collection("categories_users");
 
     let exist_document = coll
-        .find_one(bson::doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
+        .find_one(doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
         .await
         .unwrap();
     if let Some(_document) = exist_document {
@@ -94,7 +94,7 @@ pub async fn category_user_new(
     }
 
     let category_user_document = coll
-        .find_one(bson::doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
+        .find_one(doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -150,7 +150,7 @@ pub async fn categories_by_user_id(
 
     let coll_categories = db.collection("categories");
     let mut cursor_categories = coll_categories
-        .find(bson::doc! {"_id": {"$in": category_ids}}, None)
+        .find(doc! {"_id": {"$in": category_ids}}, None)
         .await?;
 
     let mut categories: Vec<Category> = vec![];
@@ -188,7 +188,7 @@ pub async fn category_by_id(
     let coll = db.collection("categories");
 
     let category_document = coll
-        .find_one(bson::doc! {"_id": id}, None)
+        .find_one(doc! {"_id": id}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -203,7 +203,7 @@ pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
     let coll = db.collection("categories");
 
     let category_document = coll
-        .find_one(bson::doc! {"slug": slug}, None)
+        .find_one(doc! {"slug": slug}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -220,7 +220,7 @@ async fn categories_users_by_user_id(
 ) -> Vec<CategoryUser> {
     let coll_categories_users = db.collection("categories_users");
     let mut cursor_categories_users = coll_categories_users
-        .find(bson::doc! {"user_id": user_id}, None)
+        .find(doc! {"user_id": user_id}, None)
         .await
         .unwrap();
 

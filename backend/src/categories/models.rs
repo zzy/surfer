@@ -41,7 +41,7 @@ impl Category {
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles_by_category_id(db, &self._id).await
+        articles_by_category_id(db, &self._id, &1).await
     }
 }
 

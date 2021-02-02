@@ -69,9 +69,24 @@ impl QueryRoot {
     async fn articles_list(
         &self,
         ctx: &Context<'_>,
+        published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::articles_list(db).await
+        articles::services::articles_list(db, &published).await
+    }
+
+    async fn articles_in_position(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+        position: String,
+        limit: i64,
+    ) -> GqlResult<Vec<Article>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        articles::services::articles_in_position(
+            db, &username, &position, limit,
+        )
+        .await
     }
 
     // Get all articles of one user by user_id
@@ -79,9 +94,10 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         user_id: ObjectId,
+        published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::articles_by_user_id(db, &user_id).await
+        articles::services::articles_by_user_id(db, &user_id, &published).await
     }
 
     // Get all articles of one user by username
@@ -89,9 +105,11 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         username: String,
+        published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::articles_by_username(db, &username).await
+        articles::services::articles_by_username(db, &username, &published)
+            .await
     }
 
     // Get all articles by category_id
@@ -99,9 +117,15 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         category_id: ObjectId,
+        published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::articles_by_category_id(db, &category_id).await
+        articles::services::articles_by_category_id(
+            db,
+            &category_id,
+            &published,
+        )
+        .await
     }
 
     // Get article by its slug

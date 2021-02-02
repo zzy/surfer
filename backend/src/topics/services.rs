@@ -2,7 +2,7 @@ use std::vec;
 
 use futures::stream::StreamExt;
 use mongodb::Database;
-use bson::oid::ObjectId;
+use bson::{doc, oid::ObjectId};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
@@ -17,7 +17,7 @@ pub async fn topic_new(
     let coll = db.collection("topics");
 
     let exist_document = coll
-        .find_one(bson::doc! {"name": &topic_new.name}, None)
+        .find_one(doc! {"name": &topic_new.name}, None)
         .await
         .unwrap();
     if let Some(_document) = exist_document {
@@ -54,7 +54,7 @@ pub async fn topic_new(
     }
 
     let topic_document = coll
-        .find_one(bson::doc! {"name": &topic_new.name}, None)
+        .find_one(doc! {"name": &topic_new.name}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -72,7 +72,7 @@ pub async fn topic_article_new(
     let coll = db.collection("topics_articles");
 
     let exist_document = coll
-        .find_one(bson::doc! {"topic_id": &topic_article_new.topic_id, "article_id": &topic_article_new.article_id}, None)
+        .find_one(doc! {"topic_id": &topic_article_new.topic_id, "article_id": &topic_article_new.article_id}, None)
         .await
         .unwrap();
     if let Some(_document) = exist_document {
@@ -93,7 +93,7 @@ pub async fn topic_article_new(
     }
 
     let topic_article_document = coll
-        .find_one(bson::doc! {"topic_id": &topic_article_new.topic_id, "article_id": &topic_article_new.article_id}, None)
+        .find_one(doc! {"topic_id": &topic_article_new.topic_id, "article_id": &topic_article_new.article_id}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -118,7 +118,7 @@ pub async fn topics_by_article_id(
 
     let coll = db.collection("topics");
     let mut cursor =
-        coll.find(bson::doc! {"_id": {"$in": topic_ids}}, None).await?;
+        coll.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
 
     let mut topics: Vec<Topic> = vec![];
     while let Some(result) = cursor.next().await {
@@ -143,7 +143,7 @@ async fn topics_articles_by_article_id(
 ) -> Vec<TopicArticle> {
     let coll_topics_articles = db.collection("topics_articles");
     let mut cursor_topics_articles = coll_topics_articles
-        .find(bson::doc! {"article_id": article_id}, None)
+        .find(doc! {"article_id": article_id}, None)
         .await
         .unwrap();
 

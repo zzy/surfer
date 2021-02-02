@@ -19,7 +19,7 @@ bson = "1.1.0"
 serde = { version = "1.0.123", features = ["derive"] }
 
 jsonwebtoken = "7.2.0"
-ring = "0.16.19"
+ring = "0.16.20"
 base64 = "0.13.0"
 
 unicode-segmentation = "1.7.1"

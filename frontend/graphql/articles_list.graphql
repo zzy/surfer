@@ -1,7 +1,7 @@
 query ArticlesList {
   articlesList {
     id
-    username
+    userId
     subject
     slug
     uri

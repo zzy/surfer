@@ -1,13 +1,13 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
-use mongodb::Database;
-use bson::oid::ObjectId;
+use mongodb::{Database, options::FindOptions};
+use bson::{doc, oid::ObjectId};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::{constant::GqlResult, common::web_base_uri};
 use crate::articles::models::{Article, ArticleNew};
-use crate::users::services::user_by_id;
+use crate::users;
 
 pub async fn article_new(
     db: Database,
@@ -17,7 +17,7 @@ pub async fn article_new(
 
     let exist_document = coll
         .find_one(
-            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -37,7 +37,9 @@ pub async fn article_new(
         }
         let slug = subject_seg.join("-");
 
-        let user = user_by_id(db.clone(), &article_new.user_id).await?;
+        let user =
+            users::services::user_by_id(db.clone(), &article_new.user_id)
+                .await?;
         let uri =
             format!("{}/{}/{}", web_base_uri().await, &user.username, &slug);
 
@@ -63,7 +65,7 @@ pub async fn article_new(
 
     let article_document = coll
         .find_one(
-            bson::doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -75,15 +77,20 @@ pub async fn article_new(
     Ok(article)
 }
 
-pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
+pub async fn articles_list(
+    db: Database,
+    published: &i32,
+) -> GqlResult<Vec<Article>> {
+    let mut find_doc = doc! {};
+    if published > &0 {
+        find_doc.insert("published", true);
+    } else if published < &0 {
+        find_doc.insert("published", false);
+    }
     let coll = db.collection("articles");
+    let mut cursor = coll.find(find_doc, None).await.unwrap();
 
     let mut articles: Vec<Article> = vec![];
-
-    // Query all documents in the collection.
-    let mut cursor = coll.find(None, None).await.unwrap();
-
-    // Iterate over the results of the cursor.
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
@@ -108,15 +115,18 @@ pub async fn articles_list(db: Database) -> GqlResult<Vec<Article>> {
 pub async fn articles_by_user_id(
     db: Database,
     user_id: &ObjectId,
+    published: &i32,
 ) -> GqlResult<Vec<Article>> {
+    let mut find_doc = doc! {"user_id": user_id};
+    if published > &0 {
+        find_doc.insert("published", true);
+    } else if published < &0 {
+        find_doc.insert("published", false);
+    }
     let coll = db.collection("articles");
+    let mut cursor = coll.find(find_doc, None).await?;
 
     let mut articles: Vec<Article> = vec![];
-
-    // Query all documents in the collection.
-    let mut cursor = coll.find(bson::doc! {"user_id": user_id}, None).await?;
-
-    // Iterate over the results of the cursor.
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
@@ -135,43 +145,27 @@ pub async fn articles_by_user_id(
 pub async fn articles_by_username(
     db: Database,
     username: &str,
+    published: &i32,
 ) -> GqlResult<Vec<Article>> {
-    let coll = db.collection("articles");
-
-    let mut articles: Vec<Article> = vec![];
-
-    // Query all documents in the collection.
-    let mut cursor = coll.find(bson::doc! {"username": username}, None).await?;
-
-    // Iterate over the results of the cursor.
-    while let Some(result) = cursor.next().await {
-        match result {
-            Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document))?;
-                articles.push(article);
-            }
-            Err(error) => {
-                println!("Error to find doc: {}", error);
-            }
-        }
-    }
-
-    Ok(articles)
+    let user = users::services::user_by_username(db.clone(), username).await?;
+    self::articles_by_user_id(db, &user._id, published).await
 }
 
 pub async fn articles_by_category_id(
     db: Database,
     category_id: &ObjectId,
+    published: &i32,
 ) -> GqlResult<Vec<Article>> {
+    let mut find_doc = doc! {"category_id": category_id};
+    if published > &0 {
+        find_doc.insert("published", true);
+    } else if published < &0 {
+        find_doc.insert("published", false);
+    }
     let coll = db.collection("articles");
+    let mut cursor = coll.find(find_doc, None).await?;
 
     let mut articles: Vec<Article> = vec![];
-
-    // Query all documents in the collection.
-    let mut cursor =
-        coll.find(bson::doc! {"category_id": category_id}, None).await?;
-
-    // Iterate over the results of the cursor.
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
@@ -196,7 +190,7 @@ pub async fn article_by_slug(
 
     // Query all documents in the collection.
     let article_document = coll
-        .find_one(bson::doc! {"username": username, "slug": slug}, None)
+        .find_one(doc! {"username": username, "slug": slug}, None)
         .await
         .expect("Document not found")
         .unwrap();
@@ -204,4 +198,44 @@ pub async fn article_by_slug(
     let article: Article =
         bson::from_bson(bson::Bson::Document(article_document)).unwrap();
     Ok(article)
+}
+
+pub async fn articles_in_position(
+    db: Database,
+    username: &str,
+    position: &str,
+    limit: i64,
+) -> GqlResult<Vec<Article>> {
+    let coll = db.collection("articles");
+
+    let mut find_doc = doc! {"published": true};
+    if "".ne(username.trim()) {
+        let user =
+            users::services::user_by_username(db.clone(), username).await?;
+        find_doc.insert("user_id", &user._id);
+    }
+    if "top".eq(position.trim()) {
+        find_doc.insert("top", true);
+    }
+    if "recommended".eq(position.trim()) {
+        find_doc.insert("recommended", true);
+    }
+
+    let find_options = FindOptions::builder().limit(limit).build();
+    let mut cursor = coll.find(find_doc, find_options).await?;
+
+    let mut articles: Vec<Article> = vec![];
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(document) => {
+                let article = bson::from_bson(bson::Bson::Document(document))?;
+                articles.push(article);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    Ok(articles)
 }

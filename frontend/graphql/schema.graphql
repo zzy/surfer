@@ -8,24 +8,55 @@ directive @ifdef on FIELD
 
 type Article {
   id: ObjectId!
-  username: String!
+  userId: ObjectId!
   subject: String!
+  categoryId: ObjectId!
+  summary: String!
   slug: String!
   uri: String!
   content: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
   published: Boolean!
   top: Boolean!
   recommended: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  category: Category!
+  topics: [Topic!]!
 }
 
 input ArticleNew {
-  username: String!
+  userId: ObjectId!
   subject: String!
+  categoryId: ObjectId!
+  summary: String!
   content: String!
   createdAt: DateTime!
   updatedAt: DateTime!
+}
+
+type Category {
+  id: ObjectId!
+  name: String!
+  description: String!
+  slug: String!
+  uri: String!
+  articles: [Article!]!
+}
+
+input CategoryNew {
+  name: String!
+  description: String!
+}
+
+type CategoryUser {
+  id: ObjectId!
+  userId: ObjectId!
+  categoryId: ObjectId!
+}
+
+input CategoryUserNew {
+  userId: ObjectId!
+  categoryId: ObjectId!
 }
 
 scalar DateTime
@@ -35,6 +66,10 @@ type MutationRoot {
   userChangePassword(pwdCur: String!, pwdNew: String!, token: String!): User!
   userUpdateProfile(userNew: UserNew!, token: String!): User!
   articleNew(articleNew: ArticleNew!): Article!
+  categoryNew(categoryNew: CategoryNew!): Category!
+  categoryUserNew(categoryUserNew: CategoryUserNew!): CategoryUser!
+  topicNew(topicNew: TopicNew!): Topic!
+  topicArticleNew(topicArticleNew: TopicArticleNew!): TopicArticle!
 }
 
 scalar ObjectId
@@ -46,14 +81,44 @@ type QueryRoot {
   userSignIn(signature: String!, password: String!): SignInfo!
   usersList(token: String!): [User!]!
   articlesList: [Article!]!
+  articlesByUserId(userId: ObjectId!): [Article!]!
   articlesByUsername(username: String!): [Article!]!
+  articlesByCategoryId(categoryId: ObjectId!): [Article!]!
   articleBySlug(username: String!, slug: String!): Article!
+  categoriesList: [Category!]!
+  categoriesByUserId(userId: ObjectId!): [Category!]!
+  categoriesByUsername(username: String!): [Category!]!
+  categoryById(id: ObjectId!): Category!
+  categoryBySlug(slug: String!): Category!
+  topicsByArticleId(articleId: ObjectId!): [Topic!]!
 }
 
 type SignInfo {
   email: String!
   username: String!
   token: String!
+}
+
+type Topic {
+  id: ObjectId!
+  name: String!
+  slug: String!
+  uri: String!
+}
+
+type TopicArticle {
+  id: ObjectId!
+  articleId: ObjectId!
+  topicId: ObjectId!
+}
+
+input TopicArticleNew {
+  articleId: ObjectId!
+  topicId: ObjectId!
+}
+
+input TopicNew {
+  name: String!
 }
 
 type User {
@@ -66,6 +131,7 @@ type User {
   createdAt: DateTime!
   updatedAt: DateTime!
   banned: Boolean!
+  introduction: String!
   articles: [Article!]!
 }
 
@@ -78,4 +144,5 @@ input UserNew {
   website: String!
   createdAt: DateTime!
   updatedAt: DateTime!
+  introduction: String!
 }
