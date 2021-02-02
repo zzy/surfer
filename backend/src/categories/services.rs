@@ -17,10 +17,8 @@ pub async fn category_new(
 ) -> GqlResult<Category> {
     let coll = db.collection("categories");
 
-    let exist_document = coll
-        .find_one(doc! {"name": &category_new.name}, None)
-        .await
-        .unwrap();
+    let exist_document =
+        coll.find_one(doc! {"name": &category_new.name}, None).await?;
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
@@ -105,7 +103,7 @@ pub async fn category_user_new(
 }
 
 // get all categories
-pub async fn categories_list(db: Database) -> GqlResult<Vec<Category>> {
+pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
     let coll = db.collection("categories");
 
     let mut categories: Vec<Category> = vec![];
@@ -149,9 +147,8 @@ pub async fn categories_by_user_id(
     }
 
     let coll_categories = db.collection("categories");
-    let mut cursor_categories = coll_categories
-        .find(doc! {"_id": {"$in": category_ids}}, None)
-        .await?;
+    let mut cursor_categories =
+        coll_categories.find(doc! {"_id": {"$in": category_ids}}, None).await?;
 
     let mut categories: Vec<Category> = vec![];
     while let Some(result) = cursor_categories.next().await {

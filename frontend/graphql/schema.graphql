@@ -79,13 +79,18 @@ type QueryRoot {
   userByEmail(email: String!): User!
   userByUsername(username: String!): User!
   userSignIn(signature: String!, password: String!): SignInfo!
-  usersList(token: String!): [User!]!
-  articlesList: [Article!]!
-  articlesByUserId(userId: ObjectId!): [Article!]!
-  articlesByUsername(username: String!): [Article!]!
-  articlesByCategoryId(categoryId: ObjectId!): [Article!]!
+  users(token: String!): [User!]!
+  articles(published: Int!): [Article!]!
+  articlesInPosition(
+    username: String!
+    position: String!
+    limit: Int!
+  ): [Article!]!
+  articlesByUserId(userId: ObjectId!, published: Int!): [Article!]!
+  articlesByUsername(username: String!, published: Int!): [Article!]!
+  articlesByCategoryId(categoryId: ObjectId!, published: Int!): [Article!]!
   articleBySlug(username: String!, slug: String!): Article!
-  categoriesList: [Category!]!
+  categories: [Category!]!
   categoriesByUserId(userId: ObjectId!): [Category!]!
   categoriesByUsername(username: String!): [Category!]!
   categoryById(id: ObjectId!): Category!
@@ -132,7 +137,7 @@ type User {
   updatedAt: DateTime!
   banned: Boolean!
   introduction: String!
-  articles: [Article!]!
+  articles(published: Int!): [Article!]!
 }
 
 input UserNew {

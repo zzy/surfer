@@ -56,23 +56,23 @@ impl QueryRoot {
     }
 
     // Get all Users,
-    async fn users_list(
+    async fn users(
         &self,
         ctx: &Context<'_>,
         token: String,
     ) -> GqlResult<Vec<User>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        users::services::users_list(db, &token).await
+        users::services::users(db, &token).await
     }
 
     // Get all articles
-    async fn articles_list(
+    async fn articles(
         &self,
         ctx: &Context<'_>,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::articles_list(db, &published).await
+        articles::services::articles(db, &published).await
     }
 
     async fn articles_in_position(
@@ -140,12 +140,9 @@ impl QueryRoot {
     }
 
     // Get all categories
-    async fn categories_list(
-        &self,
-        ctx: &Context<'_>,
-    ) -> GqlResult<Vec<Category>> {
+    async fn categories(&self, ctx: &Context<'_>) -> GqlResult<Vec<Category>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        categories::services::categories_list(db).await
+        categories::services::categories(db).await
     }
 
     // Get all categories by user_id

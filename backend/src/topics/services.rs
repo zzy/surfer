@@ -16,10 +16,8 @@ pub async fn topic_new(
 ) -> GqlResult<Topic> {
     let coll = db.collection("topics");
 
-    let exist_document = coll
-        .find_one(doc! {"name": &topic_new.name}, None)
-        .await
-        .unwrap();
+    let exist_document =
+        coll.find_one(doc! {"name": &topic_new.name}, None).await?;
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
@@ -117,8 +115,7 @@ pub async fn topics_by_article_id(
     }
 
     let coll = db.collection("topics");
-    let mut cursor =
-        coll.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
+    let mut cursor = coll.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
 
     let mut topics: Vec<Topic> = vec![];
     while let Some(result) = cursor.next().await {

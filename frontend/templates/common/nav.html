@@ -1,5 +1,5 @@
 <nav class="nav d-flex justify-content-evenly">
-    {{#each navs as |nav|}}
-        <a class="p-2 link-secondary" href="#">{{ nav }}</a>
+    {{#each categories as |category|}}
+        <a class="p-2 link-secondary" href="{{ category.uri }}" target="_blank">{{ category.name }}</a>
     {{/each}}
 </nav>

@@ -51,8 +51,7 @@ pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
 pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
     let coll = db.collection("users");
 
-    let exist_document =
-        coll.find_one(doc! {"username": username}, None).await;
+    let exist_document = coll.find_one(doc! {"username": username}, None).await;
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
@@ -178,7 +177,7 @@ pub async fn user_sign_in(
     }
 }
 
-pub async fn users_list(db: Database, token: &str) -> GqlResult<Vec<User>> {
+pub async fn users(db: Database, token: &str) -> GqlResult<Vec<User>> {
     let token_data = token_data(token).await;
     if token_data.is_ok() {
         let coll = db.collection("users");
@@ -284,13 +283,9 @@ pub async fn user_update_profile(
             let user_bson = bson::to_bson(&user).unwrap();
             let user_doc = user_bson.as_document().unwrap().to_owned();
 
-            coll.find_one_and_replace(
-                doc! {"_id": &user._id},
-                user_doc,
-                None,
-            )
-            .await
-            .expect("Failed to replace a MongoDB collection!");
+            coll.find_one_and_replace(doc! {"_id": &user._id}, user_doc, None)
+                .await
+                .expect("Failed to replace a MongoDB collection!");
 
             Ok(user)
         } else {

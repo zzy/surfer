@@ -7,7 +7,7 @@ query ArticleBySlug(
     slug: $slug
   ) {
     id
-    username
+    userId
     subject
     slug
     uri

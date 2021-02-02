@@ -10,12 +10,36 @@ use crate::util::common::{gql_uri, tpl_dir, Tpl};
 type ObjectId = String;
 type DateTime = chrono::DateTime<Local>;
 
-pub async fn index(_req: Request<State>) -> tide::Result {
-    let mut index: Tpl = Tpl::new("index").await;
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/index.graphql",
+    response_derives = "Debug"
+)]
+struct IndexData;
 
+pub async fn index(_req: Request<State>) -> tide::Result {
+    // make data and render it
+    let build_query = IndexData::build_query(index_data::Variables {
+        username: "-".to_string(),
+    });
+    let query = json!(build_query);
+
+    let resp_body: Response<serde_json::Value> =
+        surf::post(&gql_uri().await).body(query).recv_json().await?;
+    let resp_data = resp_body.data.expect("missing response data");
+
+    let mut index: Tpl = Tpl::new("index").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
-    let navs = json!(vec!["test1", "test2", "test3"]);
-    data.insert("navs", navs);
+
+    let categories = resp_data["categories"].clone();
+    data.insert("categories", categories);
+
+    let top_articles = resp_data["topArticles"].clone();
+    data.insert("top_articles", top_articles);
+
+    let recommended_articles = resp_data["recommendedArticles"].clone();
+    data.insert("recommended_articles", recommended_articles);
 
     index.reg_head(&mut data).await;
     index.reg_header(&mut data).await;

@@ -77,7 +77,7 @@ pub async fn article_new(
     Ok(article)
 }
 
-pub async fn articles_list(
+pub async fn articles(
     db: Database,
     published: &i32,
 ) -> GqlResult<Vec<Article>> {
@@ -209,7 +209,7 @@ pub async fn articles_in_position(
     let coll = db.collection("articles");
 
     let mut find_doc = doc! {"published": true};
-    if "".ne(username.trim()) {
+    if "".ne(username.trim()) && "-".ne(username.trim()) {
         let user =
             users::services::user_by_username(db.clone(), username).await?;
         find_doc.insert("user_id", &user._id);

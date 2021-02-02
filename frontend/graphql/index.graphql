@@ -1,0 +1,47 @@
+query IndexData(
+  $username: String!
+) {
+  categories {
+    name
+    description
+    uri
+  }
+
+  topArticles: articlesInPosition(
+    username: $username,
+    position: "top", 
+    limit: 1
+  ) {
+    subject
+    category {
+      name
+      uri
+    }
+    summary
+    uri
+    updatedAt
+    topics {
+      name
+      uri
+    }
+  }
+
+  recommendedArticles: articlesInPosition(
+    username: $username,
+    position: "recommended"
+    limit: 2
+  ) {
+    subject
+    category {
+      name
+      uri
+    }
+    summary
+    uri
+    updatedAt
+    topics {
+      name
+      uri
+    }
+  }
+}

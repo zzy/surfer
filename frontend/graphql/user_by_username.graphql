@@ -13,19 +13,5 @@ query UserByUsername(
     banned
     createdAt
     updatedAt
-
-    articles {
-      id
-      username
-      subject
-      slug
-      uri
-      content
-      createdAt
-      updatedAt
-      published
-      top
-      recommended
-    }
   }
 }

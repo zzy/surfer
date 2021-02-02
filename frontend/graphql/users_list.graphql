@@ -1,7 +1,7 @@
 query UsersList(
   $token: String!
 ) {
-  usersList(
+  users(
     token: $token
   ) {
     id
@@ -13,19 +13,5 @@ query UsersList(
     banned
     createdAt
     updatedAt
-
-    articles {
-      id
-      username
-      subject
-      slug
-      uri
-      content
-      published
-      top
-      recommended
-      createdAt
-      updatedAt
-    }
   }
 }

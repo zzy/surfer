@@ -17,8 +17,8 @@ serde = { version = "1.0.123", features = ["derive"] }
 serde_json = "1.0.61"
 
 surf = "2.1.0"
-handlebars = { version = "3.5.2", features = ["script_helper"] }
 graphql_client = "0.9.0"
+handlebars = { version = "3.5.2", features = ["script_helper"] }
 
 cookie = "0.14.3"
 chrono = "0.4.19"
