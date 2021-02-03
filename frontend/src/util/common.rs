@@ -114,20 +114,20 @@ impl<'tpl> Tpl<'tpl> {
         data.insert("footer", json!("footer"));
     }
 
+    pub async fn reg_script_value_check(&mut self) {
+        self.reg
+            .register_script_helper_file(
+                "value-check",
+                format!("{}{}", scripts_dir().await, "value-check.rhai"),
+            )
+            .unwrap();
+    }
+
     pub async fn reg_script_website_svg(&mut self) {
         self.reg
             .register_script_helper_file(
                 "website-svg",
                 format!("{}{}", scripts_dir().await, "website-svg.rhai"),
-            )
-            .unwrap();
-    }
-
-    pub async fn reg_script_blog_name(&mut self) {
-        self.reg
-            .register_script_helper_file(
-                "blog-name",
-                format!("{}{}", scripts_dir().await, "blog-name.rhai"),
             )
             .unwrap();
     }

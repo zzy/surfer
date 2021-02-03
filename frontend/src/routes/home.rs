@@ -39,12 +39,15 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     let recommended_articles = resp_data["recommendedArticles"].clone();
     data.insert("recommended_articles", recommended_articles);
 
+    let articles = resp_data["articles"].clone();
+    data.insert("articles", articles);
+
     index.reg_head(&mut data).await;
     index.reg_header(&mut data).await;
     index.reg_nav(&mut data).await;
     index.reg_footer(&mut data).await;
 
-    index.reg_script_blog_name().await;
+    index.reg_script_value_check().await;
     index.reg_script_website_svg().await;
 
     index.reg.register_script_helper_file(
@@ -66,7 +69,7 @@ struct UserByUsername;
 pub async fn user_index(req: Request<State>) -> tide::Result {
     let mut user_tpl: Tpl = Tpl::new("users/index").await;
     user_tpl.reg_script_website_svg().await;
-    user_tpl.reg_script_blog_name().await;
+    user_tpl.reg_script_value_check().await;
 
     let username = req.param("username").unwrap();
 
@@ -138,7 +141,7 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     data.insert("user", resp_data["userByUsername"].clone());
 
     article_tpl.reg_script_website_svg().await;
-    article_tpl.reg_script_blog_name().await;
+    article_tpl.reg_script_value_check().await;
 
     article_tpl.reg_head(&mut data).await;
     article_tpl.reg_header(&mut data).await;

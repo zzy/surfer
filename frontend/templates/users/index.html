@@ -2,7 +2,7 @@
 <html lang="zh">
 
   <head>
-    <title>{{ blog-name user.blogName }} - budshome.com</title>
+    <title>{{ value-check user.blogName "blog-rust" }} - budshome.com</title>
 
     <link rel="icon" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/static/favicon.png">
@@ -18,12 +18,12 @@
   </head>
 
   <body>
-{{data1}}
+    {{data1}}
 
-      <ul>{{user.slug}}</ul>
-      {{#each user.articles as |article|}}
-        {{article.slug}}
-      {{/each}}
+    <ul>{{user.slug}}</ul>
+    {{#each user.articles as |article|}}
+      {{article.slug}}
+    {{/each}}
 
 
     <div class="container">
@@ -34,7 +34,7 @@
           </div>
           <div class="col-4 text-center">
             <a class="blog-header-logo text-dark" href="{{ user.website }}" target="_blank">
-              {{ blog-name user.blogName }}
+              {{ value-check user.blogName "blog-rust" }}
               <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
                 <path d="{{ website-svg user.website }}" />
               </svg>

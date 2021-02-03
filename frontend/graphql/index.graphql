@@ -54,4 +54,25 @@ query IndexData(
       blogName
     }
   }
+
+  articles(
+    published: 1
+  ) {
+    subject
+    category {
+      name
+      uri
+    }
+    summary
+    uri
+    updatedAt
+    topics {
+      name
+      uri
+    }
+    user {
+      username
+      nickname
+    }
+  }
 }

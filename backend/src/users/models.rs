@@ -35,7 +35,7 @@ impl User {
     }
 
     pub async fn nickname(&self) -> &str {
-        self.username.as_str()
+        self.nickname.as_str()
     }
 
     pub async fn blog_name(&self) -> &str {
