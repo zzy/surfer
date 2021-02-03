@@ -18,8 +18,9 @@ type Article {
   published: Boolean!
   top: Boolean!
   recommended: Boolean!
-  createdAt: DateTime!
-  updatedAt: DateTime!
+  createdAt: String!
+  updatedAt: String!
+  user: User!
   category: Category!
   topics: [Topic!]!
 }
@@ -133,8 +134,8 @@ type User {
   nickname: String!
   blogName: String!
   website: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
+  createdAt: String!
+  updatedAt: String!
   banned: Boolean!
   introduction: String!
   articles(published: Int!): [Article!]!

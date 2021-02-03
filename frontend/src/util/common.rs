@@ -19,11 +19,11 @@ pub async fn gql_uri() -> String {
     format!("{}://{}:{}/{}/{}", gql_prot, gql_addr, gql_port, gql_uri, gql_path)
 }
 
-pub async fn rhai_dir() -> String {
-    format!("./{}/", "./rhai")
+pub async fn scripts_dir() -> String {
+    format!("./{}/", "./scripts")
 }
 
-pub async fn tpl_dir() -> String {
+pub async fn tpls_dir() -> String {
     format!("./{}/", "./templates")
 }
 
@@ -35,7 +35,7 @@ pub struct Tpl<'tpl> {
 impl<'tpl> Tpl<'tpl> {
     pub async fn new(rel_path: &str) -> Tpl<'tpl> {
         let tpl_name = &rel_path.replace("/", "_");
-        let abs_path = format!("{}{}.html", tpl_dir().await, rel_path);
+        let abs_path = format!("{}{}.html", tpls_dir().await, rel_path);
 
         // create the handlebars registry
         let mut hbs_reg = Handlebars::new();
@@ -65,7 +65,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "head",
-                format!("{}{}", tpl_dir().await, "common/head.html"),
+                format!("{}{}", tpls_dir().await, "common/head.html"),
             )
             .unwrap();
 
@@ -79,7 +79,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "header",
-                format!("{}{}", tpl_dir().await, "common/header.html"),
+                format!("{}{}", tpls_dir().await, "common/header.html"),
             )
             .unwrap();
 
@@ -93,7 +93,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "nav",
-                format!("{}{}", tpl_dir().await, "common/nav.html"),
+                format!("{}{}", tpls_dir().await, "common/nav.html"),
             )
             .unwrap();
 
@@ -107,7 +107,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_template_file(
                 "footer",
-                format!("{}{}", tpl_dir().await, "common/footer.html"),
+                format!("{}{}", tpls_dir().await, "common/footer.html"),
             )
             .unwrap();
 
@@ -118,7 +118,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_script_helper_file(
                 "website-svg",
-                format!("{}{}", rhai_dir().await, "website-svg.rhai"),
+                format!("{}{}", scripts_dir().await, "website-svg.rhai"),
             )
             .unwrap();
     }
@@ -127,7 +127,7 @@ impl<'tpl> Tpl<'tpl> {
         self.reg
             .register_script_helper_file(
                 "blog-name",
-                format!("{}{}", rhai_dir().await, "blog-name.rhai"),
+                format!("{}{}", scripts_dir().await, "blog-name.rhai"),
             )
             .unwrap();
     }

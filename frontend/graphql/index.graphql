@@ -24,6 +24,11 @@ query IndexData(
       name
       uri
     }
+    user {
+      username
+      nickname
+      blogName
+    }
   }
 
   recommendedArticles: articlesInPosition(
@@ -42,6 +47,11 @@ query IndexData(
     topics {
       name
       uri
+    }
+    user {
+      username
+      nickname
+      blogName
     }
   }
 }

@@ -46,12 +46,12 @@ impl User {
         self.website.as_str()
     }
 
-    pub async fn created_at(&self) -> DateTime {
-        self.created_at
+    pub async fn created_at(&self) -> String {
+        self.created_at.to_string()
     }
 
-    pub async fn updated_at(&self) -> DateTime {
-        self.updated_at
+    pub async fn updated_at(&self) -> String {
+        self.updated_at.to_string()
     }
 
     pub async fn banned(&self) -> bool {

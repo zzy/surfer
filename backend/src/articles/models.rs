@@ -5,6 +5,7 @@ use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
 use crate::categories::{self, models::Category};
 use crate::topics::{self, models::Topic};
+use crate::users::{self, models::User};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Article {
@@ -69,12 +70,20 @@ impl Article {
         self.recommended
     }
 
-    pub async fn created_at(&self) -> DateTime {
-        self.created_at
+    pub async fn created_at(&self) -> String {
+        self.created_at.to_string()
     }
 
-    pub async fn updated_at(&self) -> DateTime {
-        self.updated_at
+    pub async fn updated_at(&self) -> String {
+        self.updated_at.to_string()
+    }
+
+    pub async fn user(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<User> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        users::services::user_by_id(db, &self.user_id).await
     }
 
     pub async fn category(

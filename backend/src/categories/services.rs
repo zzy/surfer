@@ -5,7 +5,7 @@ use bson::{doc, oid::ObjectId};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
-use crate::util::{constant::GqlResult, common::web_base_uri};
+use crate::util::constant::GqlResult;
 use crate::categories::models::{
     Category, CategoryUser, CategoryNew, CategoryUserNew,
 };
@@ -33,7 +33,7 @@ pub async fn category_new(
             }
         }
         let slug = name_seg.join("-");
-        let uri = format!("{}/categories/{}", web_base_uri().await, &slug);
+        let uri = format!("/categories/{}", &slug);
 
         category_new.slug = slug;
         category_new.uri = uri;

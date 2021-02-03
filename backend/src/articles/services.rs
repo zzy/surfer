@@ -5,7 +5,7 @@ use bson::{doc, oid::ObjectId};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
-use crate::util::{constant::GqlResult, common::web_base_uri};
+use crate::util::constant::GqlResult;
 use crate::articles::models::{Article, ArticleNew};
 use crate::users;
 
@@ -40,8 +40,7 @@ pub async fn article_new(
         let user =
             users::services::user_by_id(db.clone(), &article_new.user_id)
                 .await?;
-        let uri =
-            format!("{}/{}/{}", web_base_uri().await, &user.username, &slug);
+        let uri = format!("/{}/{}", &user.username, &slug);
 
         article_new.slug = slug;
         article_new.uri = uri;

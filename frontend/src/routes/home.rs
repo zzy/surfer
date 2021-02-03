@@ -2,13 +2,11 @@ use std::collections::BTreeMap;
 use tide::Request;
 use graphql_client::{GraphQLQuery, Response};
 use serde_json::json;
-use chrono::Local;
 
 use crate::State;
-use crate::util::common::{gql_uri, tpl_dir, Tpl};
+use crate::util::common::{gql_uri, tpls_dir, scripts_dir, Tpl};
 
 type ObjectId = String;
-type DateTime = chrono::DateTime<Local>;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -48,6 +46,11 @@ pub async fn index(_req: Request<State>) -> tide::Result {
 
     index.reg_script_blog_name().await;
     index.reg_script_website_svg().await;
+
+    index.reg.register_script_helper_file(
+        "str-trc",
+        format!("{}{}", scripts_dir().await, "str-trc.rhai"),
+    )?;
 
     index.render(&data).await
 }
@@ -100,7 +103,7 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
 
     article_tpl.reg.register_template_file(
         "base",
-        format!("{}{}", tpl_dir().await, "base.html"),
+        format!("{}{}", tpls_dir().await, "base.html"),
     )?;
 
     let username = req.param("username").unwrap();
