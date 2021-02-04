@@ -6,9 +6,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::constant::GqlResult;
-use crate::categories::models::{
-    Category, CategoryUser, CategoryNew, CategoryUserNew,
-};
+
+use super::models::{Category, CategoryUser, CategoryNew, CategoryUserNew};
 
 // Create new category
 pub async fn category_new(

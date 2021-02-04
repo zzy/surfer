@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use bson::oid::ObjectId;
+use bson::{oid::ObjectId, DateTime};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Topic {
@@ -7,6 +7,8 @@ pub struct Topic {
     pub name: String,
     pub slug: String,
     pub uri: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[async_graphql::Object]
@@ -26,6 +28,14 @@ impl Topic {
     pub async fn uri(&self) -> &str {
         self.uri.as_str()
     }
+
+    pub async fn created_at(&self) -> String {
+        self.created_at.to_string()
+    }
+
+    pub async fn updated_at(&self) -> String {
+        self.updated_at.to_string()
+    }
 }
 
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
@@ -35,6 +45,8 @@ pub struct TopicNew {
     pub slug: String,
     #[graphql(skip)]
     pub uri: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

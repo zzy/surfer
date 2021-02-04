@@ -4,7 +4,7 @@ use crate::dbs::mongo::DataSource;
 use crate::util::constant::GqlResult;
 use crate::users::{
     self,
-    models::{User, UserNew},
+    models::{User, UserNew, Wish, WishNew},
 };
 use crate::articles::{
     self,
@@ -105,5 +105,15 @@ impl MutationRoot {
     ) -> GqlResult<TopicArticle> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         topics::services::topic_article_new(db, topic_article_new).await
+    }
+
+    // Add new wish
+    async fn wish_new(
+        &self,
+        ctx: &Context<'_>,
+        wish_new: WishNew,
+    ) -> GqlResult<Wish> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        users::services::wish_new(db, wish_new).await
     }
 }

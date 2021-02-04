@@ -1,6 +1,6 @@
 use futures::stream::StreamExt;
 use mongodb::Database;
-use bson::{doc, oid::ObjectId};
+use bson::{Document, doc, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use regex::Regex;
@@ -9,7 +9,8 @@ use crate::util::{
     constant::{CFG, GqlResult},
     common::{Claims, token_data},
 };
-use crate::users::models::{User, UserNew, SignInfo};
+
+use super::models::{User, UserNew, SignInfo, Wish, WishNew};
 
 // get user info by id
 pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
@@ -296,5 +297,110 @@ pub async fn user_update_profile(
         Err(Error::new("user_update_profile").extend_with(|_, e| {
             e.set("details", format!("{}", token_data.err().unwrap()))
         }))
+    }
+}
+
+// Create new wish
+pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
+    let coll = db.collection("wishes");
+
+    let exist_document = coll
+        .find_one(
+            doc! {"user_id": &wish_new.user_id, "aphorism": &wish_new.aphorism},
+            None,
+        )
+        .await?;
+    if let Some(_document) = exist_document {
+        println!("MongoDB document is exist!");
+    } else {
+        let wish_new_bson = bson::to_bson(&wish_new)?;
+
+        if let bson::Bson::Document(document) = wish_new_bson {
+            // Insert into a MongoDB collection
+            coll.insert_one(document, None)
+                .await
+                .expect("Failed to insert into a MongoDB collection!");
+        } else {
+            println!(
+                "Error converting the BSON object into a MongoDB document"
+            );
+        };
+    }
+
+    let wish_document = coll
+        .find_one(
+            doc! {"user_id": &wish_new.user_id, "aphorism": &wish_new.aphorism},
+            None,
+        )
+        .await
+        .expect("Document not found")
+        .unwrap();
+
+    let wish: Wish = bson::from_bson(bson::Bson::Document(wish_document))?;
+    Ok(wish)
+}
+
+// get all wishes
+pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
+    let mut find_doc = doc! {};
+    if published > &0 {
+        find_doc.insert("published", true);
+    } else if published < &0 {
+        find_doc.insert("published", false);
+    }
+    let coll = db.collection("wishes");
+    let mut cursor = coll.find(find_doc, None).await?;
+
+    let mut wishes: Vec<Wish> = vec![];
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(document) => {
+                let wish =
+                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                wishes.push(wish);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    if wishes.len() > 0 {
+        Ok(wishes)
+    } else {
+        Err(Error::new("9-all-wishes")
+            .extend_with(|_, e| e.set("details", "No records")))
+    }
+}
+
+// get random wish
+pub async fn random_wish(db: Database, username: &str) -> GqlResult<Wish> {
+    let mut find_doc = doc! {"published": true};
+    if "".ne(username.trim()) && "-".ne(username.trim()) {
+        let user = self::user_by_username(db.clone(), username).await?;
+        find_doc.insert("user_id", &user._id);
+    }
+    let match_doc = doc! {"$match": find_doc};
+
+    let one_wish = self::one_wish(db.clone(), match_doc).await;
+    if one_wish.is_ok() {
+        one_wish
+    } else {
+        self::one_wish(db, doc! {"$match": {"published": true}}).await
+    }
+}
+
+async fn one_wish(db: Database, match_doc: Document) -> GqlResult<Wish> {
+    let coll = db.collection("wishes");
+    let mut cursor = coll
+        .aggregate(vec![doc! {"$sample": {"size": 1}}, match_doc], None)
+        .await?;
+
+    if let Some(result) = cursor.next().await {
+        let wish = bson::from_bson(bson::Bson::Document(result?))?;
+        Ok(wish)
+    } else {
+        Err(Error::new("9-find-one-wish")
+            .extend_with(|_, e| e.set("details", "No records")))
     }
 }

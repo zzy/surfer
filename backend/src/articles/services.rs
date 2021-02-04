@@ -6,8 +6,9 @@ use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::constant::GqlResult;
-use crate::articles::models::{Article, ArticleNew};
 use crate::users;
+
+use super::models::{Article, ArticleNew};
 
 pub async fn article_new(
     db: Database,
@@ -205,8 +206,6 @@ pub async fn articles_in_position(
     position: &str,
     limit: i64,
 ) -> GqlResult<Vec<Article>> {
-    let coll = db.collection("articles");
-
     let mut find_doc = doc! {"published": true};
     if "".ne(username.trim()) && "-".ne(username.trim()) {
         let user =
@@ -220,6 +219,7 @@ pub async fn articles_in_position(
         find_doc.insert("recommended", true);
     }
 
+    let coll = db.collection("articles");
     let find_options = FindOptions::builder().limit(limit).build();
     let mut cursor = coll.find(find_doc, find_options).await?;
 

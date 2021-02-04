@@ -5,7 +5,7 @@ use crate::dbs::mongo::DataSource;
 use crate::util::constant::GqlResult;
 use crate::users::{
     self,
-    models::{User, SignInfo},
+    models::{User, SignInfo, Wish},
 };
 use crate::articles::{self, models::Article};
 use crate::categories::{self, models::Category};
@@ -193,5 +193,25 @@ impl QueryRoot {
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         topics::services::topics_by_article_id(db, &article_id).await
+    }
+
+    // search all wishes
+    async fn wishes(
+        &self,
+        ctx: &Context<'_>,
+        published: i32,
+    ) -> GqlResult<Vec<Wish>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        users::services::wishes(db, &published).await
+    }
+
+    // get random wish
+    async fn random_wish(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+    ) -> GqlResult<Wish> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        users::services::random_wish(db, &username).await
     }
 }

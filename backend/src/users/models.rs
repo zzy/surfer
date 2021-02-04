@@ -108,3 +108,64 @@ impl SignInfo {
         self.token.as_str()
     }
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Wish {
+    pub _id: ObjectId,
+    pub user_id: ObjectId,
+    pub aphorism: String,
+    pub author: String,
+    pub published: bool,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}
+
+#[async_graphql::Object]
+impl Wish {
+    pub async fn id(&self) -> ObjectId {
+        self._id.clone()
+    }
+
+    pub async fn user_id(&self) -> ObjectId {
+        self.user_id.clone()
+    }
+
+    pub async fn aphorism(&self) -> &str {
+        self.aphorism.as_str()
+    }
+
+    pub async fn author(&self) -> &str {
+        self.author.as_str()
+    }
+
+    pub async fn published(&self) -> bool {
+        self.published
+    }
+
+    pub async fn created_at(&self) -> String {
+        self.created_at.to_string()
+    }
+
+    pub async fn updated_at(&self) -> String {
+        self.updated_at.to_string()
+    }
+
+    pub async fn user(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<User> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        super::services::user_by_id(db, &self.user_id).await
+    }
+}
+
+#[derive(Serialize, Deserialize, async_graphql::InputObject)]
+pub struct WishNew {
+    pub user_id: ObjectId,
+    pub aphorism: String,
+    pub author: String,
+    #[graphql(skip)]
+    pub published: bool,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}

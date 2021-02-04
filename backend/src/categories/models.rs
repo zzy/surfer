@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use bson::oid::ObjectId;
+use bson::{oid::ObjectId, DateTime};
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
@@ -12,6 +12,8 @@ pub struct Category {
     pub description: String,
     pub slug: String,
     pub uri: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[async_graphql::Object]
@@ -36,6 +38,14 @@ impl Category {
         self.uri.as_str()
     }
 
+    pub async fn created_at(&self) -> String {
+        self.created_at.to_string()
+    }
+
+    pub async fn updated_at(&self) -> String {
+        self.updated_at.to_string()
+    }
+
     pub async fn articles(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -53,6 +63,8 @@ pub struct CategoryNew {
     pub slug: String,
     #[graphql(skip)]
     pub uri: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -7,7 +7,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::constant::GqlResult;
-use crate::topics::models::{Topic, TopicNew, TopicArticle, TopicArticleNew};
+
+use super::models::{Topic, TopicNew, TopicArticle, TopicArticleNew};
 
 // Create new topic
 pub async fn topic_new(
