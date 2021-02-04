@@ -39,12 +39,16 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     let recommended_articles = resp_data["recommendedArticles"].clone();
     data.insert("recommended_articles", recommended_articles);
 
+    let wish = resp_data["wish"].clone();
+    data.insert("wish", wish);
+
     let articles = resp_data["articles"].clone();
     data.insert("articles", articles);
 
     index.reg_head(&mut data).await;
     index.reg_header(&mut data).await;
     index.reg_nav(&mut data).await;
+    index.reg_elsewhere(&mut data).await;
     index.reg_footer(&mut data).await;
 
     index.reg_script_value_check().await;

@@ -63,8 +63,12 @@
 
       <div class="row">
         <div class="col-md-8">
-          <h3 class="pb-4 mb-4 font-italic border-bottom">
-            From the Firehose
+          <h5>{{ wish.user.nickname }}
+            (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
+            shared the aphorism --
+          </h5>
+          <h3 class="pb-4 mb-4 font-italic border-bottom text-danger">
+            {{ wish.aphorism }} - {{ wish.author }}
           </h3>
 
           {{#each articles as |article| }}
@@ -109,14 +113,7 @@
             </ol>
           </div>
 
-          <div class="p-4">
-            <h4 class="font-italic">Elsewhere</h4>
-            <ol class="list-unstyled">
-              <li><a href="#">GitHub</a></li>
-              <li><a href="#">Twitter</a></li>
-              <li><a href="#">Facebook</a></li>
-            </ol>
-          </div>
+          {{> elsewhere }}
         </div>
 
       </div><!-- /.row -->

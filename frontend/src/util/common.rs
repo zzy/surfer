@@ -100,6 +100,20 @@ impl<'tpl> Tpl<'tpl> {
         data.insert("nav", json!("nav"));
     }
 
+    pub async fn reg_elsewhere(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "elsewhere",
+                format!("{}{}", tpls_dir().await, "common/elsewhere.html"),
+            )
+            .unwrap();
+
+        data.insert("elsewhere", json!("elsewhere"));
+    }
+
     pub async fn reg_footer(
         &mut self,
         data: &mut BTreeMap<&str, serde_json::Value>,

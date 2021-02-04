@@ -39,14 +39,19 @@ type Category {
   id: ObjectId!
   name: String!
   description: String!
+  quotes: Int!
   slug: String!
   uri: String!
+  createdAt: String!
+  updatedAt: String!
   articles: [Article!]!
 }
 
 input CategoryNew {
   name: String!
   description: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
 type CategoryUser {
@@ -71,6 +76,7 @@ type MutationRoot {
   categoryUserNew(categoryUserNew: CategoryUserNew!): CategoryUser!
   topicNew(topicNew: TopicNew!): Topic!
   topicArticleNew(topicArticleNew: TopicArticleNew!): TopicArticle!
+  wishNew(wishNew: WishNew!): Wish!
 }
 
 scalar ObjectId
@@ -97,6 +103,8 @@ type QueryRoot {
   categoryById(id: ObjectId!): Category!
   categoryBySlug(slug: String!): Category!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
+  wishes(published: Int!): [Wish!]!
+  randomWish(username: String!): Wish!
 }
 
 type SignInfo {
@@ -108,8 +116,11 @@ type SignInfo {
 type Topic {
   id: ObjectId!
   name: String!
+  quotes: Int!
   slug: String!
   uri: String!
+  createdAt: String!
+  updatedAt: String!
 }
 
 type TopicArticle {
@@ -125,6 +136,8 @@ input TopicArticleNew {
 
 input TopicNew {
   name: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
 type User {
@@ -151,4 +164,23 @@ input UserNew {
   createdAt: DateTime!
   updatedAt: DateTime!
   introduction: String!
+}
+
+type Wish {
+  id: ObjectId!
+  userId: ObjectId!
+  aphorism: String!
+  author: String!
+  published: Boolean!
+  createdAt: String!
+  updatedAt: String!
+  user: User!
+}
+
+input WishNew {
+  userId: ObjectId!
+  aphorism: String!
+  author: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
