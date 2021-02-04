@@ -10,7 +10,7 @@ pub struct Category {
     pub _id: ObjectId,
     pub name: String,
     pub description: String,
-    pub quotes: usize,
+    pub quotes: i64,
     pub slug: String,
     pub uri: String,
     pub created_at: DateTime,
@@ -31,7 +31,7 @@ impl Category {
         self.description.as_str()
     }
 
-    pub async fn quotes(&self) -> usize {
+    pub async fn quotes(&self) -> i64 {
         self.quotes
     }
 
@@ -65,7 +65,7 @@ pub struct CategoryNew {
     pub name: String,
     pub description: String,
     #[graphql(skip)]
-    pub quotes: usize,
+    pub quotes: i64,
     #[graphql(skip)]
     pub slug: String,
     #[graphql(skip)]

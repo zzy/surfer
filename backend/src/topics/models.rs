@@ -5,7 +5,7 @@ use bson::{oid::ObjectId, DateTime};
 pub struct Topic {
     pub _id: ObjectId,
     pub name: String,
-    pub quotes: usize,
+    pub quotes: i64,
     pub slug: String,
     pub uri: String,
     pub created_at: DateTime,
@@ -22,7 +22,7 @@ impl Topic {
         self.name.as_str()
     }
 
-    pub async fn quotes(&self) -> usize {
+    pub async fn quotes(&self) -> i64 {
         self.quotes
     }
 
@@ -47,7 +47,7 @@ impl Topic {
 pub struct TopicNew {
     pub name: String,
     #[graphql(skip)]
-    pub quotes: usize,
+    pub quotes: i64,
     #[graphql(skip)]
     pub slug: String,
     #[graphql(skip)]
