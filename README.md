@@ -1,16 +1,14 @@
 # blog-rust
 
-Clean boilerplate for graphql services using tide, async-graphql, surf, graphql-client, handlebars-rust, jsonwebtoken, and mongodb.
+A fast, simple & powerful **blog** built on *pure Rust stack*. 
 
-Demo site: [https://blog.budshome.com](https://blog.budshome.com)
+Backend for graphql services using tide, async-graphql, jsonwebtoken, mongodb and so on. 
+
+Frontend for web application using tide, rhai, surf, graphql_client, handlebars-rust, cookie and so on.
 
 ## Features
 
-- [x] User management, and salt and hash a password with PBKDF2 - 使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算
-- [x] Article management: write and read
-- [ ] Tags
-- [ ] Archives
-- [ ] ...
+Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## Stacks
 
@@ -31,37 +29,13 @@ In brief, for **SEO**.
 
 ## How to Build & Run?
 
-``` Bash
-git clone https://github.com/zzy/blog-rust.git
-cd blog-rust
-```
+- [**Frontend: web application server**](./frontend/README.md)
 
-Put the environment variables into a `.env` file:
+![Frontend Image](./screenshot/client.jpg)
 
-```
-ADDR=127.0.0.1
-PORT=8080
+- [**Backend: graphql servies server**](./backend/README.md)
 
-GQL_VER=graphql
-GIQL_VER=graphiql
-
-MONGODB_URI=mongodb://mongo:mongo@127.0.0.1:27017
-MONGODB_BLOG=blog
-
-SITE_KEY=0F4EHz+1/hqVvZjuB8EcooQs1K6QKBvLUxqTHt4tpxE=
-CLAIM_EXP=10000000000
-```
-
-### Build & Run:
-
-``` Bash
-cargo build
-cargo run
-```
-
-Then connect to http://127.0.0.1:8080 with browser.
-
-GraphiQL: connect to http://127.0.0.1:8080/graphiql with browser.
+![Graphql Image](./screenshot/graphql.jpg)
 
 ## Contributing
 
