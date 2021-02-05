@@ -12,7 +12,7 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## Stacks
 
-- [Rust](https://budshome.com) - [Rust By Example](https://rust-by-example.budshome.com)
+- [Rust](https://github.com/rust-lang/rust) - [Rust By Example](https://rust-by-example.budshome.com) and [Cargo Book](https://cargo.budshome.com)
 - [Tide](https://crates.io/crates/tide) - [Tide Book](https://tide.budshome.com)
 - [rhai](https://crates.io/crates/rhai) - [Embedded Scripting for Rust](https://rhai.budshome.com)
 - [async-graphql](https://crates.io/crates/async-graphql) - [async-graphql docs](https://async-graphql.budshome.com)
