@@ -1,6 +1,6 @@
 # blog-rust
 
-A fast, simple & powerful **Blog** built on *pure Rust stack*. 
+The **Blog** built on *pure Rust stack*. 
 
 Backend for graphql services using tide, async-graphql, jsonwebtoken, mongodb and so on. 
 
@@ -12,10 +12,10 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## Stacks
 
-- [Rust](https://www.rust-lang.org) - [中文资料集萃](https://budshome.com)
-- [Tide](https://crates.io/crates/tide) - [中文文档](https://tide.budshome.com)
-- [rhai](https://crates.io/crates/rhai) - Embedded Scripting for Rust
-- [async-graphql](https://crates.io/crates/async-graphql) - [中文文档](https://async-graphql.budshome.com)
+- [Rust](https://budshome.com) - [Rust By Example](https://rust-by-example.budshome.com)
+- [Tide](https://crates.io/crates/tide) - [Tide Book](https://tide.budshome.com)
+- [rhai](https://crates.io/crates/rhai) - [Embedded Scripting for Rust](https://rhai.budshome.com)
+- [async-graphql](https://crates.io/crates/async-graphql) - [async-graphql docs](https://async-graphql.budshome.com)
 - [mongodb & mongo-rust-driver](https://crates.io/crates/mongodb)
 - [Surf](https://crates.io/crates/surf)
 - [graphql_client](https://crates.io/crates/graphql_client)
