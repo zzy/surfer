@@ -1,6 +1,6 @@
 # blog-rust
 
-A fast, simple & powerful **blog** built on *pure Rust stack*. 
+A fast, simple & powerful **Blog** built on *pure Rust stack*. 
 
 Backend for graphql services using tide, async-graphql, jsonwebtoken, mongodb and so on. 
 
@@ -22,10 +22,6 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 - [handlebars-rust](https://crates.io/crates/handlebars)
 - [jsonwebtoken](https://crates.io/crates/jsonwebtoken)
 - [cookie-rs](https://crates.io/crates/cookie)
-
-### Why not use React / Vue / Angular / ...?
-
-In brief, for **SEO**.
 
 ## How to Build & Run?
 
