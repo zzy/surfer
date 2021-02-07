@@ -88,4 +88,10 @@ query IndexData(
       nickname
     }
   }
+
+  topics {
+    name
+    quotes
+    uri
+  }
 }

@@ -1,8 +1,7 @@
-use std::vec;
-
 use futures::stream::StreamExt;
-use mongodb::Database;
+use mongodb::{Database, options::FindOptions};
 use bson::{doc, oid::ObjectId};
+use async_graphql::{Error, ErrorExtensions};
 use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
@@ -102,7 +101,36 @@ pub async fn topic_article_new(
     Ok(topic_article)
 }
 
-// search topics by article_id
+// get all topics
+pub async fn topics(db: Database) -> GqlResult<Vec<Topic>> {
+    let coll = db.collection("topics");
+
+    let find_options = FindOptions::builder().sort(doc! {"quotes": -1}).build();
+    let mut cursor = coll.find(None, find_options).await.unwrap();
+
+    let mut topics: Vec<Topic> = vec![];
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(document) => {
+                let topic =
+                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                topics.push(topic);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    if topics.len() > 0 {
+        Ok(topics)
+    } else {
+        Err(Error::new("all-topics")
+            .extend_with(|_, e| e.set("details", "No records")))
+    }
+}
+
+// get topics by article_id
 pub async fn topics_by_article_id(
     db: Database,
     article_id: &ObjectId,

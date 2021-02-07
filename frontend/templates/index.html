@@ -63,11 +63,11 @@
 
       <div class="row">
         <div class="col-md-8">
-          <h5>{{ wish.user.nickname }}
+          <h6>{{ wish.user.nickname }}
             (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
             shared the aphorism --
-          </h5>
-          <h3 class="pb-4 mb-4 font-italic border-bottom text-danger">
+          </h6>
+          <h3 class="pb-4 mb-4 font-italic border-bottom text-info">
             {{ wish.aphorism }} - {{ wish.author }}
           </h3>
 
@@ -90,29 +90,8 @@
         </div>
 
         <div class="col-md-4">
-          <div class="p-4 mb-3 bg-light rounded">
-            <h4 class="font-italic">Introduction</h4>
-            <p class="mb-0">{{ value-check user.introduction "纯粹 Rust 技术栈开发的博客。" }}</p>
-          </div>
-
-          <div class="p-4">
-            <h4 class="font-italic">Archives</h4>
-            <ol class="list-unstyled mb-0">
-              <li><a href="#">March 2014</a></li>
-              <li><a href="#">February 2014</a></li>
-              <li><a href="#">January 2014</a></li>
-              <li><a href="#">December 2013</a></li>
-              <li><a href="#">November 2013</a></li>
-              <li><a href="#">October 2013</a></li>
-              <li><a href="#">September 2013</a></li>
-              <li><a href="#">August 2013</a></li>
-              <li><a href="#">July 2013</a></li>
-              <li><a href="#">June 2013</a></li>
-              <li><a href="#">May 2013</a></li>
-              <li><a href="#">April 2013</a></li>
-            </ol>
-          </div>
-
+          {{> introduction }}
+          {{> topic }}
           {{> elsewhere }}
         </div>
 

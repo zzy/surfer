@@ -185,7 +185,13 @@ impl QueryRoot {
         categories::services::category_by_slug(db, &slug).await
     }
 
-    // search topics by article_id
+    // get all topics
+    async fn topics(&self, ctx: &Context<'_>) -> GqlResult<Vec<Topic>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topics(db).await
+    }
+
+    // get topics by article_id
     async fn topics_by_article_id(
         &self,
         ctx: &Context<'_>,
@@ -195,7 +201,7 @@ impl QueryRoot {
         topics::services::topics_by_article_id(db, &article_id).await
     }
 
-    // search all wishes
+    // get all wishes
     async fn wishes(
         &self,
         ctx: &Context<'_>,

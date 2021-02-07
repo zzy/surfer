@@ -57,6 +57,7 @@ GraphiQL: connect to http://127.0.0.1:8080/gql/v1i with browser.
 - categoriesByUsername(username: String!): [Category!]!
 - categoryById(id: ObjectId!): Category!
 - categoryBySlug(slug: String!): Category!
+- topics: [Topic!]!
 - topicsByArticleId(articleId: ObjectId!): [Topic!]!
 - wishes(published: Int!): [Wish!]!
 - randomWish(username: String!): Wish!

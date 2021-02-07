@@ -1,0 +1,10 @@
+<div class="p-4">
+    <h4 class="font-italic">Topics</h4>
+    {{#each topics as |topic| }}
+        <span class="badge bg-primary text-wrap fw-normal">
+            <a class="text-white text-decoration-none" href="/{{ topic.uri }}" target="_blank">
+                {{ topic.name }}({{ topic.quotes }})
+            </a>
+        </span>
+    {{/each }}
+</div>

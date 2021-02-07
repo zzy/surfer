@@ -45,9 +45,15 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     let articles = resp_data["articles"].clone();
     data.insert("articles", articles);
 
+    let topics = resp_data["topics"].clone();
+    println!("{:?}", &topics);
+    data.insert("topics", topics);
+
     index.reg_head(&mut data).await;
     index.reg_header(&mut data).await;
     index.reg_nav(&mut data).await;
+    index.reg_introduction(&mut data).await;
+    index.reg_topic(&mut data).await;
     index.reg_elsewhere(&mut data).await;
     index.reg_footer(&mut data).await;
 

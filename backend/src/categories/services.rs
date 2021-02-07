@@ -176,7 +176,7 @@ pub async fn categories_by_username(
     self::categories_by_user_id(db, &user._id).await
 }
 
-// search category by its slug
+// get category by its slug
 pub async fn category_by_id(
     db: Database,
     id: &ObjectId,
@@ -194,7 +194,7 @@ pub async fn category_by_id(
     Ok(category)
 }
 
-// search category by its slug
+// get category by its slug
 pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
     let coll = db.collection("categories");
 

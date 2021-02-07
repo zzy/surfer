@@ -102,6 +102,7 @@ type QueryRoot {
   categoriesByUsername(username: String!): [Category!]!
   categoryById(id: ObjectId!): Category!
   categoryBySlug(slug: String!): Category!
+  topics: [Topic!]!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
   wishes(published: Int!): [Wish!]!
   randomWish(username: String!): Wish!
