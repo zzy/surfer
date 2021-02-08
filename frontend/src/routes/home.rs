@@ -55,10 +55,12 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     index.reg_introduction(&mut data).await;
     index.reg_topic(&mut data).await;
     index.reg_elsewhere(&mut data).await;
+    index.reg_pagination(&mut data).await;
     index.reg_footer(&mut data).await;
 
     index.reg_script_value_check().await;
     index.reg_script_website_svg().await;
+    index.reg_script_sci_format().await;
 
     index.reg.register_script_helper_file(
         "str-trc",

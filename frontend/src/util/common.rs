@@ -142,6 +142,20 @@ impl<'tpl> Tpl<'tpl> {
         data.insert("elsewhere", json!("elsewhere"));
     }
 
+    pub async fn reg_pagination(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "pagination",
+                format!("{}{}", tpls_dir().await, "common/pagination.html"),
+            )
+            .unwrap();
+
+        data.insert("pagination", json!("pagination"));
+    }
+
     pub async fn reg_footer(
         &mut self,
         data: &mut BTreeMap<&str, serde_json::Value>,
@@ -170,6 +184,15 @@ impl<'tpl> Tpl<'tpl> {
             .register_script_helper_file(
                 "website-svg",
                 format!("{}{}", scripts_dir().await, "website-svg.rhai"),
+            )
+            .unwrap();
+    }
+
+    pub async fn reg_script_sci_format(&mut self) {
+        self.reg
+            .register_script_helper_file(
+                "sci-format",
+                format!("{}{}", scripts_dir().await, "sci-format.rhai"),
             )
             .unwrap();
     }
