@@ -46,7 +46,6 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     data.insert("articles", articles);
 
     let topics = resp_data["topics"].clone();
-    println!("{:?}", &topics);
     data.insert("topics", topics);
 
     index.reg_head(&mut data).await;
