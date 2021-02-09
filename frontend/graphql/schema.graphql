@@ -146,6 +146,7 @@ type User {
   email: String!
   username: String!
   nickname: String!
+  picture: String!
   blogName: String!
   website: String!
   createdAt: String!
@@ -159,6 +160,7 @@ input UserNew {
   email: String!
   username: String!
   nickname: String!
+  picture: String!
   cred: String!
   blogName: String!
   website: String!

@@ -11,6 +11,7 @@ pub struct User {
     pub email: String,
     pub username: String,
     pub nickname: String,
+    pub picture: String,
     pub cred: String,
     pub blog_name: String,
     pub website: String,
@@ -36,6 +37,10 @@ impl User {
 
     pub async fn nickname(&self) -> &str {
         self.nickname.as_str()
+    }
+
+    pub async fn picture(&self) -> &str {
+        self.picture.as_str()
     }
 
     pub async fn blog_name(&self) -> &str {
@@ -77,6 +82,7 @@ pub struct UserNew {
     pub email: String,
     pub username: String,
     pub nickname: String,
+    pub picture: String,
     pub cred: String,
     pub blog_name: String,
     pub website: String,

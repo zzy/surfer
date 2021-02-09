@@ -51,7 +51,7 @@ query IndexData(
     user {
       username
       nickname
-      blogName
+      picture
     }
   }
 
