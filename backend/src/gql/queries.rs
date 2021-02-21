@@ -191,6 +191,16 @@ impl QueryRoot {
         topics::services::topics(db).await
     }
 
+    // get topic info by id
+    async fn topic_by_id(
+        &self,
+        ctx: &Context<'_>,
+        id: ObjectId,
+    ) -> GqlResult<Topic> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topic_by_id(db, &id).await
+    }
+
     // get topics by article_id
     async fn topics_by_article_id(
         &self,
@@ -199,6 +209,16 @@ impl QueryRoot {
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         topics::services::topics_by_article_id(db, &article_id).await
+    }
+
+    // get topics by user_id
+    async fn topics_by_user_id(
+        &self,
+        ctx: &Context<'_>,
+        user_id: ObjectId,
+    ) -> GqlResult<Vec<Topic>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topics_by_user_id(db, &user_id).await
     }
 
     // get all wishes

@@ -59,6 +59,7 @@ pub struct TopicNew {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TopicArticle {
     pub _id: ObjectId,
+    pub user_id: ObjectId,
     pub article_id: ObjectId,
     pub topic_id: ObjectId,
 }
@@ -67,6 +68,10 @@ pub struct TopicArticle {
 impl TopicArticle {
     pub async fn id(&self) -> ObjectId {
         self._id.clone()
+    }
+
+    pub async fn user_id(&self) -> ObjectId {
+        self.user_id.clone()
     }
 
     pub async fn article_id(&self) -> ObjectId {
@@ -80,6 +85,7 @@ impl TopicArticle {
 
 #[derive(Serialize, Deserialize, async_graphql::InputObject)]
 pub struct TopicArticleNew {
+    pub user_id: ObjectId,
     pub article_id: ObjectId,
     pub topic_id: ObjectId,
 }

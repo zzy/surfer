@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use tide::Request;
+use tide::{Request, Redirect};
 use graphql_client::{GraphQLQuery, Response};
 use serde_json::json;
 
@@ -94,14 +94,17 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
 
-    let resp_data = resp_body.data.expect("missing response data");
+    if let Some(resp_data) = resp_body.data {
+        let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
+        let a = json!("很好哈");
+        data.insert("data1", &a);
+        data.insert("user", &resp_data["userByUsername"]);
 
-    let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
-    let a = json!("很好哈");
-    data.insert("data1", &a);
-    data.insert("user", &resp_data["userByUsername"]);
-
-    user_tpl.render(&data).await
+        user_tpl.render(&data).await
+    } else {
+        println!(">>> info: missing response data");
+        Ok(Redirect::new("/").into())
+    }
 }
 
 #[derive(GraphQLQuery)]

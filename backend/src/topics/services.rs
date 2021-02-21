@@ -130,6 +130,21 @@ pub async fn topics(db: Database) -> GqlResult<Vec<Topic>> {
     }
 }
 
+// get topic info by id
+pub async fn topic_by_id(db: Database, id: &ObjectId) -> GqlResult<Topic> {
+    let coll = db.collection("topics");
+
+    let topic_document = coll
+        .find_one(doc! {"_id": id}, None)
+        .await
+        .expect("Document not found")
+        .unwrap();
+
+    let topic: Topic =
+        bson::from_bson(bson::Bson::Document(topic_document)).unwrap();
+    Ok(topic)
+}
+
 // get topics by article_id
 pub async fn topics_by_article_id(
     db: Database,
@@ -170,6 +185,63 @@ async fn topics_articles_by_article_id(
     let coll_topics_articles = db.collection("topics_articles");
     let mut cursor_topics_articles = coll_topics_articles
         .find(doc! {"article_id": article_id}, None)
+        .await
+        .unwrap();
+
+    let mut topics_articles: Vec<TopicArticle> = vec![];
+    // Iterate over the results of the cursor.
+    while let Some(result) = cursor_topics_articles.next().await {
+        match result {
+            Ok(document) => {
+                let topic_article: TopicArticle =
+                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                topics_articles.push(topic_article);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    topics_articles
+}
+
+// get topics by user_id
+pub async fn topics_by_user_id(
+    db: Database,
+    user_id: &ObjectId,
+) -> GqlResult<Vec<Topic>> {
+    let topics_articles =
+        self::topics_articles_by_user_id(db.clone(), user_id).await;
+
+    let mut topic_ids_dup = vec![];
+    for topic_article in topics_articles {
+        topic_ids_dup.push(topic_article.topic_id);
+    }
+
+    let mut topic_ids = topic_ids_dup.clone();
+    topic_ids.dedup();
+
+    let mut topics: Vec<Topic> = vec![];
+    for topic_id in topic_ids {
+        let mut topic = self::topic_by_id(db.clone(), &topic_id).await?;
+        topic.quotes =
+            topic_ids_dup.iter().filter(|&id| *id == topic_id).count() as i64;
+
+        topics.push(topic);
+    }
+
+    Ok(topics)
+}
+
+// get all TopicArticle list by user_id
+async fn topics_articles_by_user_id(
+    db: Database,
+    user_id: &ObjectId,
+) -> Vec<TopicArticle> {
+    let coll_topics_articles = db.collection("topics_articles");
+    let mut cursor_topics_articles = coll_topics_articles
+        .find(doc! {"user_id": user_id}, None)
         .await
         .unwrap();
 

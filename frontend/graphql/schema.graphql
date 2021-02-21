@@ -103,7 +103,9 @@ type QueryRoot {
   categoryById(id: ObjectId!): Category!
   categoryBySlug(slug: String!): Category!
   topics: [Topic!]!
+  topicById(id: ObjectId!): Topic!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
+  topicsByUserId(userId: ObjectId!): [Topic!]!
   wishes(published: Int!): [Wish!]!
   randomWish(username: String!): Wish!
 }
@@ -126,11 +128,13 @@ type Topic {
 
 type TopicArticle {
   id: ObjectId!
+  userId: ObjectId!
   articleId: ObjectId!
   topicId: ObjectId!
 }
 
 input TopicArticleNew {
+  userId: ObjectId!
   articleId: ObjectId!
   topicId: ObjectId!
 }
