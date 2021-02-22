@@ -6,6 +6,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use pinyin::ToPinyin;
 
 use crate::util::constant::GqlResult;
+use crate::users;
 
 use super::models::{Topic, TopicNew, TopicArticle, TopicArticleNew};
 
@@ -261,4 +262,13 @@ async fn topics_articles_by_user_id(
     }
 
     topics_articles
+}
+
+// get topics by username
+pub async fn topics_by_username(
+    db: Database,
+    username: &str,
+) -> GqlResult<Vec<Topic>> {
+    let user = users::services::user_by_username(db.clone(), username).await?;
+    self::topics_by_user_id(db, &user._id).await
 }

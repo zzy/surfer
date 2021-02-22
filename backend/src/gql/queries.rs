@@ -221,6 +221,16 @@ impl QueryRoot {
         topics::services::topics_by_user_id(db, &user_id).await
     }
 
+    // get topics by username
+    async fn topics_by_username(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+    ) -> GqlResult<Vec<Topic>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topics_by_username(db, &username).await
+    }
+
     // get all wishes
     async fn wishes(
         &self,

@@ -106,6 +106,7 @@ type QueryRoot {
   topicById(id: ObjectId!): Topic!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
   topicsByUserId(userId: ObjectId!): [Topic!]!
+  topicsByUsername(username: String!): [Topic!]!
   wishes(published: Int!): [Wish!]!
   randomWish(username: String!): Wish!
 }

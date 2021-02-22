@@ -11,8 +11,7 @@ type ObjectId = String;
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
-    query_path = "./graphql/index.graphql",
-    response_derives = "Debug"
+    query_path = "./graphql/index.graphql"
 )]
 struct IndexData;
 
@@ -39,7 +38,7 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     let recommended_articles = resp_data["recommendedArticles"].clone();
     data.insert("recommended_articles", recommended_articles);
 
-    let wish = resp_data["wish"].clone();
+    let wish = resp_data["randomWish"].clone();
     data.insert("wish", wish);
 
     let articles = resp_data["articles"].clone();
@@ -72,35 +71,66 @@ pub async fn index(_req: Request<State>) -> tide::Result {
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
-    query_path = "./graphql/user_by_username.graphql",
-    response_derives = "Debug"
+    query_path = "./graphql/user_index.graphql"
 )]
-struct UserByUsername;
+struct UserIndexData;
 
 pub async fn user_index(req: Request<State>) -> tide::Result {
-    let mut user_tpl: Tpl = Tpl::new("users/index").await;
-    user_tpl.reg_script_website_svg().await;
-    user_tpl.reg_script_value_check().await;
-
     let username = req.param("username").unwrap();
 
     // make data and render it
-    let build_query =
-        UserByUsername::build_query(user_by_username::Variables {
-            username: username.to_string(),
-        });
+    let build_query = UserIndexData::build_query(user_index_data::Variables {
+        username: username.to_string(),
+    });
     let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
 
     if let Some(resp_data) = resp_body.data {
-        let mut data: BTreeMap<&str, &serde_json::Value> = BTreeMap::new();
-        let a = json!("很好哈");
-        data.insert("data1", &a);
-        data.insert("user", &resp_data["userByUsername"]);
+        let mut user_index_tpl: Tpl = Tpl::new("users/index").await;
+        let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
-        user_tpl.render(&data).await
+        let user = resp_data["userByUsername"].clone();
+        data.insert("user", user);
+
+        let categories = resp_data["categoriesByUsername"].clone();
+        data.insert("categories", categories);
+
+        let top_articles = resp_data["topArticles"].clone();
+        data.insert("top_articles", top_articles);
+
+        let recommended_articles = resp_data["recommendedArticles"].clone();
+        data.insert("recommended_articles", recommended_articles);
+
+        let wish = resp_data["randomWish"].clone();
+        data.insert("wish", wish);
+
+        let articles = resp_data["articlesByUsername"].clone();
+        data.insert("articles", articles);
+
+        let topics = resp_data["topicsByUsername"].clone();
+        data.insert("topics", topics);
+
+        user_index_tpl.reg_head(&mut data).await;
+        user_index_tpl.reg_header(&mut data).await;
+        user_index_tpl.reg_nav(&mut data).await;
+        user_index_tpl.reg_introduction(&mut data).await;
+        user_index_tpl.reg_topic(&mut data).await;
+        user_index_tpl.reg_elsewhere(&mut data).await;
+        user_index_tpl.reg_pagination(&mut data).await;
+        user_index_tpl.reg_footer(&mut data).await;
+
+        user_index_tpl.reg_script_value_check().await;
+        user_index_tpl.reg_script_website_svg().await;
+        user_index_tpl.reg_script_sci_format().await;
+
+        user_index_tpl.reg.register_script_helper_file(
+            "str-trc",
+            format!("{}{}", scripts_dir().await, "str-trc.rhai"),
+        )?;
+
+        user_index_tpl.render(&data).await
     } else {
         println!(">>> info: missing response data");
         Ok(Redirect::new("/").into())
@@ -110,8 +140,7 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
-    query_path = "./graphql/article_by_slug.graphql",
-    response_derives = "Debug"
+    query_path = "./graphql/article_by_slug.graphql"
 )]
 struct ArticleBySlug;
 

@@ -1,7 +1,23 @@
-query IndexData(
+query UserIndexData(
   $username: String!
 ) {
-  categories {
+  userByUsername(
+    username: $username
+  ) {
+    id
+    email
+    username
+    nickname
+    blogName
+    website
+    banned
+    createdAt
+    updatedAt
+  }
+
+  categoriesByUsername(
+    username: $username
+  ) {
     name
     description
     uri
@@ -68,7 +84,8 @@ query IndexData(
     }
   }
 
-  articles(
+  articlesByUsername(
+    username: $username
     published: 1
   ) {
     subject
@@ -89,7 +106,9 @@ query IndexData(
     }
   }
 
-  topics {
+  topicsByUsername(
+    username: $username
+  ) {
     name
     quotes
     uri
