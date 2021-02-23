@@ -196,4 +196,13 @@ impl<'tpl> Tpl<'tpl> {
             )
             .unwrap();
     }
+
+    pub async fn reg_script_str_trc(&mut self) {
+        self.reg
+            .register_script_helper_file(
+                "str-trc",
+                format!("{}{}", scripts_dir().await, "str-trc.rhai"),
+            )
+            .unwrap();
+    }
 }

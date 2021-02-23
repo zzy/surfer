@@ -1,12 +1,10 @@
 use std::collections::BTreeMap;
-use tide::{Request, Redirect};
+use tide::Request;
 use graphql_client::{GraphQLQuery, Response};
 use serde_json::json;
 
 use crate::State;
-use crate::util::common::{gql_uri, tpls_dir, scripts_dir, Tpl};
-
-type ObjectId = String;
+use crate::util::common::{gql_uri, Tpl};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -59,11 +57,7 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     index.reg_script_value_check().await;
     index.reg_script_website_svg().await;
     index.reg_script_sci_format().await;
-
-    index.reg.register_script_helper_file(
-        "str-trc",
-        format!("{}{}", scripts_dir().await, "str-trc.rhai"),
-    )?;
+    index.reg_script_str_trc().await;
 
     index.render(&data).await
 }
@@ -86,110 +80,103 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
+    let resp_data = resp_body.data.expect("missing response data");
 
-    if let Some(resp_data) = resp_body.data {
-        let mut user_index_tpl: Tpl = Tpl::new("users/index").await;
-        let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+    let mut user_index_tpl: Tpl = Tpl::new("users/index").await;
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
-        let user = resp_data["userByUsername"].clone();
-        data.insert("user", user);
+    let user = resp_data["userByUsername"].clone();
+    data.insert("user", user);
 
-        let categories = resp_data["categoriesByUsername"].clone();
-        data.insert("categories", categories);
+    let categories = resp_data["categoriesByUsername"].clone();
+    data.insert("categories", categories);
 
-        let top_articles = resp_data["topArticles"].clone();
-        data.insert("top_articles", top_articles);
+    let top_articles = resp_data["topArticles"].clone();
+    data.insert("top_articles", top_articles);
 
-        let recommended_articles = resp_data["recommendedArticles"].clone();
-        data.insert("recommended_articles", recommended_articles);
+    let recommended_articles = resp_data["recommendedArticles"].clone();
+    data.insert("recommended_articles", recommended_articles);
 
-        let wish = resp_data["randomWish"].clone();
-        data.insert("wish", wish);
+    let wish = resp_data["randomWish"].clone();
+    data.insert("wish", wish);
 
-        let articles = resp_data["articlesByUsername"].clone();
-        data.insert("articles", articles);
+    let articles = resp_data["articlesByUsername"].clone();
+    data.insert("articles", articles);
 
-        let topics = resp_data["topicsByUsername"].clone();
-        data.insert("topics", topics);
+    let topics = resp_data["topicsByUsername"].clone();
+    data.insert("topics", topics);
 
-        user_index_tpl.reg_head(&mut data).await;
-        user_index_tpl.reg_header(&mut data).await;
-        user_index_tpl.reg_nav(&mut data).await;
-        user_index_tpl.reg_introduction(&mut data).await;
-        user_index_tpl.reg_topic(&mut data).await;
-        user_index_tpl.reg_elsewhere(&mut data).await;
-        user_index_tpl.reg_pagination(&mut data).await;
-        user_index_tpl.reg_footer(&mut data).await;
+    user_index_tpl.reg_head(&mut data).await;
+    user_index_tpl.reg_header(&mut data).await;
+    user_index_tpl.reg_nav(&mut data).await;
+    user_index_tpl.reg_introduction(&mut data).await;
+    user_index_tpl.reg_topic(&mut data).await;
+    user_index_tpl.reg_elsewhere(&mut data).await;
+    user_index_tpl.reg_pagination(&mut data).await;
+    user_index_tpl.reg_footer(&mut data).await;
 
-        user_index_tpl.reg_script_value_check().await;
-        user_index_tpl.reg_script_website_svg().await;
-        user_index_tpl.reg_script_sci_format().await;
+    user_index_tpl.reg_script_value_check().await;
+    user_index_tpl.reg_script_website_svg().await;
+    user_index_tpl.reg_script_sci_format().await;
+    user_index_tpl.reg_script_str_trc().await;
 
-        user_index_tpl.reg.register_script_helper_file(
-            "str-trc",
-            format!("{}{}", scripts_dir().await, "str-trc.rhai"),
-        )?;
-
-        user_index_tpl.render(&data).await
-    } else {
-        println!(">>> info: missing response data");
-        Ok(Redirect::new("/").into())
-    }
+    user_index_tpl.render(&data).await
 }
 
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
-    query_path = "./graphql/article_by_slug.graphql"
+    query_path = "./graphql/article_index.graphql"
 )]
-struct ArticleBySlug;
+struct ArticleIndexData;
 
 pub async fn article_index(req: Request<State>) -> tide::Result {
-    let mut article_tpl: Tpl = Tpl::new("articles/index").await;
-
-    article_tpl.reg.register_template_file(
-        "base",
-        format!("{}{}", tpls_dir().await, "base.html"),
-    )?;
-
     let username = req.param("username").unwrap();
     let slug = req.param("slug").unwrap();
 
     // make data and render it
-    let build_query = ArticleBySlug::build_query(article_by_slug::Variables {
-        username: username.to_string(),
-        slug: slug.to_string(),
-    });
+    let build_query =
+        ArticleIndexData::build_query(article_index_data::Variables {
+            username: username.to_string(),
+            slug: slug.to_string(),
+        });
     let query = json!(build_query);
 
     let resp_body: Response<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
-
     let resp_data = resp_body.data.expect("missing response data");
-    println!("{:?}", &resp_data);
 
+    let mut article_index_tpl: Tpl = Tpl::new("articles/index").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
-    let a = json!("很好哈");
-    let a2 = json!("不太好哈");
-    let base = json!("base");
-    // let b2 = json!("base2");
 
-    data.insert("base", base);
-    // data.insert("base2", &b2);
+    let categories = resp_data["categoriesByUsername"].clone();
+    data.insert("categories", categories);
 
-    data.insert("data1", a);
-    data.insert("data2", a2);
+    let user = resp_data["articleBySlug"]["user"].clone();
+    data.insert("user", user);
 
-    data.insert("article", resp_data["articleBySlug"].clone());
-    data.insert("user", resp_data["userByUsername"].clone());
+    let article = resp_data["articleBySlug"].clone();
+    data.insert("article", article);
 
-    article_tpl.reg_script_website_svg().await;
-    article_tpl.reg_script_value_check().await;
+    let wish = resp_data["randomWish"].clone();
+    data.insert("wish", wish);
 
-    article_tpl.reg_head(&mut data).await;
-    article_tpl.reg_header(&mut data).await;
-    article_tpl.reg_nav(&mut data).await;
-    article_tpl.reg_footer(&mut data).await;
+    let topics = resp_data["topicsByUsername"].clone();
+    data.insert("topics", topics);
 
-    article_tpl.render(&data).await
+    let articles = resp_data["articlesByUsername"].clone();
+    data.insert("articles", articles);
+
+    article_index_tpl.reg_head(&mut data).await;
+    article_index_tpl.reg_header(&mut data).await;
+    article_index_tpl.reg_nav(&mut data).await;
+    article_index_tpl.reg_topic(&mut data).await;
+    article_index_tpl.reg_elsewhere(&mut data).await;
+    article_index_tpl.reg_footer(&mut data).await;
+
+    article_index_tpl.reg_script_value_check().await;
+    article_index_tpl.reg_script_website_svg().await;
+    article_index_tpl.reg_script_sci_format().await;
+
+    article_index_tpl.render(&data).await
 }

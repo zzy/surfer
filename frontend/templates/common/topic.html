@@ -2,7 +2,7 @@
     <h4 class="font-italic">Topics</h4>
     {{#each topics as |topic| }}
         <p class="badge bg-primary text-wrap fw-normal mb-1">
-            <a class="text-white text-decoration-none fs-6" href="/{{ topic.uri }}" target="_blank">
+            <a class="text-white text-decoration-none fs-6" href="{{ topic.uri }}" target="_blank">
                 {{ topic.name }}(<span class="text-info">{{ sci-format topic.quotes }}</span>)
             </a>
         </p>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh">
+  {{> head }}
+
+  <body>
+    <div class="container">
+      {{> header }}
+
+      <div class="nav-scroller py-1 mb-2">
+        {{> nav }}
+      </div>
+    </div>
+
+    <main class="container">
+
+      <div class="row">
+        <div class="col-md-8">
+          <article class="blog-post">
+            <h2 class="blog-post-title">
+              [<a href="{{ article.category.uri }}" target="_blank">{{ article.category.name }}</a>]
+              {{ article.subject }}
+            </h2>
+            <p class="blog-post-meta">{{ article.updatedAt }} by
+              <a href="/{{ article.user.username }}" target="_blank">{{ article.user.nickname }}[]</a>
+            </p>
+            <p class="p-2 border border-info bg-light">
+              <strong>Summary: </strong>{{ article.summary }}
+            </p>
+            <p><strong>Topics: </strong>
+              {{#each article.topics as |topic| }}
+                <span class="badge bg-primary text-wrap">
+                  <a class="text-white text-decoration-none" href="{{ topic.uri }}" target="_blank">
+                    {{ topic.name }}
+                  </a>
+                </span>
+              {{/each }}
+            </p>
+            <p>{{{ article.content }}}</p>
+          </article>
+
+
+          <h6>{{ wish.user.nickname }}
+            (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
+            shared the aphorism --
+          </h6>
+          <h3 class="pb-4 mb-4 font-italic border-bottom text-info">
+            {{ wish.aphorism }} - {{ wish.author }}
+          </h3>
+        </div>
+
+        <div class="col-md-4">
+          <div class="p-4">
+            <h4 class="font-italic">Related Articles</h4>
+            <ol class="list-unstyled">
+              {{#each articles as |article|}}
+                <li>
+                  [<a href="{{ article.category.uri}}" target="_blank">{{ article.category.name }}</a>]
+                  <a href="{{ article.uri}}" target="_blank">{{ article.subject }}</a>
+                </li>
+              {{/each }}
+            </ol>
+          </div>
+
+          {{> topic }}
+          {{> elsewhere }}
+        </div>
+
+      </div><!-- /.row -->
+
+    </main><!-- /.container -->
+
+    {{> footer }}
+  </body>
+
+</html>

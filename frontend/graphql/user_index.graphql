@@ -4,15 +4,11 @@ query UserIndexData(
   userByUsername(
     username: $username
   ) {
-    id
-    email
     username
     nickname
     blogName
     website
-    banned
-    createdAt
-    updatedAt
+    introduction
   }
 
   categoriesByUsername(

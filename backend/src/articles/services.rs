@@ -188,9 +188,9 @@ pub async fn article_by_slug(
 ) -> GqlResult<Article> {
     let coll = db.collection("articles");
 
-    // Query all documents in the collection.
+    let user = users::services::user_by_username(db.clone(), username).await?;
     let article_document = coll
-        .find_one(doc! {"username": username, "slug": slug}, None)
+        .find_one(doc! {"user_id": user._id, "slug": slug}, None)
         .await
         .expect("Document not found")
         .unwrap();

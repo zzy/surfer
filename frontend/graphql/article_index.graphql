@@ -1,0 +1,73 @@
+query ArticleIndexData(
+  $username: String!, 
+  $slug: String!
+) {
+  categoriesByUsername(
+    username: $username
+  ) {
+    name
+    description
+    uri
+  }
+
+  articleBySlug(
+    username: $username, 
+    slug: $slug
+  ) {
+    subject
+    summary
+    uri
+    content
+    updatedAt
+
+    user {
+      username
+      nickname
+      blogName
+    }
+
+    category {
+      name
+      uri
+    }
+
+    topics {
+      name
+      uri
+    }
+  }
+
+  randomWish(
+    username: $username
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  topicsByUsername(
+    username: $username
+  ) {
+    name
+    quotes
+    uri
+  }
+
+  articlesByUsername(
+    username: $username
+    published: 1
+  ) {
+    subject
+    uri
+
+    category {
+      name
+      uri
+    }
+  }
+}
