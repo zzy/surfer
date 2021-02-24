@@ -1,10 +1,13 @@
 <header class="blog-header py-3">
     <div class="row flex-nowrap justify-content-between align-items-center">
         <div class="col-4 pt-1">
-            <a class="link-secondary" href="#">Subscribe</a>
+            <a class="link-secondary" href="/">
+                <img width="110" height="50" src="/static/yazhijia.png" alt="home" title="home" aria-label="home">
+            </a>
         </div>
         <div class="col-4 text-center">
-            <a class="blog-header-logo text-dark" href="{{ value-check user.website "https://github.com/zzy/yazhijia" }}" target="_blank">
+            <a class="blog-header-logo text-dark" href="{{ value-check user.website " https://github.com/zzy/yazhijia"
+                }}" target="_blank">
                 {{ value-check user.blogName "yazhijia" }}
                 <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
                     <path d="{{ website-svg user.website }}" />
