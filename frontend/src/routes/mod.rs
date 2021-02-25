@@ -6,7 +6,7 @@ pub mod articles;
 
 use crate::State;
 
-use crate::routes::home::{index, user_index, article_index};
+use crate::routes::home::{index, register, sign_in, user_index, article_index};
 use crate::routes::users::{users_list, user_register};
 use crate::routes::articles::{articles_list, article_new};
 
@@ -16,6 +16,10 @@ pub async fn push_res(app: &mut Server<State>) {
 
     let mut home = app.at("");
     home.at("/").get(index);
+
+    home.at("/register").get(register).post(register);
+    home.at("/sign-in").get(sign_in).post(sign_in);
+
     home.at("/:username").get(user_index);
     home.at("/:username/:slug").get(article_index);
 

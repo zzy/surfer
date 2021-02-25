@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh">
+
+  <head>
+    <title>Sign in - yazhijia - budshome.com</title>
+    <meta charset="utf-8">
+
+    <link rel="icon" href="/static/favicon.svg">
+    <link rel="shortcut icon" href="/static/favicon.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="芽之家，纯粹 Rust 技术栈开发的博客。yazhijia, the Blog built on pure Rust stack.">
+    <meta name="author" content="zzy, https://github.com/zzy/yazhijia">
+
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/sign.css" rel="stylesheet">
+  </head>
+
+  <body class="text-center">
+
+    <main class="form-signin">
+      <form>
+        <a href="/">
+          <img class="mb-4" src="/static/yazhijia.png" alt="home" title="home" aria-label="home">
+        </a>
+        <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
+        <label for="signature" class="visually-hidden">Username or email address </label>
+        <input type="signature" id="signature" class="form-control" placeholder="Username or email address " required
+          autofocus>
+        <label for="password" class="visually-hidden">Password</label>
+        <input type="password" id="password" class="form-control" placeholder="Password" required>
+        <div class="checkbox mb-3">
+          <label>
+            <input type="checkbox" value="remember-me"> Remember me
+          </label>
+        </div>
+        <button class="w-100 btn btn-lg btn-primary" type="submit">Sign in</button>
+        <p class="mt-5 mb-3 text-muted">
+          New to yazhijia?
+          <a href="/register">Create an account.</a>
+        </p>
+      </form>
+    </main>
+
+  </body>
+
+</html>

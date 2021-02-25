@@ -62,6 +62,38 @@ pub async fn index(_req: Request<State>) -> tide::Result {
     index.render(&data).await
 }
 
+pub async fn register(req: Request<State>) -> tide::Result {
+    if req.method().eq(&http_types::Method::Get) {
+        println!("{}", "1111111111111");
+        let register: Tpl = Tpl::new("register").await;
+        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
+        register.render(&data).await
+    } else {
+        println!("{}", "22222222222222");
+        let register: Tpl = Tpl::new("register").await;
+        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
+        register.render(&data).await
+    }
+}
+
+pub async fn sign_in(req: Request<State>) -> tide::Result {
+    if req.method().eq(&http_types::Method::Get) {
+        println!("{}", "3333333333333333");
+        let sign_in: Tpl = Tpl::new("sign-in").await;
+        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
+        sign_in.render(&data).await
+    } else {
+        println!("{}", "444444444444444444");
+        let sign_in: Tpl = Tpl::new("sign-in").await;
+        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
+        sign_in.render(&data).await
+    }
+}
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
