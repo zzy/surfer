@@ -1,6 +1,8 @@
-<nav class="nav d-flex justify-content-evenly">
-    {{#each categories as |category|}}
-        <a class="p-2 link-secondary" href="{{ category.uri }}" title="{{ category.description }}"
-            target="_blank">{{ category.name }}</a>
-    {{/each}}
-</nav>
+<div class="nav-scroller py-1 mb-2">
+    <nav class="nav d-flex justify-content-evenly">
+        {{#each categories as |category|}}
+            <a class="p-2 link-secondary" href="{{ category.uri }}" title="{{ category.description }}"
+                target="_blank">{{ category.name }}</a>
+        {{/each}}
+    </nav>
+</div>
