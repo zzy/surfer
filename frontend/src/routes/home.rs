@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use tide::Request;
+use tide::{Request, http::Method};
 use graphql_client::{GraphQLQuery, Response};
 use serde_json::json;
 
@@ -63,7 +63,7 @@ pub async fn index(_req: Request<State>) -> tide::Result {
 }
 
 pub async fn register(req: Request<State>) -> tide::Result {
-    if req.method().eq(&http_types::Method::Get) {
+    if req.method().eq(&Method::Get) {
         println!("{}", "1111111111111");
         let register: Tpl = Tpl::new("register").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
@@ -79,7 +79,7 @@ pub async fn register(req: Request<State>) -> tide::Result {
 }
 
 pub async fn sign_in(req: Request<State>) -> tide::Result {
-    if req.method().eq(&http_types::Method::Get) {
+    if req.method().eq(&Method::Get) {
         println!("{}", "3333333333333333");
         let sign_in: Tpl = Tpl::new("sign-in").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
