@@ -23,8 +23,12 @@
                     <path d="M21 21l-5.2-5.2" />
                 </svg>
             </a> --}}
-            <a class="btn btn-sm btn-outline-primary me-2" href="/sign-in">Sign in</a>
-            <a class="btn btn-sm btn-outline-info" href="/register">Register</a>
+            {{#if user }}
+                {{ user.username }} ({{ user.nickname }})
+            {{ else }}
+                <a class="btn btn-sm btn-outline-primary me-2" href="/sign-in">Sign in</a>
+                <a class="btn btn-sm btn-outline-info" href="/register">Register</a>
+            {{/if}}
         </div>
 
     </div>
