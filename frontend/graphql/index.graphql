@@ -1,6 +1,16 @@
 query IndexData(
+  $signIn: Boolean!
   $username: String!
 ) {
+  userByUsername(
+    username: $username
+  ) 
+  @include(if: $signIn) {
+    username
+    nickname
+    picture
+  }
+
   categories {
     name
     description
@@ -8,7 +18,7 @@ query IndexData(
   }
 
   topArticles: articlesInPosition(
-    username: $username
+    username: "-"
     position: "top"
     limit: 1
   ) {
@@ -32,7 +42,7 @@ query IndexData(
   }
 
   recommendedArticles: articlesInPosition(
-    username: $username
+    username: "-"
     position: "recommended"
     limit: 2
   ) {
@@ -56,7 +66,7 @@ query IndexData(
   }
 
   randomWish(
-    username: $username
+    username: "-"
   ) {
     aphorism
     author

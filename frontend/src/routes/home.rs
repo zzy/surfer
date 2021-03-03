@@ -1,6 +1,10 @@
 use std::collections::BTreeMap;
-use tide::{Request, http::Method};
-use graphql_client::{GraphQLQuery, Response};
+use tide::{
+    Request, Response, Redirect,
+    http::{Method, Cookie},
+};
+use graphql_client::{GraphQLQuery, Response as GqlResponse};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::State;
@@ -13,19 +17,36 @@ use crate::util::common::{gql_uri, Tpl};
 )]
 struct IndexData;
 
-pub async fn index(_req: Request<State>) -> tide::Result {
-    // make data and render it
+pub async fn index(req: Request<State>) -> tide::Result {
+    let mut username = String::new();
+    if let Some(cookie) = req.cookie("username") {
+        username.push_str(cookie.value());
+    } else {
+        username.push_str("-");
+    }
+
+    let mut sign_in = false;
+    if "".ne(username.trim()) && "-".ne(username.trim()) {
+        sign_in = true;
+    }
+
     let build_query = IndexData::build_query(index_data::Variables {
-        username: "-".to_string(),
+        sign_in: sign_in,
+        username: username,
     });
     let query = json!(build_query);
 
-    let resp_body: Response<serde_json::Value> =
+    let resp_body: GqlResponse<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await?;
     let resp_data = resp_body.data.expect("missing response data");
 
     let mut index: Tpl = Tpl::new("index").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
+    if sign_in {
+        let user = resp_data["userByUsername"].clone();
+        data.insert("user", user);
+    }
 
     let categories = resp_data["categories"].clone();
     data.insert("categories", categories);
@@ -63,14 +84,12 @@ pub async fn index(_req: Request<State>) -> tide::Result {
 }
 
 pub async fn register(req: Request<State>) -> tide::Result {
-    if req.method().eq(&Method::Get) {
-        println!("{}", "1111111111111");
+    if req.method().eq(&Method::Post) {
         let register: Tpl = Tpl::new("register").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
         register.render(&data).await
     } else {
-        println!("{}", "22222222222222");
         let register: Tpl = Tpl::new("register").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
@@ -78,15 +97,61 @@ pub async fn register(req: Request<State>) -> tide::Result {
     }
 }
 
-pub async fn sign_in(req: Request<State>) -> tide::Result {
-    if req.method().eq(&Method::Get) {
-        println!("{}", "3333333333333333");
-        let sign_in: Tpl = Tpl::new("sign-in").await;
-        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+#[derive(Deserialize)]
+struct SignInInfo {
+    signature: String,
+    password: String,
+}
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/sign_in.graphql"
+)]
+struct SignInData;
 
-        sign_in.render(&data).await
+pub async fn sign_in(mut req: Request<State>) -> tide::Result {
+    if req.method().eq(&Method::Post) {
+        let sign_in_info: SignInInfo = req.body_form().await?;
+
+        let build_query = SignInData::build_query(sign_in_data::Variables {
+            signature: sign_in_info.signature,
+            password: sign_in_info.password,
+        });
+        let query = json!(build_query);
+
+        let resp_body: GqlResponse<serde_json::Value> =
+            surf::post(&gql_uri().await).body(query).recv_json().await?;
+        let resp_data = resp_body.data;
+
+        if let Some(sign_in_info) = resp_data {
+            let mut resp: Response = Redirect::new("/").into();
+
+            let sign_in_data = sign_in_info["userSignIn"].clone();
+            resp.insert_cookie(Cookie::new(
+                "email",
+                sign_in_data["email"].as_str().unwrap().to_owned(),
+            ));
+            resp.insert_cookie(Cookie::new(
+                "username",
+                sign_in_data["username"].as_str().unwrap().to_owned(),
+            ));
+            resp.insert_cookie(Cookie::new(
+                "token",
+                sign_in_data["token"].as_str().unwrap().to_owned(),
+            ));
+
+            Ok(resp.into())
+        } else {
+            let sign_in: Tpl = Tpl::new("sign-in").await;
+            let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+            data.insert(
+                "sign_in_failed",
+                json!("Invalid username, email, or password"),
+            );
+
+            sign_in.render(&data).await
+        }
     } else {
-        println!("{}", "444444444444444444");
         let sign_in: Tpl = Tpl::new("sign-in").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
@@ -110,7 +175,7 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
     });
     let query = json!(build_query);
 
-    let resp_body: Response<serde_json::Value> =
+    let resp_body: GqlResponse<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
     let resp_data = resp_body.data.expect("missing response data");
 
@@ -174,7 +239,7 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         });
     let query = json!(build_query);
 
-    let resp_body: Response<serde_json::Value> =
+    let resp_body: GqlResponse<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await.unwrap();
     let resp_data = resp_body.data.expect("missing response data");
 

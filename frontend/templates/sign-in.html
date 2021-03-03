@@ -19,16 +19,19 @@
   <body class="text-center">
 
     <main class="form-sign">
+      <a href="/">
+        <img class="mb-4" src="/static/yazhijia.png" alt="home" title="home" aria-label="home">
+      </a>
+      <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
+      {{#if sign_in_failed }}
+        <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ sign_in_failed }}</p>
+      {{/if }}
       <form method="POST">
-        <a href="/">
-          <img class="mb-4" src="/static/yazhijia.png" alt="home" title="home" aria-label="home">
-        </a>
-        <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
-        <label for="signature" class="visually-hidden">Username or email address </label>
-        <input type="signature" id="signature" class="form-control" placeholder="Username or email address " required
-          autofocus>
+        <label for="signature" class="visually-hidden">Username or email address</label>
+        <input type="text" name="signature" id="signature" class="form-control" placeholder="Username or email address"
+          required autofocus>
         <label for="password" class="visually-hidden">Password</label>
-        <input type="password" id="password" class="form-control" placeholder="Password" required>
+        <input type="password" name="password" id="password" class="form-control" placeholder="Password" required>
         <div class="checkbox mb-3">
           <label>
             <input type="checkbox" value="remember-me"> Remember me
