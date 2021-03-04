@@ -154,6 +154,16 @@ pub async fn sign_in(mut req: Request<State>) -> tide::Result {
     }
 }
 
+pub async fn sign_out(_req: Request<State>) -> tide::Result {
+    let mut resp: Response = Redirect::new("/").into();
+
+    resp.remove_cookie(Cookie::named("email"));
+    resp.remove_cookie(Cookie::named("username"));
+    resp.remove_cookie(Cookie::named("token"));
+
+    Ok(resp.into())
+}
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",

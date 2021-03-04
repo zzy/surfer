@@ -1,5 +1,6 @@
 <header class="blog-header py-3">
     <div class="row flex-nowrap justify-content-between align-items-center">
+
         <div class="col-4 pt-1">
             <a class="link-secondary" href="/">
                 <img width="110" height="50" src="/static/yazhijia.png" alt="home" title="home" aria-label="home">
@@ -24,7 +25,29 @@
                 </svg>
             </a> --}}
             {{#if user }}
-                {{ user.username }} ({{ user.nickname }})
+                <span class="dropdown-toggle" id="dropdown-menu" data-bs-toggle="dropdown" aria-expanded="false">
+                    {{ user.nickname }}
+                    <img src="{{ user.picture }}" width="34" height="34" class="rounded" alt="{{ user.nickname }}">
+                </span>
+                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdown-menu">
+                    <li>
+                        <a class="dropdown-item active" href="/{{ user.username }}" target="_blank">
+                            {{ user.blogName }}
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#">Your profile</a>
+                    </li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#">Settings</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="/sign-out">Sign out</a>
+                    </li>
+                </ul>
             {{ else }}
                 <a class="btn btn-sm btn-outline-primary me-2" href="/sign-in">Sign in</a>
                 <a class="btn btn-sm btn-outline-info" href="/register">Register</a>
