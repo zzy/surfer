@@ -4,7 +4,6 @@ use tide::{
     http::{Method, Cookie},
 };
 use graphql_client::{GraphQLQuery, Response as GqlResponse};
-use serde::Deserialize;
 use serde_json::json;
 
 use crate::State;
@@ -97,17 +96,13 @@ pub async fn register(req: Request<State>) -> tide::Result {
     }
 }
 
-#[derive(Deserialize)]
-struct SignInInfo {
-    signature: String,
-    password: String,
-}
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
     query_path = "./graphql/sign_in.graphql"
 )]
 struct SignInData;
+use crate::models::users::SignInInfo;
 
 pub async fn sign_in(mut req: Request<State>) -> tide::Result {
     if req.method().eq(&Method::Post) {

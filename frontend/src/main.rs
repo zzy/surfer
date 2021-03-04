@@ -1,5 +1,6 @@
 mod util;
 mod routes;
+mod models;
 
 use crate::util::constant::CFG;
 

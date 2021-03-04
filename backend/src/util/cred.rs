@@ -1,5 +1,11 @@
 use std::num::NonZeroU32;
 use ring::{digest, pbkdf2};
+use serde::{Serialize, Deserialize};
+use jsonwebtoken::{
+    decode, TokenData, Algorithm, DecodingKey, Validation, errors::Error,
+};
+
+use crate::util::constant::CFG;
 
 static PBKDF2_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
 
@@ -55,4 +61,23 @@ pub async fn cred_verify(
         &actual_cred_decode,
     )
     .is_ok()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub email: String,
+    pub username: String,
+    pub exp: usize,
+}
+
+pub async fn token_data(token: &str) -> Result<TokenData<Claims>, Error> {
+    let site_key = CFG.get("SITE_KEY").unwrap().as_bytes();
+
+    let data = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(site_key),
+        &Validation::new(Algorithm::HS512),
+    );
+
+    data
 }

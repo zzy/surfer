@@ -7,7 +7,7 @@ use regex::Regex;
 
 use crate::util::{
     constant::{CFG, GqlResult},
-    common::{Claims, token_data},
+    cred::{cred_encode, cred_verify, Claims, token_data},
 };
 
 use super::models::{User, UserNew, SignInfo, Wish, WishNew};
@@ -88,8 +88,7 @@ pub async fn user_register(
         Err(Error::new("username exists")
             .extend_with(|_, e| e.set("details", "2_USERNAME_EXISTS")))
     } else {
-        user_new.cred =
-            super::cred::cred_encode(&user_new.username, &user_new.cred).await;
+        user_new.cred = cred_encode(&user_new.username, &user_new.cred).await;
         user_new.banned = false;
 
         let user_new_bson = bson::to_bson(&user_new).unwrap();
@@ -129,8 +128,7 @@ pub async fn user_sign_in(
 
     if let Ok(user) = user_res {
         let is_verified =
-            super::cred::cred_verify(&user.username, password, &user.cred)
-                .await;
+            cred_verify(&user.username, password, &user.cred).await;
         if is_verified {
             let mut header = Header::default();
             // header.kid = Some("signing_key".to_owned());
@@ -233,11 +231,8 @@ pub async fn user_change_password(
         let email = data.claims.email;
         let user_res = self::user_by_email(db.clone(), &email).await;
         if let Ok(mut user) = user_res {
-            if super::cred::cred_verify(&user.username, pwd_cur, &user.cred)
-                .await
-            {
-                user.cred =
-                    super::cred::cred_encode(&user.username, pwd_new).await;
+            if cred_verify(&user.username, pwd_cur, &user.cred).await {
+                user.cred = cred_encode(&user.username, pwd_new).await;
 
                 let coll = db.collection("users");
                 coll.update_one(
