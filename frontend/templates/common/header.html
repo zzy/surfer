@@ -1,82 +1,87 @@
-<header class="blog-header">
+<header class="blog-header py-3">
 
-    <div class="container fixed-top">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark" aria-label="Main navigation">
-            <div class="container-fluid">
+    <nav class="navbar navbar-expand-xxl navbar-dark bg-dark fixed-top" aria-label="user navigation">
+        <div class="container-xxl">
 
-                <div class="col-2 navbar-brand">
-                    <a class="link-secondary" href="/">
-                        <img width="77" height="35" src="/static/yazhijia.png" alt="homepage" title="homepage"
-                            aria-label="homepage">
-                    </a>
-                </div>
+            <a class="navbar-brand" href="/">
+                <img class="m-0 p-0" width="88" height="40" src="/static/yazhijia.png" alt="homepage" title="homepage"
+                    aria-label="homepage">
+            </a>
 
-                <div class="col-7 navbar-brand text-center">
-                    <a class="blog-header-logo text-light" href="{{ value-check user.website "
-                        https://github.com/zzy/yazhijia" }}" target="_blank">
-                        {{ value-check user.blogName "yazhijia" }}
-                        <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
-                            <path d="{{ website-svg user.website }}" />
-                        </svg>
-                    </a>
-                </div>
+            <a class="navbar-brand blog-header-logo" href="{{ value-check user.website "
+                https://github.com/zzy/yazhijia" }}" target="_blank">
+                {{ value-check user.blogName "yazhijia" }}
+                <svg width="28" height="28" viewBox="0 0 18 18" fill="currentColor">
+                    <path d="{{ website-svg user.website }}" />
+                </svg>
+            </a>
 
-                <button class="navbar-toggler p-0 border-0" type="button" data-bs-toggle="offcanvas"
-                    aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sign-info"
+                aria-controls="sign-info" aria-expanded="false" aria-label="toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-                <div class="col-3 navbar-collapse offcanvas-collapse" id="offcanvas-collapse">
-                    <a class="link-secondary" href="#" aria-label="Search">
-                        <svg class="m-3" width="20" height="20" fill="none" stroke="currentColor" stroke-linecap="round"
-                            stroke-linejoin="round" stroke-width="2" class="mx-3" role="img" viewBox="0 0 24 24">
-                            <title>Search</title>
-                            <circle cx="10.5" cy="10.5" r="7.5" />
-                            <path d="M21 21l-5.2-5.2" />
-                        </svg>
-                    </a>
-                    <ul class="navbar-nav" aria-labelledby="dropdown-menu">
-                        {{#if user }}
-                            <li class="nav-item dropdown">
-                                <span class="nav-link dropdown-toggle" id="dropdown-user" data-bs-toggle="dropdown"
-                                    aria-expanded="false">
-                                    {{ user.nickname }}
-                                    <img src="{{ user.picture }}" width="34" height="34" class="rounded"
-                                        alt="{{ user.nickname }}">
-                                </span>
-                                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdown-user">
-                                    <li>
-                                        <a class="dropdown-item m-3" href="/{{ user.username }}" target="_blank">
-                                            {{ user.blogName }}
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item m-3" href="#">Your profile</a>
-                                    </li>
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item m-3" href="#">Settings</a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item m-3" href="/sign-out">Sign out</a>
-                                    </li>
-                                </ul>
+            <div class="collapse navbar-collapse" id="sign-info">
+
+                <ul class="navbar-nav me-auto my-2">
+                    <li class="nav-item">
+                        <form action="/title-search" method="post" target="_blank" class="input-group input-group-sm">
+                            <input class="form-control" type="search" placeholder="Search" aria-label="Search">
+                            <span class="input-group-text">/</span>
+                        </form>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/excellent-articles" aria-label="excellent articles">
+                            Excellent-articles
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/explore" aria-label="explore">
+                            Explore
+                        </a>
+                    </li>
+                </ul>
+
+                {{#if user }}
+                    <li class="nav-item dropdown">
+                        <span class="nav-link dropdown-toggle btn btn-sm btn-outline-warning" id="dropdown-user"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            {{ user.nickname }}
+                            <img src="{{ user.picture }}" width="34" height="34" class="rounded"
+                                alt="{{ user.nickname }}">
+                        </span>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdown-user">
+                            <li>
+                                <a class="dropdown-item mt-2" href="/{{ user.username }}" target="_blank">
+                                    {{ user.blogName }}
+                                </a>
                             </li>
-                        {{ else }}
-                            <li class="nav-item">
-                                <a class="nav-link btn btn-sm btn-outline-primary m-2" href="/sign-in">Sign in</a>
+                            <li>
+                                <a class="dropdown-item mt-2" href="#">Your profile</a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link btn btn-sm btn-outline-info m-2" href="/register">Register</a>
+                            <li>
+                                <hr class="dropdown-divider">
                             </li>
-                        {{/if}}
-                    </ul>
-                </div>
+                            <li>
+                                <a class="dropdown-item mt-2" href="#">Settings</a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item mt-2" href="/sign-out">Sign out</a>
+                            </li>
+                        </ul>
+                    </li>
+                {{ else }}
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-sm btn-outline-primary m-2" href="/sign-in">Sign in</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-sm btn-outline-info m-2" href="/register">Register</a>
+                    </li>
+                {{/if}}
 
             </div>
-        </nav>
-    </div>
+
+        </div>
+    </nav>
 
 </header>

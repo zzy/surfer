@@ -1,53 +1,21 @@
 html,
 body {
-  overflow-x: hidden; /* Prevent scroll on narrow devices */
+  height: 100%;
 }
 
 body {
-  padding-top: 60px;
-}
-
-@media (max-width: 768px) {
-  .offcanvas-collapse {
-    position: fixed;
-    top: 60px; /* Height of navbar */
-    bottom: 0;
-    left: 100%;
-    width: 100%;
-    padding-right: 1rem;
-    padding-left: 1rem;
-    overflow-y: auto;
-    visibility: hidden;
-    background-color: #343a40;
-    transition: transform .3s ease-in-out, visibility .3s ease-in-out;
-  }
-  .offcanvas-collapse.open {
-    visibility: visible;
-    transform: translateX(-100%);
-  }
-}
-
-.bd-placeholder-img {
-  font-size: 1.125rem;
-  text-anchor: middle;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none;
-}
-@media (min-width: 768px) {
-  .bd-placeholder-img-lg {
-    font-size: 3.5rem;
-  }
+  padding-top: 40px;
+  padding-bottom: 20px;
 }
 
 .blog-header {
   line-height: 1;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 0px solid #e5e5e5;
 }
 
 .blog-header-logo {
   font-family: "Playfair Display", Georgia, "Times New Roman", serif/*rtl:Amiri, Georgia, "Times New Roman", serif*/;
-  font-size: 1.55rem;
+  font-size: 1rem;
 }
 
 .blog-header-logo:hover {
@@ -70,7 +38,7 @@ h1, h2, h3, h4, h5, h6 {
 .nav-scroller {
   position: relative;
   z-index: 2;
-  height: 3rem;
+  height: 2.75rem;
   overflow-y: hidden;
 }
 
@@ -78,6 +46,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-wrap: nowrap;
   padding-bottom: 1rem;
+  margin-top: -1px;
   overflow-x: auto;
   text-align: center;
   white-space: nowrap;
