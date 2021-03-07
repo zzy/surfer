@@ -2,7 +2,7 @@
 *~
 *.swp
 
-Cargo.lock
+# Cargo.lock
 target
 **/*.rs.bk
 
