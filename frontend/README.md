@@ -1,8 +1,8 @@
 # Web Application Server
 
 ``` Bash
-git clone https://github.com/zzy/yazhijia.git
-cd yazhijia
+git clone https://github.com/zzy/surfer.git
+cd surfer
 cargo build
 
 cd frontend

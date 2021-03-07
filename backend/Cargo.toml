@@ -1,10 +1,10 @@
 [package]
-name = "yazhijia-backend"
+name = "surfer-backend"
 version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
-[dependencies]
+[dependencies] 
 futures = "0.3.13"
 tide = "0.16.0"
 async-std = { version = "1.9.0", features = ["attributes"] }
@@ -13,10 +13,10 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.4.3"
 
-async-graphql = "2.5.9"
+async-graphql = "2.5.10"
 mongodb = { version = "1.2.0", default-features = false, features = ["async-std-runtime"] }
 bson = "1.2.0"
-serde = { version = "1.0.123", features = ["derive"] }
+serde = { version = "1.0.124", features = ["derive"] }
 
 jsonwebtoken = "7.2.0"
 ring = "0.16.20"

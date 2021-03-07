@@ -1,4 +1,4 @@
-# yazhijia
+# surfer
 
 The **Blog** built on *pure Rust stack*. 
 
@@ -35,4 +35,4 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## Contributing
 
-You are welcome in contributing to the yazhijia project.
+You are welcome in contributing to the surfer project.

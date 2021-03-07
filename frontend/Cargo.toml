@@ -1,5 +1,5 @@
 [package]
-name = "yazhijia-frontend"
+name = "surfer-frontend"
 version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
@@ -11,7 +11,7 @@ async-std = { version = "1.9.0", features = ["attributes"] }
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
 
-serde = { version = "1.0.123", features = ["derive"] }
+serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
 
 surf = "2.2.0"
