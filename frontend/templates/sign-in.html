@@ -27,11 +27,16 @@
         <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ sign_in_failed }}</p>
       {{/if }}
       <form method="post">
-        <label for="signature" class="visually-hidden">Username or email address</label>
-        <input type="text" name="signature" id="signature" class="form-control" placeholder="Username or email address"
-          required autofocus>
-        <label for="password" class="visually-hidden">Password</label>
-        <input type="password" name="password" id="password" class="form-control" placeholder="Password" required>
+        <div class="input-group mb-2">
+          <span class="input-group-text">Signature:</span>
+          <input type="text" name="signature" class="form-control" placeholder="Username or email address"
+            aria-label="Username or email address" required autofocus>
+        </div>
+        <div class="input-group mb-2">
+          <span class="input-group-text">Password:</span>
+          <input type="password" name="password" class="form-control" placeholder="password" aria-label="password"
+            required>
+        </div>
         <div class="checkbox mb-3">
           <label>
             <input type="checkbox" value="remember-me"> Remember me

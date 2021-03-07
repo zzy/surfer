@@ -22,23 +22,37 @@
             <a href="/">
                 <img class="mb-4" src="/static/logo.png" alt="homepage" title="homepage" aria-label="homepage">
             </a>
-            <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
-            {{#if sign_in_failed }}
-                <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ sign_in_failed }}</p>
+            <h1 class="h3 mb-3 fw-normal">Please register</h1>
+            {{#if register_failed }}
+                <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ register_failed }}</p>
             {{/if }}
             <form method="post">
-                <label for="signature" class="visually-hidden">Username or email address</label>
-                <input type="text" name="signature" id="signature" class="form-control"
-                    placeholder="Username or email address" required autofocus>
-                <label for="password" class="visually-hidden">Password</label>
-                <input type="password" name="password" id="password" class="form-control" placeholder="Password"
-                    required>
-                <div class="checkbox mb-3">
-                    <label>
-                        <input type="checkbox" value="remember-me"> Remember me
-                    </label>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Email:</span>
+                    <input type="text" name="email" class="form-control" placeholder="email" aria-label="email"
+                        required>
                 </div>
-                <button class="w-100 btn btn-lg btn-primary" type="submit">Sign in</button>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Username:</span>
+                    <input type="text" name="username" class="form-control" placeholder="username" aria-label="username"
+                        required>
+                </div>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Nickname:</span>
+                    <input type="text" name="nickname" class="form-control" placeholder="nickname" aria-label="nickname"
+                        required>
+                </div>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Blog Name:</span>
+                    <input type="text" name="blog_name" class="form-control" placeholder="blog name"
+                        aria-label="blog name" required>
+                </div>
+                <div class="input-group mb-2">
+                    <span class="input-group-text">Password:</span>
+                    <input type="password" name="password" class="form-control" placeholder="password"
+                        aria-label="password" required>
+                </div>
+                <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
                 <p class="mt-5 mb-3 text-muted">
                     Have an account?
                     <a href="/sign-in">Sign in.</a>

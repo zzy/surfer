@@ -13,7 +13,7 @@ body {
 
 .form-sign {
   width: 100%;
-  max-width: 330px;
+  max-width: 450px;
   padding: 15px;
   margin: auto;
 }
@@ -29,14 +29,4 @@ body {
 }
 .form-sign .form-control:focus {
   z-index: 2;
-}
-.form-sign input[type="email"] {
-  margin-bottom: -1px;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-}
-.form-sign input[type="password"] {
-  margin-bottom: 10px;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
 }
