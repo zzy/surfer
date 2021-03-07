@@ -6,5 +6,6 @@
 target
 **/*.rs.bk
 
+frontend/static/users
 .env
 examples
