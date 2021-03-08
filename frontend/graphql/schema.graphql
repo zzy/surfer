@@ -68,7 +68,7 @@ input CategoryUserNew {
 scalar DateTime
 
 type MutationRoot {
-  userRegister(userNew: UserNew!): User!
+  userRegister(registerInfo: RegisterInfo!): User!
   userChangePassword(pwdCur: String!, pwdNew: String!, token: String!): User!
   userUpdateProfile(userNew: UserNew!, token: String!): User!
   articleNew(articleNew: ArticleNew!): Article!
@@ -109,6 +109,16 @@ type QueryRoot {
   topicsByUsername(username: String!): [Topic!]!
   wishes(published: Int!): [Wish!]!
   randomWish(username: String!): Wish!
+}
+
+input RegisterInfo {
+  email: String!
+  username: String!
+  nickname: String!
+  password: String!
+  blogName: String!
+  website: String!
+  introduction: String!
 }
 
 type SignInfo {
@@ -154,10 +164,10 @@ type User {
   picture: String!
   blogName: String!
   website: String!
+  introduction: String!
   createdAt: String!
   updatedAt: String!
   banned: Boolean!
-  introduction: String!
   articles(published: Int!): [Article!]!
 }
 
@@ -169,9 +179,9 @@ input UserNew {
   cred: String!
   blogName: String!
   website: String!
+  introduction: String!
   createdAt: DateTime!
   updatedAt: DateTime!
-  introduction: String!
 }
 
 type Wish {

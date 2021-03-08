@@ -82,8 +82,27 @@ pub async fn index(req: Request<State>) -> tide::Result {
     index.render(&data).await
 }
 
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/register.graphql"
+)]
+struct RegisterData;
+use midmodels::users::RegisterInfo;
+
 pub async fn register(req: Request<State>) -> tide::Result {
     if req.method().eq(&Method::Post) {
+        let register_info: RegisterInfo = req.body_form().await?;
+
+        let build_query = RegisterData::build_query(register_data::Variables {
+            register_info: register_info,
+        });
+        let query = json!(build_query);
+
+        let resp_body: GqlResponse<serde_json::Value> =
+            surf::post(&gql_uri().await).body(query).recv_json().await?;
+        let resp_data = resp_body.data;
+
         let register: Tpl = Tpl::new("register").await;
         let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
@@ -102,7 +121,7 @@ pub async fn register(req: Request<State>) -> tide::Result {
     query_path = "./graphql/sign_in.graphql"
 )]
 struct SignInData;
-use crate::models::users::SignInInfo;
+use midmodels::users::SignInInfo;
 
 pub async fn sign_in(mut req: Request<State>) -> tide::Result {
     if req.method().eq(&Method::Post) {

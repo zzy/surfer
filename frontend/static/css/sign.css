@@ -21,10 +21,10 @@ body {
   font-weight: 400;
 }
 .form-sign .form-control {
-  position: relative;
+  /* position: relative; */
   box-sizing: border-box;
   height: auto;
-  padding: 10px;
+  /* padding: 10px; */
   font-size: 16px;
 }
 .form-sign .form-control:focus {

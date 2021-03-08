@@ -1,0 +1,10 @@
+mutation RegisterData(
+  $registerInfo: RegisterInfo!
+) {
+  userRegister(
+    registerInfo: $registerInfo
+  ) {
+    username
+    nickname
+  }
+}
