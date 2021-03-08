@@ -15,10 +15,10 @@ pub struct User {
     pub cred: String,
     pub blog_name: String,
     pub website: String,
+    pub introduction: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub banned: bool,
-    pub introduction: String,
 }
 
 #[async_graphql::Object]
@@ -51,6 +51,10 @@ impl User {
         self.website.as_str()
     }
 
+    pub async fn introduction(&self) -> &str {
+        self.introduction.as_str()
+    }
+
     pub async fn created_at(&self) -> String {
         self.created_at.to_string()
     }
@@ -61,10 +65,6 @@ impl User {
 
     pub async fn banned(&self) -> bool {
         self.banned
-    }
-
-    pub async fn introduction(&self) -> &str {
-        self.introduction.as_str()
     }
 
     pub async fn articles(
@@ -86,11 +86,11 @@ pub struct UserNew {
     pub cred: String,
     pub blog_name: String,
     pub website: String,
+    pub introduction: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     #[graphql(skip)]
     pub banned: bool,
-    pub introduction: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

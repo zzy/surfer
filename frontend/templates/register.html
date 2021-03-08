@@ -22,52 +22,66 @@
             <a href="/">
                 <img class="mb-4" src="/static/logo.png" alt="homepage" title="homepage" aria-label="homepage">
             </a>
-            <h1 class="h3 mb-3 fw-normal">Please register</h1>
-            {{#if register_failed }}
-                <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ register_failed }}</p>
-            {{/if }}
-            <form method="post">
-                <div class="form-floating mb-2">
-                    <input type="email" name="email" id="email" class="form-control" placeholder="email address"
-                        aria-label="email address" required autofocus>
-                    <label for="email">Email address</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <input type="text" name="username" id="username" class="form-control" placeholder="username"
-                        aria-label="username" required>
-                    <label for="username">Username</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <input type="text" name="nickname" id="nickname" class="form-control" placeholder="nickname"
-                        aria-label="nickname" required>
-                    <label for="nickname">Nickname</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <input type="password" name="password" id="password" class="form-control" placeholder="password"
-                        aria-label="password" required>
-                    <label for="password">Password</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <input type="text" name="blog_name" id="blog_name" class="form-control" placeholder="blog name"
-                        aria-label="blog name" required>
-                    <label for="blog_name">Blog name</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <input type="url" name="website" id="website" class="form-control" placeholder="website"
-                        aria-label="website" required>
-                    <label for="website">Website</label>
-                </div>
-                <div class="form-floating mb-2">
-                    <textarea name="introduction" id="introduction" class="form-control" placeholder="introduction"
-                        aria-label="introduction" required></textarea>
-                    <label for="introduction">Introduction</label>
-                </div>
-                <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
-                <p class="mt-5 mb-3 text-muted">
-                    Have an account?
-                    <a href="/sign-in">Sign in.</a>
+
+            {{#if register_result }}
+                <p class="fs-4 text-start">
+                    <span class="badge bg-primary text-wrap">{{ register_result.nickname }}</span>
+                    , Congratulations! You have just created an account successfully.
                 </p>
-            </form>
+                <p class="fs-4 text-start">
+                    Please <a href="/sign-in">sign in BudsHome</a>
+                    with username(<span class="badge bg-primary text-wrap">{{ register_result.username }}</span>),
+                    or email address(<span class="badge bg-primary text-wrap">{{ register_result.email }}</span>).
+                </p>
+            {{ else }}
+                <h1 class="h3 mb-3 fw-normal">Please register</h1>
+                {{#if register_failed }}
+                    <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ register_failed }}</p>
+                {{/if }}
+                <form method="post">
+                    <div class="form-floating mb-2">
+                        <input type="email" name="email" id="email" class="form-control" placeholder="email address"
+                            aria-label="email address" required>
+                        <label for="email">Email address</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="text" name="username" id="username" class="form-control"
+                            onkeyup="this.value=this.value.replace(/[^a-z0-9_]/g,'');" placeholder="username"
+                            aria-label="username" required>
+                        <label for="username">Username(a-z, _, or 0-9)</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="text" name="nickname" id="nickname" class="form-control" placeholder="nickname"
+                            aria-label="nickname" required>
+                        <label for="nickname">Nickname</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="password" name="password" id="password" class="form-control" placeholder="password"
+                            aria-label="password" required>
+                        <label for="password">Password</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="text" name="blog_name" id="blog_name" class="form-control" placeholder="blog name"
+                            aria-label="blog name" required>
+                        <label for="blog_name">Blog name</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <input type="url" name="website" id="website" class="form-control" placeholder="website"
+                            aria-label="website" required>
+                        <label for="website">Website(include http:// or https://)</label>
+                    </div>
+                    <div class="form-floating mb-2">
+                        <textarea name="introduction" id="introduction" class="form-control" placeholder="introduction"
+                            aria-label="introduction" required></textarea>
+                        <label for="introduction">Introduction</label>
+                    </div>
+                    <button class="w-100 btn btn-lg btn-primary" type="submit">Register</button>
+                    <p class="mt-5 mb-3 text-muted">
+                        Have an account?
+                        <a href="/sign-in">Sign in.</a>
+                    </p>
+                </form>
+            {{/if }}
         </main>
 
     </body>

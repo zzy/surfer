@@ -5,9 +5,13 @@ use tide::{
 };
 use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use serde_json::json;
+use chrono::Local;
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
+use crate::models::users::{SignInInfo, RegisterInfo};
+
+type DateTime = chrono::DateTime<Local>;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -88,14 +92,27 @@ pub async fn index(req: Request<State>) -> tide::Result {
     query_path = "./graphql/register.graphql"
 )]
 struct RegisterData;
-use midmodels::users::RegisterInfo;
 
-pub async fn register(req: Request<State>) -> tide::Result {
+pub async fn register(mut req: Request<State>) -> tide::Result {
+    let register: Tpl = Tpl::new("register").await;
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
     if req.method().eq(&Method::Post) {
         let register_info: RegisterInfo = req.body_form().await?;
 
+        let now = Local::now();
+
         let build_query = RegisterData::build_query(register_data::Variables {
-            register_info: register_info,
+            email: register_info.email,
+            username: register_info.username,
+            nickname: register_info.nickname,
+            picture: "/static/favicon.png".to_string(),
+            cred: register_info.password,
+            blog_name: register_info.blog_name,
+            website: register_info.website,
+            introduction: register_info.introduction,
+            created_at: now,
+            updated_at: now,
         });
         let query = json!(build_query);
 
@@ -103,14 +120,22 @@ pub async fn register(req: Request<State>) -> tide::Result {
             surf::post(&gql_uri().await).body(query).recv_json().await?;
         let resp_data = resp_body.data;
 
-        let register: Tpl = Tpl::new("register").await;
-        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+        if let Some(register_result) = resp_data {
+            data.insert(
+                "register_result",
+                register_result["userRegister"].to_owned(),
+            );
 
-        register.render(&data).await
+            register.render(&data).await
+        } else {
+            data.insert(
+                "register_failed",
+                json!("Username or email already exists"),
+            );
+
+            register.render(&data).await
+        }
     } else {
-        let register: Tpl = Tpl::new("register").await;
-        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
-
         register.render(&data).await
     }
 }
@@ -121,9 +146,11 @@ pub async fn register(req: Request<State>) -> tide::Result {
     query_path = "./graphql/sign_in.graphql"
 )]
 struct SignInData;
-use midmodels::users::SignInInfo;
 
 pub async fn sign_in(mut req: Request<State>) -> tide::Result {
+    let sign_in: Tpl = Tpl::new("sign-in").await;
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
     if req.method().eq(&Method::Post) {
         let sign_in_info: SignInInfo = req.body_form().await?;
 
@@ -156,8 +183,6 @@ pub async fn sign_in(mut req: Request<State>) -> tide::Result {
 
             Ok(resp.into())
         } else {
-            let sign_in: Tpl = Tpl::new("sign-in").await;
-            let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
             data.insert(
                 "sign_in_failed",
                 json!("Invalid username, email, or password"),
@@ -166,9 +191,6 @@ pub async fn sign_in(mut req: Request<State>) -> tide::Result {
             sign_in.render(&data).await
         }
     } else {
-        let sign_in: Tpl = Tpl::new("sign-in").await;
-        let data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
-
         sign_in.render(&data).await
     }
 }

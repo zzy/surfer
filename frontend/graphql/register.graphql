@@ -1,9 +1,30 @@
 mutation RegisterData(
-  $registerInfo: RegisterInfo!
+  $email: String!
+  $username: String!
+  $nickname: String!
+  $picture: String!
+  $cred: String!
+  $blogName: String!
+  $website: String!
+  $introduction: String!
+  $createdAt: DateTime!
+  $updatedAt: DateTime!
 ) {
   userRegister(
-    registerInfo: $registerInfo
+    userNew: {
+      email: $email
+      username: $username
+      nickname: $nickname
+      picture: $picture
+      cred: $cred
+      blogName: $blogName
+      website: $website
+      introduction: $introduction
+      createdAt: $createdAt
+      updatedAt: $updatedAt
+    }
   ) {
+    email
     username
     nickname
   }
