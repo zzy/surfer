@@ -16,3 +16,8 @@ pub struct RegisterInfo {
     pub website: String,
     pub introduction: String,
 }
+
+#[derive(Deserialize)]
+pub struct ArticleInfo {
+    pub content: String,
+}

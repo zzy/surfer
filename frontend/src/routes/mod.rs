@@ -32,7 +32,7 @@ pub async fn push_res(app: &mut Server<State>) {
 
     let mut articles = app.at("articles");
     articles.at("list").get(articles_list);
-    articles.at("new").get(article_new);
+    articles.at("new").get(article_new).post(article_new);
 
     // app
 }

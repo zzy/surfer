@@ -1,5 +1,9 @@
-use graphql_client::{GraphQLQuery, Response};
-use tide::Request;
+use std::collections::BTreeMap;
+use tide::{
+    Request, Response, Redirect,
+    http::{Method, Cookie},
+};
+use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use chrono::Local;
 use serde_json::json;
 
@@ -24,7 +28,7 @@ pub async fn articles_list(_req: Request<State>) -> tide::Result {
     let build_query = ArticlesList::build_query(articles_list::Variables {});
     let query = json!(build_query);
 
-    let resp_body: Response<serde_json::Value> =
+    let resp_body: GqlResponse<serde_json::Value> =
         surf::post(&gql_uri().await).body(query).recv_json().await?;
 
     let resp_data = resp_body.data.expect("missing response data");
@@ -39,28 +43,39 @@ pub async fn articles_list(_req: Request<State>) -> tide::Result {
     response_derives = "Debug"
 )]
 struct ArticleNew;
+use crate::models::articles::ArticleInfo;
 
-pub async fn article_new(_req: Request<State>) -> tide::Result {
-    let article_new_tpl: Tpl = Tpl::new("articles/new").await;
+pub async fn article_new(mut req: Request<State>) -> tide::Result {
+    let article_new: Tpl = Tpl::new("articles/new").await;
+    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
-    let now = Local::now();
+    if req.method().eq(&Method::Post) {
+        println!("1111111111");
+        let article_info: ArticleInfo = req.body_form().await?;
+        println!("{:?}", article_info.content);
 
-    // make data and render it
-    let build_query = ArticleNew::build_query(article_new::Variables {
-        username: "test".to_string(),
-        subject: "香洲半岛 2021 ... You sig---er tab or wi...ur session.".to_string(),
-        content:
-            "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
-                .to_string(),
-        created_at: now,
-        updated_at: now,
-    });
-    let query = json!(build_query);
+        article_new.render(&data).await
+    } else {
+        println!("22222222222");
+        article_new.render(&data).await
+    }
+    // let now = Local::now();
 
-    let resp_body: Response<serde_json::Value> =
-        surf::post(&gql_uri().await).body(query).recv_json().await?;
+    // let build_query = ArticleNew::build_query(article_new::Variables {
+    //     username: "test".to_string(),
+    //     subject: "香洲半岛 2021 ... You sig---er tab or wi...ur session.".to_string(),
+    //     content:
+    //         "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
+    //             .to_string(),
+    //     created_at: now,
+    //     updated_at: now,
+    // });
+    // let query = json!(build_query);
 
-    let resp_data = resp_body.data.expect("missing response data");
+    // let resp_body: Response<serde_json::Value> =
+    //     surf::post(&gql_uri().await).body(query).recv_json().await?;
 
-    article_new_tpl.render(&resp_data).await
+    // let resp_data = resp_body.data.expect("missing response data");
+
+    // article_new_tpl.render(&resp_data).await
 }

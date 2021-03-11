@@ -6,21 +6,33 @@
 
     <link rel="icon" href="/static/favicon.svg">
     <link rel="shortcut icon" href="/static/favicon.png">
+
+    <link rel="stylesheet" href="/static/editor/stacks.min.css">
+    <link href="/static/editor/app.css" rel="stylesheet">
   </head>
 
   <body>
-    <h1>all articles</h1>
-    <ul>
-      {{#each allArticles as |a|}}
-        <li><b>{{a.subject}}</b></li>
-        <ul>
-          <li>{{a.id}}</li>
-          <li>{{a.userId}}</li>
-          <li><a href="{{a.slug}}" target="_blank">{{a.slug}}</a></li>
-        </ul>
-      {{/each}}
-    </ul>
+    <div class="grid--cell s-toggle-switch">
+      <input id="js-toggle-dark" type="checkbox" />
+      <div class="s-toggle-switch--indicator"></div>
+      <label for="js-toggle-dark" class="grid--cell ml4">Dark mode</label>
+    </div>
 
+    <form class="wmx6 m-auto">
+
+      <div id="content-div" class="js-tables-enabled"></div>
+      <textarea id="content" name="content" class="d-none">
+        ``` html
+            <div>
+                <strong>foo</strong>
+              </div>
+        ```
+      </textarea>
+
+    </form>
+
+    <script src="/static/editor/stacks.min.js" defer="defer"></script>
+    <script src="/static/editor/app.bundle.js" defer="defer"></script>
   </body>
 
 </html>
