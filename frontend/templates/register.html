@@ -2,17 +2,9 @@
 <html lang="zh">
 
     <head>
-        <title>Register - 芽之家 - budshome.com</title>
-        <meta charset="utf-8">
-
-        <link rel="icon" href="/static/favicon.svg">
-        <link rel="shortcut icon" href="/static/favicon.png">
-
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="芽之家，纯粹 Rust 技术栈开发的博客。budshome, the Blog built on pure Rust stack.">
-        <meta name="author" content="zzy, https://github.com/zzy/surfer">
-
-        <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+        <title>注册博客账户 - 芽之家 - budshome.com</title>
+        <meta name="description" content="注册博客账户 - 芽之家，纯粹 Rust 技术栈开发的博客。budshome, the Blog built on pure Rust stack.">
+        {{> head }}
         <link href="/static/css/sign.css" rel="stylesheet">
     </head>
 
@@ -33,7 +25,7 @@
                     with username(<span class="badge bg-primary text-wrap">{{ register_result.username }}</span>),
                     or email address(<span class="badge bg-primary text-wrap">{{ register_result.email }}</span>).
                 </p>
-            {{ else }}
+                {{ else }}
                 <h1 class="h3 mb-3 fw-normal">Please register</h1>
                 {{#if register_failed }}
                     <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ register_failed }}</p>
