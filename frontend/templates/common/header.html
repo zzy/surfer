@@ -52,12 +52,14 @@
                         </span>
                         <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdown-user">
                             <li>
-                                <a class="dropdown-item mt-2" href="/{{ user.username }}" target="_blank">
-                                    {{ user.blogName }}
+                                <a class="dropdown-item mt-2" href="/{{ user.username }}/dashboard" target="_blank">
+                                    Your dashboard
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item mt-2" href="#">Your profile</a>
+                                <a class="dropdown-item mt-2" href="/{{ user.username }}" target="_blank">
+                                    {{ user.blogName }}
+                                </a>
                             </li>
                             <li>
                                 <hr class="dropdown-divider">

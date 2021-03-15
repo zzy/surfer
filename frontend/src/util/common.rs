@@ -100,6 +100,20 @@ impl<'tpl> Tpl<'tpl> {
         data.insert("nav", json!("nav"));
     }
 
+    pub async fn reg_sidebar(
+        &mut self,
+        data: &mut BTreeMap<&str, serde_json::Value>,
+    ) {
+        self.reg
+            .register_template_file(
+                "sidebar",
+                format!("{}{}", tpls_dir().await, "common/sidebar.html"),
+            )
+            .unwrap();
+
+        data.insert("sidebar", json!("sidebar"));
+    }
+
     pub async fn reg_introduction(
         &mut self,
         data: &mut BTreeMap<&str, serde_json::Value>,

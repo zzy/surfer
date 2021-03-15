@@ -11,9 +11,9 @@ async-std = { version = "1.9.0", features = ["attributes"] }
 
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
-regex = "1.4.3"
+regex = "1.4.5"
 
-async-graphql = "2.5.13"
+async-graphql = "2.5.14"
 mongodb = { version = "1.2.0", default-features = false, features = ["async-std-runtime"] }
 bson = "1.2.0"
 serde = { version = "1.0.124", features = ["derive"] }
