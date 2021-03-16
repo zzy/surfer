@@ -7,7 +7,7 @@ pub mod articles;
 use crate::State;
 
 use crate::routes::home::{index, register, sign_in, sign_out};
-use crate::routes::users::{user_index, user_dashboard, users_list, user_register};
+use crate::routes::users::{user_index, user_dashboard, users_list};
 use crate::routes::articles::{article_index, articles_list, article_new};
 
 // pub async fn push_res(mut app: Server<State>) -> Server<State> {
@@ -27,7 +27,6 @@ pub async fn push_res(app: &mut Server<State>) {
 
     let mut users = app.at("users");
     users.at("list").get(users_list);
-    users.at("register").get(user_register);
 
     let mut articles = app.at("articles");
     articles.at("list").get(articles_list);

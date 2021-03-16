@@ -1,4 +1,4 @@
-mutation ArticleNew(
+mutation ArticleNewData(
   $username: String!
   $subject: String!
   $content: String!

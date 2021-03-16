@@ -1,0 +1,20 @@
+query UserDashboardData(
+  $signIn: Boolean!
+  $username: String!
+) {
+  userByUsername(
+    username: $username
+  ) 
+  @include(if: $signIn) {
+    username
+    nickname
+    blogName
+    picture
+  }
+
+  categories {
+    name
+    description
+    uri
+  }
+}
