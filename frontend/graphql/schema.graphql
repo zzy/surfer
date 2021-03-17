@@ -15,6 +15,7 @@ type Article {
   slug: String!
   uri: String!
   content: String!
+  contentHtml: String!
   published: Boolean!
   top: Boolean!
   recommended: Boolean!

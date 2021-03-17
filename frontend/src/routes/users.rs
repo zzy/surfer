@@ -115,6 +115,7 @@ pub async fn user_dashboard(req: Request<State>) -> tide::Result {
         user_dashboard_tpl.reg_header(&mut data).await;
         user_dashboard_tpl.reg_nav(&mut data).await;
         user_dashboard_tpl.reg_sidebar(&mut data).await;
+        user_dashboard_tpl.reg_footer(&mut data).await;
 
         user_dashboard_tpl.reg_script_value_check().await;
         user_dashboard_tpl.reg_script_website_svg().await;

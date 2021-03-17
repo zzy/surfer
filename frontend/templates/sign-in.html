@@ -18,6 +18,7 @@
       {{#if sign_in_failed }}
         <p class="p-2 mb-2 bg-warning text-dark fs-6">{{ sign_in_failed }}</p>
       {{/if }}
+
       <form method="post">
         <div class="form-floating mb-2">
           <input type="text|email" name="signature" id="signature" class="form-control"
@@ -36,11 +37,13 @@
           </label>
         </div>
         <button class="w-100 btn btn-lg btn-primary" type="submit">Sign in</button>
-        <p class="mt-5 mb-3 text-muted">
+        <p class="mt-3 mb-3 text-muted">
           New to BudsHome?
           <a href="/register">Create an account.</a>
         </p>
       </form>
+
+      {{> footer }}
     </main>
 
   </body>

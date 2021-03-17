@@ -24,3 +24,4 @@ base64 = "0.13.0"
 
 unicode-segmentation = "1.7.1"
 pinyin = "0.8.0"
+pulldown-cmark = "0.8.0"

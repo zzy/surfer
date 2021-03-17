@@ -116,6 +116,7 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
     article_new_tpl.reg_header(&mut data).await;
     article_new_tpl.reg_nav(&mut data).await;
     article_new_tpl.reg_sidebar(&mut data).await;
+    article_new_tpl.reg_footer(&mut data).await;
 
     article_new_tpl.reg_script_value_check().await;
     article_new_tpl.reg_script_website_svg().await;

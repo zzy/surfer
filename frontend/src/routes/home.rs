@@ -96,7 +96,9 @@ struct RegisterData;
 pub async fn register(mut req: Request<State>) -> tide::Result {
     let mut register_tpl: Tpl = Tpl::new("register").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
     register_tpl.reg_head(&mut data).await;
+    register_tpl.reg_footer(&mut data).await;
 
     if req.method().eq(&Method::Post) {
         let register_info: RegisterInfo = req.body_form().await?;
@@ -151,7 +153,9 @@ struct SignInData;
 pub async fn sign_in(mut req: Request<State>) -> tide::Result {
     let mut sign_in_tpl: Tpl = Tpl::new("sign-in").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
+
     sign_in_tpl.reg_head(&mut data).await;
+    sign_in_tpl.reg_footer(&mut data).await;
 
     if req.method().eq(&Method::Post) {
         let sign_in_info: SignInInfo = req.body_form().await?;
