@@ -121,6 +121,7 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
     article_new_tpl.reg_script_website_svg().await;
 
     if req.method().eq(&Method::Post) {
+        println!("\n\n\n 333333333333333333");
         let article_info: ArticleInfo = req.body_form().await?;
         println!("{:?}", article_info.content);
 

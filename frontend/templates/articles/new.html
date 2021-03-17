@@ -8,11 +8,8 @@
         <link href="/static/css/blog.css" rel="stylesheet">
         <link href="/static/css/sidebar.css" rel="stylesheet">
 
-        <link rel="stylesheet" href="/static/editor/stacks.min.css">
-        <link href="/static/editor/app.css" rel="stylesheet">
-
-        <script src="/static/editor/stacks.min.js" defer="defer"></script>
-        <script src="/static/editor/app.bundle.js" defer="defer"></script>
+        <link href="/static/css/stacks.min.css" rel="stylesheet">
+        <link href="/static/css/stacks-editor.min.css" rel="stylesheet">
     </head>
 
     <body>
@@ -29,26 +26,33 @@
                     <h3 class="mb-3">New Article</h3>
 
                     <form method="post">
-                        <div class="grid--cell s-toggle-switch">
-                            <input id="js-toggle-dark" type="checkbox" />
-                            <div class="s-toggle-switch--indicator"></div>
-                            <label for="js-toggle-dark" class="grid--cell ml4">Dark mode</label>
-                        </div>
-                        <div id="content-div" class="js-tables-enabled"></div>
-                        <textarea id="content" name="content" class="d-none">
-                        ``` html
-                            <div>
-                                <strong>foo</strong>
-                            </div>
-                        ```
-                        </textarea>
 
+                        <textarea id="content" name="content" class="d-none">
+# 一级标题
+支持 **Markdown** 语法
+                        </textarea>
+                        <div id="content-div" class="js-tables-enabled"></div>
+                        <button onclick="document.querySelector('#content').value = editor.content;" type="submit"
+                            class="w-100 btn btn-lg btn-primary">Publish</button>
                     </form>
 
                 </main>
             </div>
         </div>
 
+        <script src="/static/js/highlight.min.js"></script>
+        <script src="/static/js/stacks-editor.bundle.js"></script>
+        <script>
+            let editor = new window.stacksEditor.StacksEditor(
+                document.querySelector("#content-div"),
+                document.querySelector("#content").value,
+                {
+                    parserFeatures: {
+                        tables: true,
+                    },
+                }
+            );
+        </script>
     </body>
 
 </html>

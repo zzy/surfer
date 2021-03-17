@@ -21,16 +21,17 @@ pub async fn push_res(app: &mut Server<State>) {
     home.at("/sign-in").get(sign_in).post(sign_in);
     home.at("/sign-out").get(sign_out);
 
-    home.at("/:username").get(user_index);
-    home.at("/:username/dashboard").get(user_dashboard);
-    home.at("/:username/:slug").get(article_index);
+    let mut user = app.at("/:username");
+    user.at("/").get(user_index);
+    user.at("/dashboard").get(user_dashboard);
+    user.at("/:slug").get(article_index);
 
-    let mut users = app.at("users");
-    users.at("list").get(users_list);
+    let mut users = app.at("/users");
+    users.at("/").get(users_list);
 
-    let mut articles = app.at("articles");
-    articles.at("list").get(articles_list);
-    articles.at("new").get(article_new).post(article_new);
+    let mut articles = app.at("/articles");
+    articles.at("/").get(articles_list);
+    articles.at("/new").get(article_new).post(article_new);
 
     // app
 }
