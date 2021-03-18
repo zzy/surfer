@@ -25,12 +25,31 @@
                     <h3 class="mb-3">New Article</h3>
 
                     <form method="post">
-
-                        <textarea id="content" name="content" class="d-none">
+                        <input type="hidden" name="user_id" value="{{ user.id }}">
+                        <div class="form-floating mb-2">
+                            <input type="text" name="subject" id="subject" class="form-control" placeholder="subject"
+                                aria-label="subject" required>
+                            <label for="subject">Article subject</label>
+                        </div>
+                        <div class="form-floating mb-2">
+                            <input type="text" name="category_id" id="category_id" class="form-control"
+                                placeholder="category_id" aria-label="category_id" required>
+                            <label for="category_id">Article category</label>
+                        </div>
+                        <div class="form-floating mb-2">
+                            <textarea name="summary" id="summary" class="form-control" style="height: 100px"
+                                placeholder="summary" aria-label="summary" required></textarea>
+                            <label for="summary">Article summary</label>
+                        </div>
+                        <div class="form-floating mb-2">
+                            <textarea id="content" name="content" class="d-none form-control" placeholder="content"
+                                aria-label="content" required>
 # 一级标题
 支持 **Markdown** 语法
                         </textarea>
-                        <div id="content-div" class="js-tables-enabled"></div>
+                            <label for="content">Article content</label>
+                            <div id="content-div" class="js-tables-enabled"></div>
+                        </div>
                         <button onclick="setContent()" type="submit"
                             class="w-100 btn btn-lg btn-primary mt-3">Publish</button>
                     </form>

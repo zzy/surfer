@@ -109,38 +109,59 @@ struct ArticleNewData;
 use crate::models::articles::ArticleInfo;
 
 pub async fn article_new(mut req: Request<State>) -> tide::Result {
-    let mut article_new_tpl: Tpl = Tpl::new("articles/new").await;
-    let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
-
-    article_new_tpl.reg_head(&mut data).await;
-    article_new_tpl.reg_header(&mut data).await;
-    article_new_tpl.reg_nav(&mut data).await;
-    article_new_tpl.reg_sidebar(&mut data).await;
-    article_new_tpl.reg_footer(&mut data).await;
-
-    article_new_tpl.reg_script_value_check().await;
-    article_new_tpl.reg_script_website_svg().await;
-
-    if req.method().eq(&Method::Post) {
-        println!("\n\n\n 333333333333333333");
-        let article_info: ArticleInfo = req.body_form().await?;
-        println!("{:?}", article_info.content);
-
-        article_new_tpl.render(&data).await
+    let mut username = String::new();
+    if let Some(cookie) = req.cookie("username") {
+        username.push_str(cookie.value());
     } else {
-        let mut username = String::new();
-        if let Some(cookie) = req.cookie("username") {
-            username.push_str(cookie.value());
+        username.push_str("-");
+    }
+
+    let mut sign_in = false;
+    if "".ne(username.trim()) && "-".ne(username.trim()) {
+        sign_in = true;
+    }
+
+    if sign_in {
+        if req.method().eq(&Method::Post) {
+            let article_info: ArticleInfo = req.body_form().await?;
+
+            let now = Local::now();
+
+            let build_query =
+                ArticleNewData::build_query(article_new_data::Variables {
+                    user_id: article_info.user_id,
+                    subject: article_info.subject,
+                    category_id: article_info.category_id,
+                    summary: article_info.summary,
+                    content: article_info.content,
+                    created_at: now,
+                    updated_at: now,
+                });
+            let query = json!(build_query);
+
+            let resp_body: GqlResponse<serde_json::Value> =
+                surf::post(&gql_uri().await).body(query).recv_json().await?;
+            let resp_data = resp_body.data.expect("missing response data");
+
+            let article_uri =
+                resp_data["articleNew"]["uri"].as_str().unwrap_or("/");
+            let resp: Response =
+                Redirect::new(format!("{}", article_uri)).into();
+
+            Ok(resp.into())
         } else {
-            username.push_str("-");
-        }
+            let mut article_new_tpl: Tpl = Tpl::new("articles/new").await;
+            let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
-        let mut sign_in = false;
-        if "".ne(username.trim()) && "-".ne(username.trim()) {
-            sign_in = true;
-        }
+            article_new_tpl.reg_head(&mut data).await;
+            article_new_tpl.reg_header(&mut data).await;
+            article_new_tpl.reg_nav(&mut data).await;
+            article_new_tpl.reg_sidebar(&mut data).await;
+            article_new_tpl.reg_footer(&mut data).await;
 
-        if sign_in {
+            article_new_tpl.reg_script_value_check().await;
+            article_new_tpl.reg_script_website_svg().await;
+
             let build_query = UserDashboardData::build_query(
                 user_dashboard_data::Variables {
                     sign_in: sign_in,
@@ -160,29 +181,10 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
             data.insert("categories", categories);
 
             article_new_tpl.render(&data).await
-        } else {
-            let resp: Response = Redirect::new("/sign-in").into();
-
-            Ok(resp.into())
         }
+    } else {
+        let resp: Response = Redirect::new("/sign-in").into();
+
+        Ok(resp.into())
     }
-    // let now = Local::now();
-
-    // let build_query = ArticleNew::build_query(article_new::Variables {
-    //     username: "test".to_string(),
-    //     subject: "香洲半岛 2021 ... You sig---er tab or wi...ur session.".to_string(),
-    //     content:
-    //         "<span>抱歉，您正在使用的浏览器未被完全支持，我们强烈推荐您进行浏览器升级。</span>"
-    //             .to_string(),
-    //     created_at: now,
-    //     updated_at: now,
-    // });
-    // let query = json!(build_query);
-
-    // let resp_body: Response<serde_json::Value> =
-    //     surf::post(&gql_uri().await).body(query).recv_json().await?;
-
-    // let resp_data = resp_body.data.expect("missing response data");
-
-    // article_new_tpl.render(&resp_data).await
 }

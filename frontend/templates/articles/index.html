@@ -6,6 +6,7 @@
     <meta name="description"
       content="{{ article.summary }} - 芽之家，纯粹 Rust 技术栈开发的博客。budshome, the Blog built on pure Rust stack.">
     {{> head }}
+    <link href="/static/css/night-owl.min.css" rel="stylesheet">
   </head>
 
   <body>
@@ -24,7 +25,9 @@
               {{ article.subject }}
             </h2>
             <p class="blog-post-meta">{{ article.updatedAt }} by
-              <a href="/{{ article.user.username }}" target="_blank">{{ article.user.nickname }}[]</a>
+              <a href="/{{ article.user.username }}" target="_blank">
+                {{ article.user.nickname }}[{{ article.user.blogName }}]
+              </a>
             </p>
             <p class="p-2 border border-info bg-light">
               <strong>Summary: </strong>{{ article.summary }}
@@ -38,7 +41,7 @@
                 </span>
               {{/each }}
             </p>
-            <p>{{{ article.content }}}</p>
+            <p>{{{ article.contentHtml }}}</p>
           </article>
 
 
@@ -70,6 +73,9 @@
 
       </div><!-- /.row -->
     </main><!-- /.container-xxl -->
+
+    <script src="/static/js/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
 
     {{> footer }}
   </body>

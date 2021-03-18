@@ -17,7 +17,7 @@ query ArticleIndexData(
     subject
     summary
     uri
-    content
+    contentHtml
     updatedAt
 
     user {

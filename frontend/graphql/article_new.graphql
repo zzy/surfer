@@ -1,28 +1,23 @@
 mutation ArticleNewData(
-  $username: String!
+  $userId: ObjectId!
   $subject: String!
+  $categoryId: ObjectId!
+  $summary: String!
   $content: String!
   $createdAt: DateTime!
   $updatedAt: DateTime!
-  ) {
+) {
   articleNew(
     articleNew: {
-      username: $username
+      userId: $userId
       subject: $subject
+      categoryId: $categoryId
+      summary: $summary
       content: $content
       createdAt: $createdAt
       updatedAt: $updatedAt
     }
   ) {
-    id
-    userId
-    subject
-    slug
-    content
-    createdAt
-    updatedAt
-    published
-    top
-    recommended
+    uri
   }
 }

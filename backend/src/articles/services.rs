@@ -45,9 +45,9 @@ pub async fn article_new(
 
         article_new.slug = slug;
         article_new.uri = uri;
-        article_new.published = false;
-        article_new.top = false;
-        article_new.recommended = false;
+        article_new.published = true; // false;
+        article_new.top = true; // false;
+        article_new.recommended = true; // false;
 
         let article_new_bson = bson::to_bson(&article_new).unwrap();
 
@@ -88,7 +88,10 @@ pub async fn articles(
         find_doc.insert("published", false);
     }
     let coll = db.collection("articles");
-    let mut cursor = coll.find(find_doc, None).await.unwrap();
+
+    let find_options =
+        FindOptions::builder().sort(doc! {"updated_at": -1}).build();
+    let mut cursor = coll.find(find_doc, find_options).await.unwrap();
 
     let mut articles: Vec<Article> = vec![];
     while let Some(result) = cursor.next().await {
@@ -124,7 +127,10 @@ pub async fn articles_by_user_id(
         find_doc.insert("published", false);
     }
     let coll = db.collection("articles");
-    let mut cursor = coll.find(find_doc, None).await?;
+
+    let find_options =
+        FindOptions::builder().sort(doc! {"updated_at": -1}).build();
+    let mut cursor = coll.find(find_doc, find_options).await?;
 
     let mut articles: Vec<Article> = vec![];
     while let Some(result) = cursor.next().await {
@@ -163,7 +169,10 @@ pub async fn articles_by_category_id(
         find_doc.insert("published", false);
     }
     let coll = db.collection("articles");
-    let mut cursor = coll.find(find_doc, None).await?;
+
+    let find_options =
+        FindOptions::builder().sort(doc! {"updated_at": -1}).build();
+    let mut cursor = coll.find(find_doc, find_options).await?;
 
     let mut articles: Vec<Article> = vec![];
     while let Some(result) = cursor.next().await {
@@ -220,7 +229,11 @@ pub async fn articles_in_position(
     }
 
     let coll = db.collection("articles");
-    let find_options = FindOptions::builder().limit(limit).build();
+
+    let find_options = FindOptions::builder()
+        .sort(doc! {"updated_at": -1})
+        .limit(limit)
+        .build();
     let mut cursor = coll.find(find_doc, find_options).await?;
 
     let mut articles: Vec<Article> = vec![];
