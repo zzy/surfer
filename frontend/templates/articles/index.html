@@ -19,15 +19,22 @@
 
       <div class="row">
         <div class="col-md-8">
+          <h6>{{ wish.user.nickname }}
+            (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
+            shared the aphorism --
+          </h6>
+          <h5 class="pb-4 mb-4 font-italic border-bottom text-primary">
+            {{ wish.aphorism }} -- {{ wish.author }}
+          </h5>
+
           <article class="blog-post">
             <h2 class="blog-post-title">
               [<a href="{{ article.category.uri }}" target="_blank">{{ article.category.name }}</a>]
               {{ article.subject }}
             </h2>
-            <p class="blog-post-meta">{{ article.updatedAt }} by
-              <a href="/{{ article.user.username }}" target="_blank">
-                {{ article.user.nickname }}[{{ article.user.blogName }}]
-              </a>
+            <p class="blog-post-meta">{{ article.updatedAt }} by -
+              <strong>{{ article.user.nickname }}</strong>
+              [blog: <a href="/{{ article.user.username }}" target="_blank">{{ article.user.blogName }}</a>]
             </p>
             <p class="p-2 border border-info bg-light">
               <strong>Summary: </strong>{{ article.summary }}
@@ -44,14 +51,6 @@
             <p>{{{ article.contentHtml }}}</p>
           </article>
 
-
-          <h6>{{ wish.user.nickname }}
-            (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
-            shared the aphorism --
-          </h6>
-          <h3 class="pb-4 mb-4 font-italic border-bottom text-info">
-            {{ wish.aphorism }} - {{ wish.author }}
-          </h3>
         </div>
 
         <div class="col-md-4">
@@ -71,8 +70,8 @@
           {{> elsewhere }}
         </div>
 
-      </div><!-- /.row -->
-    </main><!-- /.container-xxl -->
+      </div>
+    </main>
 
     <script src="/static/js/highlight.min.js"></script>
     <script>hljs.highlightAll();</script>

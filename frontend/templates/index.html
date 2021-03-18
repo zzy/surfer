@@ -65,9 +65,9 @@
             (blog: <a href="/{{wish.user.username}}" target="_blank">{{ wish.user.blogName }}</a>)
             shared the aphorism --
           </h6>
-          <h3 class="pb-4 mb-4 font-italic border-bottom text-info">
-            {{ wish.aphorism }} - {{ wish.author }}
-          </h3>
+          <h5 class="pb-4 mb-4 font-italic border-bottom text-primary">
+            {{ wish.aphorism }} -- {{ wish.author }}
+          </h5>
 
           {{#each articles as |article| }}
             <article class="blog-post">
