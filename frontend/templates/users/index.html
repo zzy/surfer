@@ -40,7 +40,7 @@
                     {{ recommended_article.category.name }}
                   </a>
                 </strong>
-                <h3 class="mb-0">{{ recommended_article.subject }}</h3>
+                <h3 class="mb-0">{{ str-trc recommended_article.subject 34 }}</h3>
                 <div class="mb-1 text-muted">{{ recommended_article.updatedAt }}</div>
                 <p class="card-text mb-auto">
                   {{ str-trc recommended_article.summary 50 }}

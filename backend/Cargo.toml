@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
-[dependencies] 
+[dependencies]
 futures = "0.3.13"
 tide = "0.16.0"
 async-std = { version = "1.9.0", features = ["attributes"] }
@@ -13,7 +13,7 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.4.5"
 
-async-graphql = "2.5.14"
+async-graphql = "2.6.0"
 mongodb = { version = "1.2.0", default-features = false, features = ["async-std-runtime"] }
 bson = "1.2.0"
 serde = { version = "1.0.124", features = ["derive"] }
@@ -24,4 +24,4 @@ base64 = "0.13.0"
 
 unicode-segmentation = "1.7.1"
 pinyin = "0.8.0"
-pulldown-cmark = "0.8.0"
+pulldown-cmark = { version = "0.8.0", default-features = false, features = ["simd"] }
