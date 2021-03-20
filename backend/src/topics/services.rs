@@ -2,8 +2,7 @@ use futures::stream::StreamExt;
 use mongodb::{Database, options::FindOptions};
 use bson::{doc, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
-use unicode_segmentation::UnicodeSegmentation;
-use pinyin::ToPinyin;
+use deunicode::deunicode_with_tofu;
 
 use crate::util::constant::GqlResult;
 use crate::users;
@@ -22,17 +21,9 @@ pub async fn topic_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let name_low = topic_new.name.to_lowercase();
-        let mut name_seg: Vec<&str> = name_low.unicode_words().collect();
-        for n in 0..name_seg.len() {
-            let seg = name_seg[n];
-            if !seg.is_ascii() {
-                let seg_py =
-                    seg.chars().next().unwrap().to_pinyin().unwrap().plain();
-                name_seg[n] = seg_py;
-            }
-        }
-        let slug = name_seg.join("-");
+        let slug = deunicode_with_tofu(&topic_new.name, "-")
+            .to_lowercase()
+            .replace(" ", "-");
         let uri = format!("/topics/{}", &slug);
 
         topic_new.slug = slug;

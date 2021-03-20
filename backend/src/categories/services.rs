@@ -2,8 +2,7 @@ use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::Database;
 use bson::{doc, oid::ObjectId};
-use unicode_segmentation::UnicodeSegmentation;
-use pinyin::ToPinyin;
+use deunicode::deunicode_with_tofu;
 
 use crate::util::constant::GqlResult;
 
@@ -21,17 +20,9 @@ pub async fn category_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let name_low = category_new.name.to_lowercase();
-        let mut name_seg: Vec<&str> = name_low.unicode_words().collect();
-        for n in 0..name_seg.len() {
-            let seg = name_seg[n];
-            if !seg.is_ascii() {
-                let seg_py =
-                    seg.chars().next().unwrap().to_pinyin().unwrap().plain();
-                name_seg[n] = seg_py;
-            }
-        }
-        let slug = name_seg.join("-");
+        let slug = deunicode_with_tofu(&category_new.name, "-")
+            .to_lowercase()
+            .replace(" ", "-");
         let uri = format!("/categories/{}", &slug);
 
         category_new.slug = slug;

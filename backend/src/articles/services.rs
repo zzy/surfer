@@ -2,8 +2,7 @@ use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::{Database, options::FindOptions};
 use bson::{doc, oid::ObjectId};
-use unicode_segmentation::UnicodeSegmentation;
-use pinyin::ToPinyin;
+use deunicode::deunicode_with_tofu;
 
 use crate::util::constant::GqlResult;
 use crate::users;
@@ -26,17 +25,9 @@ pub async fn article_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let subject_low = article_new.subject.to_lowercase();
-        let mut subject_seg: Vec<&str> = subject_low.unicode_words().collect();
-        for n in 0..subject_seg.len() {
-            let seg = subject_seg[n];
-            if !seg.is_ascii() {
-                let seg_py =
-                    seg.chars().next().unwrap().to_pinyin().unwrap().plain();
-                subject_seg[n] = seg_py;
-            }
-        }
-        let slug = subject_seg.join("-");
+        let slug = deunicode_with_tofu(&article_new.subject, "-")
+            .to_lowercase()
+            .replace(" ", "-");
 
         let user =
             users::services::user_by_id(db.clone(), &article_new.user_id)
