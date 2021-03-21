@@ -23,7 +23,8 @@ pub async fn topic_new(
     } else {
         let slug = deunicode_with_tofu(&topic_new.name, "-")
             .to_lowercase()
-            .replace(" ", "-");
+            .replace(" ", "-")
+            .replace("\"", "");
         let uri = format!("/topics/{}", &slug);
 
         topic_new.slug = slug;

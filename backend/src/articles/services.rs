@@ -27,7 +27,8 @@ pub async fn article_new(
     } else {
         let slug = deunicode_with_tofu(&article_new.subject, "-")
             .to_lowercase()
-            .replace(" ", "-");
+            .replace(" ", "-")
+            .replace("\"", "");
 
         let user =
             users::services::user_by_id(db.clone(), &article_new.user_id)
