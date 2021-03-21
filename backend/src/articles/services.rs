@@ -2,9 +2,8 @@ use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::{Database, options::FindOptions};
 use bson::{doc, oid::ObjectId};
-use deunicode::deunicode_with_tofu;
 
-use crate::util::constant::GqlResult;
+use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
 
 use super::models::{Article, ArticleNew};
@@ -25,10 +24,7 @@ pub async fn article_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let slug = deunicode_with_tofu(&article_new.subject, "-")
-            .to_lowercase()
-            .replace(" ", "-")
-            .replace("\"", "");
+        let slug = slugify(&article_new.subject).await;
 
         let user =
             users::services::user_by_id(db.clone(), &article_new.user_id)

@@ -2,9 +2,8 @@ use futures::stream::StreamExt;
 use mongodb::{Database, options::FindOptions};
 use bson::{doc, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
-use deunicode::deunicode_with_tofu;
 
-use crate::util::constant::GqlResult;
+use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
 
 use super::models::{Topic, TopicNew, TopicArticle, TopicArticleNew};
@@ -21,10 +20,7 @@ pub async fn topic_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let slug = deunicode_with_tofu(&topic_new.name, "-")
-            .to_lowercase()
-            .replace(" ", "-")
-            .replace("\"", "");
+        let slug = slugify(&topic_new.name).await;
         let uri = format!("/topics/{}", &slug);
 
         topic_new.slug = slug;

@@ -2,9 +2,8 @@ use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::Database;
 use bson::{doc, oid::ObjectId};
-use deunicode::deunicode_with_tofu;
 
-use crate::util::constant::GqlResult;
+use crate::util::{constant::GqlResult, common::slugify};
 
 use super::models::{Category, CategoryUser, CategoryNew, CategoryUserNew};
 
@@ -20,10 +19,7 @@ pub async fn category_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let slug = deunicode_with_tofu(&category_new.name, "-")
-            .to_lowercase()
-            .replace(" ", "-")
-            .replace("\"", "");
+        let slug = slugify(&category_new.name).await;
         let uri = format!("/categories/{}", &slug);
 
         category_new.slug = slug;
