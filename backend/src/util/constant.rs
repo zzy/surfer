@@ -5,6 +5,9 @@ use std::collections::HashMap;
 pub type GqlResult<T> = std::result::Result<T, async_graphql::Error>;
 
 lazy_static! {
+    // datetime format
+    pub static ref DT_F: String = String::from("%Y-%m-%d %H:%M:%S%Z");
+
     // CFG variables defined in .env file
     pub static ref CFG: HashMap<&'static str, String> = {
         dotenv().ok();
