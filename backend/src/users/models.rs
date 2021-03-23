@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use bson::{oid::ObjectId, DateTime};
+use chrono::FixedOffset;
 
 use crate::util::constant::GqlResult;
 use crate::dbs::mongo::DataSource;
@@ -56,11 +57,11 @@ impl User {
     }
 
     pub async fn created_at(&self) -> String {
-        self.created_at.to_string()
+        self.created_at.with_timezone(&FixedOffset::east(8 * 3600)).to_string()
     }
 
     pub async fn updated_at(&self) -> String {
-        self.updated_at.to_string()
+        self.updated_at.with_timezone(&FixedOffset::east(8 * 3600)).to_string()
     }
 
     pub async fn banned(&self) -> bool {
@@ -149,11 +150,11 @@ impl Wish {
     }
 
     pub async fn created_at(&self) -> String {
-        self.created_at.to_string()
+        self.created_at.with_timezone(&FixedOffset::east(8 * 3600)).to_string()
     }
 
     pub async fn updated_at(&self) -> String {
-        self.updated_at.to_string()
+        self.updated_at.with_timezone(&FixedOffset::east(8 * 3600)).to_string()
     }
 
     pub async fn user(

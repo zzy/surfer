@@ -16,8 +16,9 @@ regex = "1.4.5"
 async-graphql = { version = "2.6.4", features = ["bson", "chrono"] }
 mongodb = { version = "1.2.0", default-features = false, features = ["async-std-runtime"] }
 bson = "1.2.0"
-serde = { version = "1.0.124", features = ["derive"] }
 
+serde = { version = "1.0.124", features = ["derive"] }
+chrono = "0.4.19"
 jsonwebtoken = "7.2.0"
 ring = "0.16.20"
 base64 = "0.13.0"
