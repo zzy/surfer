@@ -32,8 +32,14 @@
                             <label for="subject">Article subject</label>
                         </div>
                         <div class="form-floating mb-2">
-                            <input type="text" name="category_id" id="category_id" class="form-control"
+                            <select name="category_id" id="category_id" class="form-select form-control"
                                 placeholder="category_id" aria-label="category_id" required>
+                                <option selected>Article category</option>
+                                {{#each categories as |category|}}
+                                    <option value="{{ category.id }}">{{ category.name }}：{{ category.description }}
+                                    </option>
+                                {{/each}}
+                            </select>
                             <label for="category_id">Article category</label>
                         </div>
                         <div class="form-floating mb-2">
