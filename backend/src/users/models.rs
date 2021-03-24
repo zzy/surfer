@@ -59,14 +59,14 @@ impl User {
     pub async fn created_at(&self) -> String {
         self.created_at
             .with_timezone(&FixedOffset::east(8 * 3600))
-            .format(&DT_F)
+            .format(DT_F)
             .to_string()
     }
 
     pub async fn updated_at(&self) -> String {
         self.updated_at
             .with_timezone(&FixedOffset::east(8 * 3600))
-            .format(&DT_F)
+            .format(DT_F)
             .to_string()
     }
 
@@ -158,14 +158,14 @@ impl Wish {
     pub async fn created_at(&self) -> String {
         self.created_at
             .with_timezone(&FixedOffset::east(8 * 3600))
-            .format(&DT_F)
+            .format(DT_F)
             .to_string()
     }
 
     pub async fn updated_at(&self) -> String {
         self.updated_at
             .with_timezone(&FixedOffset::east(8 * 3600))
-            .format(&DT_F)
+            .format(DT_F)
             .to_string()
     }
 

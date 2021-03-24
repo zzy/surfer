@@ -2,12 +2,13 @@ use dotenv::dotenv;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
+// async-graphql result type
 pub type GqlResult<T> = std::result::Result<T, async_graphql::Error>;
 
-lazy_static! {
-    // datetime format
-    pub static ref DT_F: String = String::from("%Y-%m-%d %H:%M:%S%Z");
+// datetime format
+pub const DT_F: &str = "%Y-%m-%d %H:%M:%S%Z";
 
+lazy_static! {
     // CFG variables defined in .env file
     pub static ref CFG: HashMap<&'static str, String> = {
         dotenv().ok();
