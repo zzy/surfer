@@ -8,6 +8,14 @@ body {
   padding-bottom: 20px;
 }
 
+blockquote {
+  margin: 10px 5px 10px 25px;
+  padding: 10px 10px 10px 15px;
+  background-color:#f1f1f1;
+  border-left: 3px solid #ccc;
+  font-size: .95rem;
+}
+
 table, 
 thead, 
 tr, 
