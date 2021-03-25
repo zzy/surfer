@@ -10,9 +10,9 @@ body {
 
 blockquote {
   margin: 10px 5px 10px 25px;
-  padding: 10px 10px 10px 15px;
+  padding: 10px 10px 5px 15px;
   background-color:#f1f1f1;
-  border-left: 3px solid #ccc;
+  border-left: 3px solid lightskyblue;
   font-size: .95rem;
 }
 
