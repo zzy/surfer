@@ -63,9 +63,13 @@ impl Article {
         use pulldown_cmark::{Parser, Options, html};
 
         let mut options = Options::empty();
+        options.insert(Options::ENABLE_TABLES);
+        options.insert(Options::ENABLE_FOOTNOTES);
+        options.insert(Options::ENABLE_STRIKETHROUGH);
+        options.insert(Options::ENABLE_TASKLISTS);
         options.insert(Options::ENABLE_SMART_PUNCTUATION);
 
-        let parser = Parser::new_ext(self.content.as_str(), options);
+        let parser = Parser::new_ext(&self.content, options);
 
         let mut content_html = String::new();
         html::push_html(&mut content_html, parser);

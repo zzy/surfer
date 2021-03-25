@@ -1,4 +1,4 @@
-html,
+html, 
 body {
   height: 100%;
 }
@@ -6,6 +6,16 @@ body {
 body {
   padding-top: 40px;
   padding-bottom: 20px;
+}
+
+table, 
+thead, 
+tr, 
+th, 
+td {
+  border: 1px solid gray;
+  margin: 10px;
+  padding: 5px;
 }
 
 .blog-header {
