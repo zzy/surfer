@@ -1,9 +1,9 @@
 [workspace]
-resolver = "2"
 members = [
   "./backend",
   "./frontend",
 ]
+resolver = "2"
 
 [profile.dev]
 split-debuginfo = "unpacked"
