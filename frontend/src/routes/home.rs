@@ -5,13 +5,10 @@ use tide::{
 };
 use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use serde_json::json;
-use chrono::Local;
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
 use crate::models::users::{SignInInfo, RegisterInfo};
-
-type DateTime = chrono::DateTime<Local>;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -103,8 +100,6 @@ pub async fn register(mut req: Request<State>) -> tide::Result {
     if req.method().eq(&Method::Post) {
         let register_info: RegisterInfo = req.body_form().await?;
 
-        let now = Local::now();
-
         let build_query = RegisterData::build_query(register_data::Variables {
             email: register_info.email,
             username: register_info.username,
@@ -114,8 +109,6 @@ pub async fn register(mut req: Request<State>) -> tide::Result {
             blog_name: register_info.blog_name,
             website: register_info.website,
             introduction: register_info.introduction,
-            created_at: now,
-            updated_at: now,
         });
         let query = json!(build_query);
 

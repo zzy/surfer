@@ -1,7 +1,8 @@
 use futures::stream::StreamExt;
 use mongodb::Database;
-use bson::{Document, doc, oid::ObjectId};
+use bson::{Document, Bson, doc, from_bson, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
+use chrono::Utc;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use regex::Regex;
 
@@ -22,8 +23,7 @@ pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
         .expect("Document not found")
         .unwrap();
 
-    let user: User =
-        bson::from_bson(bson::Bson::Document(user_document)).unwrap();
+    let user: User = from_bson(Bson::Document(user_document)).unwrap();
     Ok(user)
 }
 
@@ -35,8 +35,7 @@ pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
-            let user: User =
-                bson::from_bson(bson::Bson::Document(user_document)).unwrap();
+            let user: User = from_bson(Bson::Document(user_document)).unwrap();
             Ok(user)
         } else {
             Err(Error::new("2-email")
@@ -56,8 +55,7 @@ pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
-            let user: User =
-                bson::from_bson(bson::Bson::Document(user_document)).unwrap();
+            let user: User = from_bson(Bson::Document(user_document)).unwrap();
             Ok(user)
         } else {
             Err(Error::new("4-username")
@@ -93,7 +91,11 @@ pub async fn user_register(
 
         let user_new_bson = bson::to_bson(&user_new).unwrap();
 
-        if let bson::Bson::Document(document) = user_new_bson {
+        if let Bson::Document(mut document) = user_new_bson {
+            let now = Utc::now();
+            document.insert("created_at", Bson::DateTime(now));
+            document.insert("updated_at", Bson::DateTime(now));
+
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -190,8 +192,7 @@ pub async fn users(db: Database, token: &str) -> GqlResult<Vec<User>> {
         while let Some(result) = cursor.next().await {
             match result {
                 Ok(document) => {
-                    let user = bson::from_bson(bson::Bson::Document(document))
-                        .unwrap();
+                    let user = from_bson(Bson::Document(document)).unwrap();
                     users.push(user);
                 }
                 Err(error) => {
@@ -310,7 +311,11 @@ pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
     } else {
         let wish_new_bson = bson::to_bson(&wish_new)?;
 
-        if let bson::Bson::Document(document) = wish_new_bson {
+        if let Bson::Document(mut document) = wish_new_bson {
+            let now = Utc::now();
+            document.insert("created_at", Bson::DateTime(now));
+            document.insert("updated_at", Bson::DateTime(now));
+
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -331,7 +336,7 @@ pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
         .expect("Document not found")
         .unwrap();
 
-    let wish: Wish = bson::from_bson(bson::Bson::Document(wish_document))?;
+    let wish: Wish = from_bson(Bson::Document(wish_document))?;
     Ok(wish)
 }
 
@@ -350,8 +355,7 @@ pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let wish =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let wish = from_bson(Bson::Document(document)).unwrap();
                 wishes.push(wish);
             }
             Err(error) => {
@@ -392,7 +396,7 @@ async fn one_wish(db: Database, match_doc: Document) -> GqlResult<Wish> {
         .await?;
 
     if let Some(result) = cursor.next().await {
-        let wish = bson::from_bson(bson::Bson::Document(result?))?;
+        let wish = from_bson(Bson::Document(result?))?;
         Ok(wish)
     } else {
         Err(Error::new("9-find-one-wish")

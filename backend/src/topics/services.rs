@@ -1,7 +1,8 @@
 use futures::stream::StreamExt;
 use mongodb::{Database, options::FindOptions};
-use bson::{doc, oid::ObjectId};
+use bson::{Bson, doc, from_bson, oid::ObjectId};
 use async_graphql::{Error, ErrorExtensions};
+use chrono::Utc;
 
 use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
@@ -28,7 +29,11 @@ pub async fn topic_new(
 
         let topic_new_bson = bson::to_bson(&topic_new).unwrap();
 
-        if let bson::Bson::Document(document) = topic_new_bson {
+        if let Bson::Document(mut document) = topic_new_bson {
+            let now = Utc::now();
+            document.insert("created_at", Bson::DateTime(now));
+            document.insert("updated_at", Bson::DateTime(now));
+
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -46,8 +51,7 @@ pub async fn topic_new(
         .expect("Document not found")
         .unwrap();
 
-    let topic: Topic =
-        bson::from_bson(bson::Bson::Document(topic_document)).unwrap();
+    let topic: Topic = from_bson(Bson::Document(topic_document)).unwrap();
     Ok(topic)
 }
 
@@ -67,7 +71,7 @@ pub async fn topic_article_new(
     } else {
         let topic_article_new_bson = bson::to_bson(&topic_article_new).unwrap();
 
-        if let bson::Bson::Document(document) = topic_article_new_bson {
+        if let Bson::Document(document) = topic_article_new_bson {
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -86,7 +90,7 @@ pub async fn topic_article_new(
         .unwrap();
 
     let topic_article: TopicArticle =
-        bson::from_bson(bson::Bson::Document(topic_article_document)).unwrap();
+        from_bson(Bson::Document(topic_article_document)).unwrap();
     Ok(topic_article)
 }
 
@@ -101,8 +105,7 @@ pub async fn topics(db: Database) -> GqlResult<Vec<Topic>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let topic =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let topic = from_bson(Bson::Document(document)).unwrap();
                 topics.push(topic);
             }
             Err(error) => {
@@ -129,8 +132,7 @@ pub async fn topic_by_id(db: Database, id: &ObjectId) -> GqlResult<Topic> {
         .expect("Document not found")
         .unwrap();
 
-    let topic: Topic =
-        bson::from_bson(bson::Bson::Document(topic_document)).unwrap();
+    let topic: Topic = from_bson(Bson::Document(topic_document)).unwrap();
     Ok(topic)
 }
 
@@ -154,7 +156,7 @@ pub async fn topics_by_article_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let topic = bson::from_bson(bson::Bson::Document(document))?;
+                let topic = from_bson(Bson::Document(document))?;
                 topics.push(topic);
             }
             Err(error) => {
@@ -183,7 +185,7 @@ async fn topics_articles_by_article_id(
         match result {
             Ok(document) => {
                 let topic_article: TopicArticle =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                    from_bson(Bson::Document(document)).unwrap();
                 topics_articles.push(topic_article);
             }
             Err(error) => {
@@ -240,7 +242,7 @@ async fn topics_articles_by_user_id(
         match result {
             Ok(document) => {
                 let topic_article: TopicArticle =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                    from_bson(Bson::Document(document)).unwrap();
                 topics_articles.push(topic_article);
             }
             Err(error) => {

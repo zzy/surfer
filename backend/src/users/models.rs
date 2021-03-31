@@ -94,8 +94,6 @@ pub struct UserNew {
     pub blog_name: String,
     pub website: String,
     pub introduction: String,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
     #[graphql(skip)]
     pub banned: bool,
 }
@@ -185,6 +183,4 @@ pub struct WishNew {
     pub author: String,
     #[graphql(skip)]
     pub published: bool,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
 }

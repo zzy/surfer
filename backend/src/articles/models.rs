@@ -145,6 +145,4 @@ pub struct ArticleNew {
     pub top: bool,
     #[graphql(skip)]
     pub recommended: bool,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
 }

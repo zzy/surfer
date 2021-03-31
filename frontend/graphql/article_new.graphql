@@ -4,8 +4,6 @@ mutation ArticleNewData(
   $categoryId: ObjectId!
   $summary: String!
   $content: String!
-  $createdAt: DateTime!
-  $updatedAt: DateTime!
 ) {
   articleNew(
     articleNew: {
@@ -14,8 +12,6 @@ mutation ArticleNewData(
       categoryId: $categoryId
       summary: $summary
       content: $content
-      createdAt: $createdAt
-      updatedAt: $updatedAt
     }
   ) {
     uri

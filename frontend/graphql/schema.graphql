@@ -32,8 +32,6 @@ input ArticleNew {
   categoryId: ObjectId!
   summary: String!
   content: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type Category {
@@ -51,8 +49,6 @@ type Category {
 input CategoryNew {
   name: String!
   description: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type CategoryUser {
@@ -65,8 +61,6 @@ input CategoryUserNew {
   userId: ObjectId!
   categoryId: ObjectId!
 }
-
-scalar DateTime
 
 type MutationRoot {
   userRegister(userNew: UserNew!): User!
@@ -143,8 +137,6 @@ input TopicArticleNew {
 
 input TopicNew {
   name: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type User {
@@ -171,8 +163,6 @@ input UserNew {
   blogName: String!
   website: String!
   introduction: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }
 
 type Wish {
@@ -190,6 +180,4 @@ input WishNew {
   userId: ObjectId!
   aphorism: String!
   author: String!
-  createdAt: DateTime!
-  updatedAt: DateTime!
 }

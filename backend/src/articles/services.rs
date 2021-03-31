@@ -1,7 +1,8 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::{Database, options::FindOptions};
-use bson::{doc, oid::ObjectId};
+use bson::{Bson, doc, from_bson, oid::ObjectId};
+use chrono::Utc;
 
 use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
@@ -39,7 +40,11 @@ pub async fn article_new(
 
         let article_new_bson = bson::to_bson(&article_new).unwrap();
 
-        if let bson::Bson::Document(document) = article_new_bson {
+        if let Bson::Document(mut document) = article_new_bson {
+            let now = Utc::now();
+            document.insert("created_at", Bson::DateTime(now));
+            document.insert("updated_at", Bson::DateTime(now));
+
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -60,8 +65,7 @@ pub async fn article_new(
         .expect("Document not found")
         .unwrap();
 
-    let article: Article =
-        bson::from_bson(bson::Bson::Document(article_document)).unwrap();
+    let article: Article = from_bson(Bson::Document(article_document)).unwrap();
     Ok(article)
 }
 
@@ -85,8 +89,7 @@ pub async fn articles(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let article = from_bson(Bson::Document(document)).unwrap();
                 articles.push(article);
             }
             Err(error) => {
@@ -124,7 +127,7 @@ pub async fn articles_by_user_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document))?;
+                let article = from_bson(Bson::Document(document))?;
                 articles.push(article);
             }
             Err(error) => {
@@ -166,7 +169,7 @@ pub async fn articles_by_category_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document))?;
+                let article = from_bson(Bson::Document(document))?;
                 articles.push(article);
             }
             Err(error) => {
@@ -192,8 +195,7 @@ pub async fn article_by_slug(
         .expect("Document not found")
         .unwrap();
 
-    let article: Article =
-        bson::from_bson(bson::Bson::Document(article_document)).unwrap();
+    let article: Article = from_bson(Bson::Document(article_document)).unwrap();
     Ok(article)
 }
 
@@ -228,7 +230,7 @@ pub async fn articles_in_position(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = bson::from_bson(bson::Bson::Document(document))?;
+                let article = from_bson(Bson::Document(document))?;
                 articles.push(article);
             }
             Err(error) => {

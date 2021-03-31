@@ -7,8 +7,6 @@ mutation RegisterData(
   $blogName: String!
   $website: String!
   $introduction: String!
-  $createdAt: DateTime!
-  $updatedAt: DateTime!
 ) {
   userRegister(
     userNew: {
@@ -20,8 +18,6 @@ mutation RegisterData(
       blogName: $blogName
       website: $website
       introduction: $introduction
-      createdAt: $createdAt
-      updatedAt: $updatedAt
     }
   ) {
     email

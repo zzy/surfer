@@ -61,8 +61,6 @@ pub struct TopicNew {
     pub slug: String,
     #[graphql(skip)]
     pub uri: String,
-    pub created_at: DateTime,
-    pub updated_at: DateTime,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

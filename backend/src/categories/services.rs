@@ -1,7 +1,8 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::Database;
-use bson::{doc, oid::ObjectId};
+use bson::{Bson, doc, from_bson, oid::ObjectId};
+use chrono::Utc;
 
 use crate::util::{constant::GqlResult, common::slugify};
 
@@ -27,7 +28,11 @@ pub async fn category_new(
 
         let category_new_bson = bson::to_bson(&category_new).unwrap();
 
-        if let bson::Bson::Document(document) = category_new_bson {
+        if let Bson::Document(mut document) = category_new_bson {
+            let now = Utc::now();
+            document.insert("created_at", Bson::DateTime(now));
+            document.insert("updated_at", Bson::DateTime(now));
+
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -46,7 +51,7 @@ pub async fn category_new(
         .unwrap();
 
     let category: Category =
-        bson::from_bson(bson::Bson::Document(category_document)).unwrap();
+        from_bson(Bson::Document(category_document)).unwrap();
     Ok(category)
 }
 
@@ -66,7 +71,7 @@ pub async fn category_user_new(
     } else {
         let category_user_new_bson = bson::to_bson(&category_user_new).unwrap();
 
-        if let bson::Bson::Document(document) = category_user_new_bson {
+        if let Bson::Document(document) = category_user_new_bson {
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
                 .await
@@ -85,7 +90,7 @@ pub async fn category_user_new(
         .unwrap();
 
     let category_user: CategoryUser =
-        bson::from_bson(bson::Bson::Document(category_user_document)).unwrap();
+        from_bson(Bson::Document(category_user_document)).unwrap();
     Ok(category_user)
 }
 
@@ -102,8 +107,7 @@ pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let category =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                let category = from_bson(Bson::Document(document)).unwrap();
                 categories.push(category);
             }
             Err(error) => {
@@ -141,8 +145,7 @@ pub async fn categories_by_user_id(
     while let Some(result) = cursor_categories.next().await {
         match result {
             Ok(document) => {
-                let category: Category =
-                    bson::from_bson(bson::Bson::Document(document))?;
+                let category: Category = from_bson(Bson::Document(document))?;
                 categories.push(category);
             }
             Err(error) => {
@@ -178,7 +181,7 @@ pub async fn category_by_id(
         .unwrap();
 
     let category: Category =
-        bson::from_bson(bson::Bson::Document(category_document)).unwrap();
+        from_bson(Bson::Document(category_document)).unwrap();
     Ok(category)
 }
 
@@ -193,7 +196,7 @@ pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
         .unwrap();
 
     let category: Category =
-        bson::from_bson(bson::Bson::Document(category_document)).unwrap();
+        from_bson(Bson::Document(category_document)).unwrap();
     Ok(category)
 }
 
@@ -214,7 +217,7 @@ async fn categories_users_by_user_id(
         match result {
             Ok(document) => {
                 let category_user: CategoryUser =
-                    bson::from_bson(bson::Bson::Document(document)).unwrap();
+                    from_bson(Bson::Document(document)).unwrap();
                 categories_users.push(category_user);
             }
             Err(error) => {

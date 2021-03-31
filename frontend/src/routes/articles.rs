@@ -1,14 +1,12 @@
 use std::collections::BTreeMap;
 use tide::{Request, Response, Redirect, http::Method};
 use graphql_client::{GraphQLQuery, Response as GqlResponse};
-use chrono::Local;
 use serde_json::json;
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl};
 
 type ObjectId = String;
-type DateTime = chrono::DateTime<Local>;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -125,8 +123,6 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
         if req.method().eq(&Method::Post) {
             let article_info: ArticleInfo = req.body_form().await?;
 
-            let now = Local::now();
-
             let build_query =
                 ArticleNewData::build_query(article_new_data::Variables {
                     user_id: article_info.user_id,
@@ -134,8 +130,6 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
                     category_id: article_info.category_id,
                     summary: article_info.summary,
                     content: article_info.content,
-                    created_at: now,
-                    updated_at: now,
                 });
             let query = json!(build_query);
 
