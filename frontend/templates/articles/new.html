@@ -48,6 +48,11 @@
                             <label for="summary">Article summary</label>
                         </div>
                         <div class="form-floating mb-2">
+                            <input type="text" name="topics" id="topics" class="form-control" placeholder="topics"
+                                aria-label="topics" required>
+                            <label for="topics">Article topics</label>
+                        </div>
+                        <div class="form-floating mb-2">
                             <textarea id="content" name="content" class="d-none form-control" placeholder="content"
                                 aria-label="content" required>
 # 一级标题
@@ -68,8 +73,8 @@
         <script src="/static/js/stacks-editor.bundle.js"></script>
         <script>
             let editor = new window.stacksEditor.StacksEditor(
-                document.querySelector("#content-div"),
-                document.querySelector("#content").value,
+                document.getElementById("content-div"),
+                document.getElementById("content").value,
                 {
                     parserFeatures: {
                         tables: true,
@@ -78,7 +83,7 @@
             );
 
             function setContent() {
-                document.querySelector('#content').value = editor.content;
+                document.getElementById("content").value = editor.content;
             }
         </script>
 

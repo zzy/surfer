@@ -1,0 +1,40 @@
+.keyword-tags-kit {
+    font-family: sans-serif;
+    /* above: having to duplicate global css */
+    display: flex;
+    width: 50rem;
+    padding: .7rem 1.2rem;
+    border: 1px solid darkgrey;
+    font-size: 1.5rem;
+}
+
+.keyword-tags {
+    display: flex;
+}
+
+button.keyword-tag {
+    display: flex;
+    align-items: center;
+    padding: .5rem;
+    background-color: lightblue;
+    border: 1px solid lightgrey;
+    border-radius: .5rem;
+    box-shadow: 0 .2rem .1rem rgba(0, 0, 0, 0.1);
+    outline: none;
+    margin-right: 1.2rem;
+    cursor: pointer;
+}
+
+.delete-icon {
+    width: 1.4rem;
+    height: 1.4rem;
+    margin-left: .5rem;
+    background: url("/static/imgs/close.svg") center center no-repeat;
+    background-size: 100% 100%;
+}
+
+.keyword-input {
+    border: none;
+    outline: none;
+    flex-grow: 1;
+}
