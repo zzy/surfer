@@ -2833,7 +2833,6 @@ name = "surfer-frontend"
 version = "0.0.1"
 dependencies = [
  "async-std",
- "chrono",
  "dotenv",
  "graphql_client",
  "handlebars",

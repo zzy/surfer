@@ -87,6 +87,16 @@ impl MutationRoot {
         categories::services::category_user_new(db, category_user_new).await
     }
 
+    // Add new topics
+    async fn topics_new(
+        &self,
+        ctx: &Context<'_>,
+        topic_names: String,
+    ) -> GqlResult<Vec<Topic>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topics_new(db, &topic_names).await
+    }
+
     // Add new topic
     async fn topic_new(
         &self,

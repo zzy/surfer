@@ -69,6 +69,7 @@ type MutationRoot {
   articleNew(articleNew: ArticleNew!): Article!
   categoryNew(categoryNew: CategoryNew!): Category!
   categoryUserNew(categoryUserNew: CategoryUserNew!): CategoryUser!
+  topicsNew(topicNames: String!): [Topic!]!
   topicNew(topicNew: TopicNew!): Topic!
   topicArticleNew(topicArticleNew: TopicArticleNew!): TopicArticle!
   wishNew(wishNew: WishNew!): Wish!
@@ -99,6 +100,7 @@ type QueryRoot {
   categoryBySlug(slug: String!): Category!
   topics: [Topic!]!
   topicById(id: ObjectId!): Topic!
+  topicByName(name: String!): Topic!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
   topicsByUserId(userId: ObjectId!): [Topic!]!
   topicsByUsername(username: String!): [Topic!]!

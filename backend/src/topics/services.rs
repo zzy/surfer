@@ -9,6 +9,29 @@ use crate::users;
 
 use super::models::{Topic, TopicNew, TopicArticle, TopicArticleNew};
 
+// Create new topics
+pub async fn topics_new(
+    db: Database,
+    topic_names: &str,
+) -> GqlResult<Vec<Topic>> {
+    let mut topics: Vec<Topic> = vec![];
+
+    let names = topic_names.split(",");
+    for name in names {
+        let topic_new = TopicNew {
+            name: name.trim().to_string(),
+            quotes: 1,
+            slug: "".to_string(),
+            uri: "".to_string(),
+        };
+
+        let topic = self::topic_new(db.clone(), topic_new).await?;
+        topics.push(topic);
+    }
+
+    Ok(topics)
+}
+
 // Create new topic
 pub async fn topic_new(
     db: Database,
@@ -16,10 +39,17 @@ pub async fn topic_new(
 ) -> GqlResult<Topic> {
     let coll = db.collection("topics");
 
-    let exist_document =
-        coll.find_one(doc! {"name": &topic_new.name}, None).await?;
-    if let Some(_document) = exist_document {
-        println!("MongoDB document is exist!");
+    topic_new.name = topic_new.name.to_lowercase();
+
+    let exist_topic = self::topic_by_name(db, &topic_new.name).await;
+    if let Ok(topic) = exist_topic {
+        coll.update_one(
+            doc! {"_id": &topic._id},
+            doc! {"$set": {"quotes": &topic.quotes + 1}},
+            None,
+        )
+        .await
+        .expect("Failed to update a MongoDB collection!");
     } else {
         let slug = slugify(&topic_new.name).await;
         let uri = format!("/topics/{}", &slug);
@@ -134,6 +164,24 @@ pub async fn topic_by_id(db: Database, id: &ObjectId) -> GqlResult<Topic> {
 
     let topic: Topic = from_bson(Bson::Document(topic_document)).unwrap();
     Ok(topic)
+}
+
+// get topic info by name
+pub async fn topic_by_name(db: Database, name: &str) -> GqlResult<Topic> {
+    let coll = db.collection("topics");
+
+    let topic_document = coll
+        .find_one(doc! {"name": name.to_lowercase()}, None)
+        .await
+        .expect("Document not found");
+
+    if let Some(document) = topic_document {
+        let topic: Topic = from_bson(Bson::Document(document)).unwrap();
+        Ok(topic)
+    } else {
+        Err(Error::new("topic_by_name")
+            .extend_with(|_, e| e.set("details", "Not found")))
+    }
 }
 
 // get topics by article_id

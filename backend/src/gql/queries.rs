@@ -201,6 +201,16 @@ impl QueryRoot {
         topics::services::topic_by_id(db, &id).await
     }
 
+    // get topic info by name
+    async fn topic_by_name(
+        &self,
+        ctx: &Context<'_>,
+        name: String,
+    ) -> GqlResult<Topic> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics::services::topic_by_name(db, &name).await
+    }
+
     // get topics by article_id
     async fn topics_by_article_id(
         &self,
