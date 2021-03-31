@@ -150,7 +150,7 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
 
             Ok(resp.into())
         } else {
-            let mut article_new_tpl: Tpl = Tpl::new("articles/new").await;
+            let mut article_new_tpl: Tpl = Tpl::new("articles/input").await;
             let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
             article_new_tpl.reg_head(&mut data).await;

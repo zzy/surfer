@@ -6,5 +6,6 @@ pub struct ArticleInfo {
     pub subject: String,
     pub category_id: String,
     pub summary: String,
+    pub topics: String,
     pub content: String,
 }

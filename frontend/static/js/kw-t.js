@@ -11,32 +11,26 @@ class KeywordTags extends HTMLElement {
         var keywordTagsContainer = this.keywordTagsContainer = shadow.querySelector(".keyword-tags")
         var tagTemplate = this.tagTemplate = document.getElementById('keyword-tag-template')
 
-        var tagValues = this.getAttribute('tag-values')
-        tagValues = tagValues.split(',')
-        tagValues.forEach((tagValue) => {
-            tagValue = tagValue.trim()
-            if (tagValue.length != 0)
-                this.addTag(tagValue)
-        })
-
         var input = this.input = shadow.querySelector("input")
         input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === ",") {
-                e.preventDefault()
-                this.addTag(input.value)
+            var inputValue = input.value.trim();
+
+            if (e.key === " " || e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                if (inputValue !== '')
+                    this.addTag(inputValue)
                 input.value = ''
             }
-            if (e.key === "Backspace" && input.value === '') {
+            if (e.key === "Backspace" && inputValue === '') {
                 this.removeLastTag()
             }
         })
-
     }
 
     addTag(tagValue) {
         var tagFrag = this.tagTemplate.content.cloneNode(true)
         var keywordNode = tagFrag.querySelector(".keyword")
-        keywordNode.textContent = tagValue
+        keywordNode.textContent = tagValue.trim()
 
         this.keywordTagsContainer.appendChild(
             tagFrag
@@ -46,10 +40,14 @@ class KeywordTags extends HTMLElement {
         tagNode.addEventListener("click", (e) => {
             this.removeTag(tagNode)
         })
+
+        this.setTopics()
     }
 
     removeTag(tagNode) {
         this.keywordTagsContainer.removeChild(tagNode)
+
+        this.setTopics()
     }
 
     removeLastTag() {
@@ -63,8 +61,26 @@ class KeywordTags extends HTMLElement {
         return tagNodes.length ? tagNodes[tagNodes.length - 1] : null
     }
 
+    setTopics() {
+        var topics = []
+
+        var tagNodes = this.keywordTagsContainer.querySelectorAll('.keyword-tag')
+        tagNodes.forEach((tagNode) => {
+            topics.push(tagNode.textContent.trim())
+        })
+
+        document.getElementById("topics").value = topics.toString()
+    }
+
     connectedCallback() {
-        // TODO
+        var tagValues = this.getAttribute('tag-values')
+        tagValues = tagValues.split(',')
+
+        tagValues.forEach((tagValue) => {
+            tagValue = tagValue.trim()
+            if (tagValue !== '')
+                this.addTag(tagValue)
+        })
     }
 
 }

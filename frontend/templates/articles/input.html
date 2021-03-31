@@ -34,7 +34,7 @@
                         <div class="form-floating mb-2">
                             <select name="category_id" id="category_id" class="form-select form-control"
                                 placeholder="category_id" aria-label="category_id" required>
-                                <option selected>Article category</option>
+                                <option value="">Article category</option>
                                 {{#each categories as |category|}}
                                     <option value="{{ category.id }}">{{ category.name }}：{{ category.description }}
                                     </option>
@@ -48,9 +48,26 @@
                             <label for="summary">Article summary</label>
                         </div>
                         <div class="form-floating mb-2">
-                            <input type="text" name="topics" id="topics" class="form-control" placeholder="topics"
-                                aria-label="topics" required>
-                            <label for="topics">Article topics</label>
+                            <input type="hidden" name="topics" id="topics">
+                            <keyword-tags tag-values="" class="form-control" placeholder="topics" aria-label="topics">
+                            </keyword-tags>
+                            <template id="keyword-tags-template">
+                                <link href="/static/css/kw-t.css" rel="stylesheet">
+                                <div class="keyword-tags-kit">
+                                    <div class="keyword-tags"></div>
+                                    <input type="text" class="keyword-input">
+                                </div>
+                            </template>
+                            <template id="keyword-tag-template">
+                                <button type="button" class="keyword-tag">
+                                    <span class="keyword">中国</span>
+                                    <span class="delete-icon"></span>
+                                </button>
+                            </template>
+                            <label for="tag-values">
+                                Article topics
+                                (separate with <strong class="text-primary">space / Enter / comma</strong>)
+                            </label>
                         </div>
                         <div class="form-floating mb-2">
                             <textarea id="content" name="content" class="d-none form-control" placeholder="content"
@@ -69,6 +86,7 @@
             </div>
         </div>
 
+        <script src="/static/js/kw-t.js"></script>
         <script src="/static/js/highlight.min.js"></script>
         <script src="/static/js/stacks-editor.bundle.js"></script>
         <script>
@@ -83,6 +101,7 @@
             );
 
             function setContent() {
+                alert(document.getElementById("topics").value)
                 document.getElementById("content").value = editor.content;
             }
         </script>
