@@ -14,7 +14,10 @@ pub async fn slugify(str: &str) -> String {
     let slug = deunicode_with_tofu(str.trim(), "-")
         .to_lowercase()
         .replace(" ", "-")
-        .replace("\"", "");
+        .replace("[", "-")
+        .replace("]", "-")
+        .replace("\"", "-")
+        .replace("/", "-");
 
     slug
 }

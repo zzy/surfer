@@ -188,10 +188,11 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
                         },
                     );
                 let topic_article_query = json!(topic_article_build_query);
-                surf::post(&gql_uri().await)
-                    .body(topic_article_query)
-                    .recv_json()
-                    .await?;
+                let _topic_article_resp_body: GqlResponse<serde_json::Value> =
+                    surf::post(&gql_uri().await)
+                        .body(topic_article_query)
+                        .recv_json()
+                        .await?;
             }
 
             let article_uri =
