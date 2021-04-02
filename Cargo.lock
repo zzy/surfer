@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.6.3"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "796540673305a66d127804eef19ad696f1f204b8c1025aaca4958c17eab32877"
+checksum = "7f200cbb1e856866d9eade941cf3aa0c5d7dd36f74311c4273b494f4ef036957"
 dependencies = [
  "getrandom 0.2.2",
  "once_cell",
@@ -186,9 +186,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.7.1"
+version = "2.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3effc87eeddba6b305530acf604f5815780ddc5a605e5d3bea6cece18fe1d114"
+checksum = "8431f71d911045362bd18a1f48fd43c503e85e6bc3ddddbe6cfb4b57d5b7fd15"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -215,9 +215,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.7.1"
+version = "2.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62a879d2cd7552beab93474e8c138b4e4ac128858097c01fe4e635aaccf5590e"
+checksum = "ca7e7f5709656e84a92fc92b89234a975dad63d38afaff987b782c8f49f96146"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -2333,22 +2333,23 @@ dependencies = [
 
 [[package]]
 name = "rhai"
-version = "0.19.14"
+version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "309d2e139896eccb9487d8ddc4147dc98062a54d52916d0d638b100de8b1fcac"
+checksum = "e39f22e6f2e7ecf283d206eb5fcfae2652b05c43f9956f79341fd87f7a4234b9"
 dependencies = [
  "ahash",
  "instant",
  "num-traits",
  "rhai_codegen",
  "smallvec",
+ "smartstring",
 ]
 
 [[package]]
 name = "rhai_codegen"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f2da2116fb882e3977223ab21acb2176bdc995a794aff3c727e6491476c0ef"
+checksum = "1ab3e36a503a6ad970dc686fb86d2dda2ab042144edb1416542cb95cb7035565"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2642,6 +2643,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe0f37c9e8f3c5a4a66ad655a93c74daac4ad00c441533bf5c6e7990bb42604e"
 
 [[package]]
+name = "smartstring"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ada87540bf8ef4cf8a1789deb175626829bb59b1fefd816cf7f7f55efcdbae9"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "socket2"
 version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2837,7 +2847,7 @@ dependencies = [
  "graphql_client",
  "handlebars",
  "lazy_static",
- "rhai 0.19.14",
+ "rhai 0.19.15",
  "serde",
  "serde_json",
  "surf",

@@ -62,14 +62,14 @@ class KeywordTags extends HTMLElement {
     }
 
     setTopics() {
-        var topics = []
+        var topic_names = []
 
         var tagNodes = this.keywordTagsContainer.querySelectorAll('.keyword-tag')
         tagNodes.forEach((tagNode) => {
-            topics.push(tagNode.textContent.trim())
+            topic_names.push(tagNode.textContent.trim())
         })
 
-        document.getElementById("topics").value = topics.toString()
+        document.getElementById("topic_names").value = topic_names.toString()
     }
 
     connectedCallback() {

@@ -100,6 +100,22 @@ struct UserDashboardData;
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/topics_new.graphql",
+    response_derives = "Debug"
+)]
+struct TopicsNewData;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/topic_article_new.graphql",
+    response_derives = "Debug"
+)]
+struct TopicArticleNewData;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
     query_path = "./graphql/article_new.graphql",
     response_derives = "Debug"
 )]
@@ -123,22 +139,63 @@ pub async fn article_new(mut req: Request<State>) -> tide::Result {
         if req.method().eq(&Method::Post) {
             let article_info: ArticleInfo = req.body_form().await?;
 
-            let build_query =
+            // create topics
+            let topics_build_query =
+                TopicsNewData::build_query(topics_new_data::Variables {
+                    topic_names: article_info.topic_names,
+                });
+            let topics_query = json!(topics_build_query);
+
+            let topics_resp_body: GqlResponse<serde_json::Value> =
+                surf::post(&gql_uri().await)
+                    .body(topics_query)
+                    .recv_json()
+                    .await?;
+            let topics_resp_data =
+                topics_resp_body.data.expect("missing response data");
+            let topic_ids = topics_resp_data["topicsNew"].as_array().unwrap();
+
+            // create article
+            let article_build_query =
                 ArticleNewData::build_query(article_new_data::Variables {
-                    user_id: article_info.user_id,
+                    user_id: article_info.user_id.clone(),
                     subject: article_info.subject,
                     category_id: article_info.category_id,
                     summary: article_info.summary,
                     content: article_info.content,
                 });
-            let query = json!(build_query);
+            let article_query = json!(article_build_query);
 
-            let resp_body: GqlResponse<serde_json::Value> =
-                surf::post(&gql_uri().await).body(query).recv_json().await?;
-            let resp_data = resp_body.data.expect("missing response data");
+            let article_resp_body: GqlResponse<serde_json::Value> =
+                surf::post(&gql_uri().await)
+                    .body(article_query)
+                    .recv_json()
+                    .await?;
+            let article_resp_data =
+                article_resp_body.data.expect("missing response data");
+
+            // crate topic_article
+            let article_id =
+                article_resp_data["articleNew"]["id"].as_str().unwrap();
+            for topic_id in topic_ids {
+                let topic_id = topic_id["id"].as_str().unwrap();
+                let topic_article_build_query =
+                    TopicArticleNewData::build_query(
+                        topic_article_new_data::Variables {
+                            user_id: article_info.user_id.clone(),
+                            article_id: article_id.to_string(),
+                            topic_id: topic_id.to_string(),
+                        },
+                    );
+                let topic_article_query = json!(topic_article_build_query);
+                surf::post(&gql_uri().await)
+                    .body(topic_article_query)
+                    .recv_json()
+                    .await?;
+            }
 
             let article_uri =
-                resp_data["articleNew"]["uri"].as_str().unwrap_or("/");
+                article_resp_data["articleNew"]["uri"].as_str().unwrap_or("/");
             let resp: Response =
                 Redirect::new(format!("{}", article_uri)).into();
 

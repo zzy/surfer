@@ -1,0 +1,15 @@
+mutation TopicArticleNewData(
+  $userId: ObjectId!
+  $articleId: ObjectId!
+  $topicId: ObjectId!
+) {
+  topicArticleNew(
+    topicArticleNew: {
+      userId: $userId
+      articleId: $articleId
+      topicId: $topicId
+    }
+  ) {
+    id
+  }
+}
