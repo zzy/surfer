@@ -19,4 +19,4 @@ graphql_client = "0.9.0"
 handlebars = { version = "3.5.4", features = ["script_helper"] }
 
 [dev-dependencies]
-rhai = "0.19.15"
+rhai = "0.20.0"

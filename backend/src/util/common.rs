@@ -17,7 +17,8 @@ pub async fn slugify(str: &str) -> String {
         .replace("[", "-")
         .replace("]", "-")
         .replace("\"", "-")
-        .replace("/", "-");
+        .replace("/", "-")
+        .replace("?", "-");
 
     slug
 }
