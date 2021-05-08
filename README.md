@@ -12,7 +12,7 @@ Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## MongoDB data
 
-MongoDB data location is [./data/surfer-dev.sql](./data/surfer-dev.sql).
+MongoDB data(include structure & documents) file is `/data/surfer-dev.sql`.
 
 If you need mongodb cloud count, email to me or wechat(微信): yupen-com, please.
 
