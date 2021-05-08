@@ -1,5 +1,13 @@
 # Web Application Server
 
+## MongoDB data
+
+MongoDB data location is [./data/surfer-dev.sql](./data/surfer-dev.sql).
+
+If you need mongodb cloud count, email to me or wechat(微信): yupen-com, please.
+
+## Build & run
+
 ``` Bash
 git clone https://github.com/zzy/surfer.git
 cd surfer
@@ -29,7 +37,7 @@ cargo run
 ```
 Then connect to http://127.0.0.1:3000 with browser.
 
-![Client Image](../screenshot/client.jpg)
+![Client Image](../data/client.jpg)
 
 ## Contributing
 

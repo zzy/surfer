@@ -1,5 +1,13 @@
 # Graphql Services Server
 
+## MongoDB data
+
+MongoDB data location is [./data/surfer-dev.sql](./data/surfer-dev.sql).
+
+If you need mongodb cloud count, email to me or wechat(微信): yupen-com, please.
+
+## Build & run
+
 ``` Bash
 git clone https://github.com/zzy/surfer.git
 cd surfer
@@ -33,7 +41,7 @@ cargo run
 
 GraphiQL: connect to http://127.0.0.1:8080/gql/v1i with browser.
 
-![Graphql Image](../screenshot/graphql.jpg)
+![Graphql Image](../data/graphql.jpg)
 
 ## Queries
 

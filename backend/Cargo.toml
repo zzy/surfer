@@ -23,5 +23,5 @@ jsonwebtoken = "7.2.0"
 ring = "0.16.20"
 base64 = "0.13.0"
 
-deunicode = "1.2.1"
+deunicode = "1.3.0"
 pulldown-cmark = { version = "0.8.0", default-features = false, features = ["simd"] }

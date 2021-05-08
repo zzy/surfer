@@ -899,9 +899,9 @@ dependencies = [
 
 [[package]]
 name = "deunicode"
-version = "1.2.1"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2044dd33b8b682eedf68271c913235cbefdaf17bf842310be1389c21d6e5945c"
+checksum = "7f37775d639f64aa16389eede0cbe6a70f56df4609d50d8b6858690d5d7bf8f2"
 
 [[package]]
 name = "digest"
@@ -1322,9 +1322,9 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "3.5.4"
+version = "3.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "580b6f551b29a3a02436318aed09ba1c58eea177dc49e39beac627ad356730a5"
+checksum = "4498fc115fa7d34de968184e473529abb40eeb6be8bc5f7faba3d08c316cb3e3"
 dependencies = [
  "log",
  "pest",
@@ -2331,9 +2331,9 @@ dependencies = [
 
 [[package]]
 name = "rhai"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc88025c7d5087cd44d99b6320608e19f897a22e01b0b4c1116e63168a60440"
+checksum = "84125e961ca5cd0c6f207dbc56c5a9ebb75a08a269182c249e48750806074ac0"
 dependencies = [
  "ahash",
  "instant",
@@ -2836,7 +2836,7 @@ dependencies = [
  "graphql_client",
  "handlebars",
  "lazy_static",
- "rhai 0.20.0",
+ "rhai 0.20.1",
  "serde",
  "serde_json",
  "surf",

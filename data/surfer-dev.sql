@@ -1,0 +1,3476 @@
+/*
+ Source Server Type    : MongoDB
+ Source Schema         : surfer-dev
+ File Encoding         : 65001
+
+ Date: 08/05/2021 09:48:56
+*/
+
+// ----------------------------
+// Collection structure for articles
+// ----------------------------
+db.getCollection("articles").drop();
+db.createCollection("articles");
+
+// ----------------------------
+// Documents of articles
+// ----------------------------
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6052dc1500b6b760000838d9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 操控大疆可编程 tello 无人机",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "大疆的 tello 无人机也提供了可编程的接口，官方已经支持了 Scratch 图形化编程。由此分析，我们可以得出 tello 无人机实际上提供了 2 个接口：tello 无人机应用程序使用的基于文本的接口，以及一个非公共接口。因为提供了开放的接口，才能和图形化编程进行文本交互，实现用户的编程控制。",
+    slug: "rust-cao-kong-da-jiang-ke-bian-cheng-tello-wu-ren-ji",
+    uri: "/budshome/rust-cao-kong-da-jiang-ke-bian-cheng-tello-wu-ren-ji",
+    content: "大疆旗下最便宜的无人机品牌 tello 采用了英特尔的视觉处理芯片，虽然相比于大疆御、悟等系列，功能简陋。但比起与其它如小米和华强北的众多品牌，可算的上非常有用的玩具了。\r\n\r\n大疆的 tello 无人机也提供了可编程的接口，官方已经支持了 Scratch 图形化编程。由此分析，我们可以得出 tello 无人机实际上提供了 2 个接口：tello 无人机应用程序使用的基于文本的接口，以及一个非公共接口。因为提供了开放的接口，才能和图形化编程进行文本交互，实现用户的编程控制。在 tellopilots 论坛（微信公众号不能贴连接，请自行搜索），有玩家做了很棒的工作，对 tello edu app 的编程界面进行了反向工程，从而可以支持其它诸如 python、golang 等……\r\n\r\n![tello drone](https://blog.budshome.com/static/articles/1616041681013.jpg)\r\n\r\n但本文讨论的主角是 **Rust**。\r\n\r\n因为 tello 无人机是通过网络协议于操作器（手机、手柄等）交互通信的。因此，我们可以结合了网络协议与无人机进行通信，并获得可用的元数据。\r\n\r\n当然，籍此拓展思维之上，我们也可以提供一个远程控制框架，用键盘或操纵杆来控制。甚至更为简化，命令组合为批处理方式，然后简单触发（想象一下好莱坞大片）。\r\n\r\n我们简单尝试下，从原理分析，到编码实现——\r\n\r\n# 和 tello 无人机通信\r\n\r\n首先，请保证无人机在明亮的环境中翻转、反弹……\r\n\r\n然后，我们分析下和 tello 无人机的沟通原理：当 tello 无人机得到一个启动命令包(drone.connect(11111);）时，tello 无人机会在两个 UDP 通道上发送数据。命令通道 A（端口：8889）和视频通道 B（WIP）（端口：11111）。在 AP 模式下，tello 无人机将以默认 ip 192.168.10.1 出现。\r\n\r\n再次，所有发送、呼叫都是同步完成的。如果要接收数据，则必须轮询无人机。如下示例：\r\n\r\n``` Rust\r\nuse tello::{Drone, Message, Package, PackageData, ResponseMsg};\r\nuse std::time::Duration;\r\n​\r\nfn main() -> Result<(), String> {\r\n    let mut drone = Drone::new(\"192.168.10.1:8889\");\r\n    drone.connect(11111);\r\n    loop {\r\n        if let Some(msg) = drone.poll() {\r\n            match msg {\r\n                Message::Data(Package {data: PackageData::FlightData(d), ..}) => {\r\n                    println!(\"battery {}\", d.battery_percentage);\r\n                }\r\n                Message::Response(ResponseMsg::Connected(_)) => {\r\n                    println!(\"connected\");\r\n                    drone.throw_and_go().unwrap();\r\n                }\r\n                _ => ()\r\n            }\r\n        }\r\n        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));\r\n    }\r\n}\r\n```\r\n\r\n# 远程控制 tello 无人机\r\n\r\n无人机飞行时，具有一个状态码：rc_state。只要无人机联网（无人机联网不限于手机、手柄。如果失联，那就是布朗运动了，结局就是所谓“炸机”），此状态用来操纵 tello 无人机的运动。所以远程控制的原理就是我们通过向 tello 无人机传输或者迭代状态码，来远程控制 tello 无人机的状态和行为。\r\n\r\n例如，如果我们需要远程控制无人机下坠，使用：\r\n\r\n``` Rust\r\ndrone.rc_state.go_down()\r\n```\r\n\r\n如果我们需要远程控制无人机前进或者后退多少单位，使用：\r\n\r\n``` Rust\r\ndrone.rc_state.go_forward_back(-0.7)\r\n```\r\n\r\n上面文章介绍到了和 tello 无人机交互通信的原理和方法。远程控制时，和 tello 无人机的通信中，我们是需要对无人机状态进行轮询的。其不仅包括接收来自无人机的消息，还将发送一些默认设置、回复确认、触发关键帧，或者发送实时移动命令等等，才能远程控制状态。\r\n\r\n上面提到，无人机联网不限于手机、手柄。我们可以使用 SDL 打开窗口，处理键盘输入，并显示如何连接游戏板或操纵杆等。\r\n\r\n如下例子比较长，但原理如上所述，并不复杂，核心部分就是轮询 tello 无人机状态。\r\n\r\n``` Rust\r\n​use sdl2::event::Event;\r\nuse sdl2::keyboard::Keycode;\r\nuse tello::{Drone, Message, Package, PackageData, ResponseMsg};\r\nuse std::time::Duration;\r\n​\r\nfn main() -> Result<(), String> {\r\n    let mut drone = Drone::new(\"192.168.10.1:8889\");\r\n    drone.connect(11111);\r\n​\r\n    let sdl_context = sdl2::init()?;\r\n    let video_subsystem = sdl_context.video()?;\r\n    let window = video_subsystem.window(\"TELLO drone\", 1280, 720).build().unwrap();\r\n    let mut canvas = window.into_canvas().build().unwrap();\r\n​\r\n    let mut event_pump = sdl_context.event_pump()?;\r\n    'running: loop {\r\n        // draw some stuff\r\n        canvas.clear();\r\n        // [...]\r\n​\r\n        // handle input from a keyboard or something like a game-pad\r\n        // ue the keyboard events\r\n        for event in event_pump.poll_iter() {\r\n            match event {\r\n                Event::Quit { .. }\r\n                | Event::KeyDown { keycode: Some(Keycode::Escape), .. } =>\r\n                    break 'running,\r\n                Event::KeyDown { keycode: Some(Keycode::K), .. } =>\r\n                    drone.take_off().unwrap(),\r\n                Event::KeyDown { keycode: Some(Keycode::L), .. } =>\r\n                    drone.land().unwrap(),\r\n                Event::KeyDown { keycode: Some(Keycode::A), .. } =>\r\n                    drone.rc_state.go_left(),\r\n                Event::KeyDown { keycode: Some(Keycode::D), .. } =>\r\n                    drone.rc_state.go_right(),\r\n                Event::KeyUp { keycode: Some(Keycode::A), .. }\r\n                | Event::KeyUp { keycode: Some(Keycode::D), .. } =>\r\n                    drone.rc_state.stop_left_right(),\r\n                //...\r\n            }\r\n        }\r\n​\r\n        // or use a game pad (range from -1 to 1)\r\n        // drone.rc_state.go_left_right(dummy_joystick.axis.1);\r\n        // drone.rc_state.go_forward_back(dummy_joystick.axis.2);\r\n        // drone.rc_state.go_up_down(dummy_joystick.axis.3);\r\n        // drone.rc_state.turn(dummy_joystick.axis.4);\r\n​\r\n        // the poll will send the move command to the drone\r\n        drone.poll();\r\n​\r\n        canvas.present();\r\n        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));\r\n    }\r\n}\r\n```\r\n\r\nRust 操控大疆可编程无人机这两篇文章，仅仅是个人一时兴趣的尝试，并非什么深入或复杂的应用，后续是否继续也不确定。感兴趣的朋友，您如果有更深入的见解和应用，我将十分期待您的指导。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6053138400b6b760000838da"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（1）- 起步及 crate 选择",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "本系列博客中，我们使用 Tide + async-graphql + mongodb + jsonwebtoken + handlebars-rust 构建基于 Rust 技术栈的 GraphQL 服务，我们需要做到前后端分离。需要说明的是：本博客即采用前述 Rust 技术栈搭建，目前仍然处于开发阶段。\r\n本文为起步教程，主要包括：\r\n1、工程初始化；\r\n2、crate 的比较和选择。",
+    slug: "gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze",
+    uri: "/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze",
+    content: "本系列博客中，我们使用 Tide + async-grapqhl + mongodb + jsonwebtoken + handlebars-rust 构建基于 Rust 技术栈的 GraphQL 服务，我们需要做到前后端分离。\r\n\r\n> 需要说明的是：本博客即采用前述 Rust 技术栈搭建，目前仍然处于开发阶段。\r\n\r\n1. **后端**主要提供 GraphQL 服务，使用到的 crate 包括：[tide](https://tide.budshome.com/)、[async-graphql](https://async-graphql.budshome.com/)、jsonwebtoken、mongodb/bson、serde、ring、base64，以及 pinyin 等。\r\n2. **前端**主要 WEB 应用服务，使用到 crate 包括：[tide](https://tide.budshome.com/)、[rhai](https://rhai.budshome.com/)、surf、graphql_client、[handlebars-rust](https://handlebars.budshome.com/guide/)、cookie 等。\r\n\r\nRust 环境的配置，cargo 工具的使用，以及 Rust 程序设计语言和 GraphQL 的介绍和优势，在此不在赘述。您可以参阅如下资料学习 Rust 程序设计语言，以及 Rust 生态中的 GraphQL 实现。\r\n\r\n- 请参阅 [Windows、Linux，以及 MacOS 下安装和配置 Rust 环境](https://rust-guide.budshome.com/3-env.html)，以及配置 Rust 工具链的国内源、配置 Cargo 国内镜像源。\r\n- [Tide](https://tide.budshome.com/)，Rust 官方团队开发的 HTTP 服务器框架。\r\n- [actix-web](https://actix-web.budshome.com/)，Rust 社区中最活跃、成熟的 WEB 框架。推荐作为了解，本系列文章中我们选择 Tide。\r\n- [通过例子学 Rust](https://rust-by-example.budshome.com/)，推荐。\r\n- [Rust Cookbook 中文版](https://rust-cookbook.budshome.com)，推荐。\r\n- [Cargo 中文文档](https://cargo.budshome.com/)，推荐\r\n- [Rust 程序设计语言](https://rust-lang.budshome.com/)\r\n- [async-graphql 中文文档](https://async-graphql.budshome.com/)\r\n- [Juniper 中文文档](https://juniper.budshome.com/)，推荐作为了解，本系列文章中我们选择 async-graphql。\r\n\r\n其它概念性、对比类的内容，请您自行搜索。\r\n\r\n# 工程的创建\r\n\r\n文章的开始提到，我们要做到前后端分离。因此，前、后端需要各自创建一个工程。同时，我们要使用 cargo 对工程进行管理和组织。\r\n\r\n- 首先，创新本次工程根目录和 cargo 清单文件\r\n\r\n``` Bash\r\nmkdir rust-graphql\r\ncd ./rust-graphql\r\n\r\ntouch Cargo.toml \r\n```\r\n\r\n在 `Cargo.toml` 文件中，填入以下内容：\r\n\r\n``` Toml\r\n[workspace]\r\nmembers = [\r\n  \"./backend\",\r\n  \"./frontend\",\r\n]\r\n```\r\n\r\n文件中，`workspace` 是 cargo 中的工作区。cargo 中，工作区共享公共依赖项解析（即具有共享 Cargo.lock），输出目录和各种设置，如配置文件等的一个或多个包的集合。\r\n\r\n虚拟工作区是 `Cargo.toml` 清单中，根目录的工作空间，不需要定义包，只列出工作区成员即可。\r\n\r\n上述配置中，包含 2 个成员 \\`backend\\` 和 \\`frontend\\`，即我们需要创建 2 个工程（请注意您处于 rust-graphql 目录中）：前端和后端 —— 均为二进制程序，所以传递 `--bin` 参数，或省略参数。\r\n\r\n``` Bash\r\ncargo new backend --bin\r\ncargo new frontend --bin\r\n```\r\n\r\n创建后，工程结构如下图所示——\r\n\r\n![工程结构](https://blog.budshome.com/static/articles/1616056418.png)\r\n\r\n现在，工程已经创建完成了。\r\n\r\n# 工具类 crate 安装\r\n\r\n工程创建完成后，我们即可以进入开发环节了。开发中，一些工具类 crate 可以起到“善其事”的作用，我们需要先进行安装。\r\n\r\n- cargo-edit，包含 `cargo add`、`cargo rm`，以及 `cargo upgrade`，可以让我们方便地管理 crate。\r\n- cargo-watch，监视项目的源代码，以了解其更改，并在源代码发生更改时，运行 Cargo 命令。\r\n\r\n好的，我们安装这 2 个 crate。\r\n\r\n``` Bash\r\ncargo install cargo-edit\r\ncargo install cargo-watch\r\n```\r\n\r\n> 安装依赖较多，如果时间较长，请[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)。\r\n\r\n# 添加依赖 crate\r\n\r\n接着，我们需要添加开发所需依赖项。依赖项的添加，我们不用一次性全部添加，我们根据开发需要，一步步添加。首先，从后端工程开始。\r\n\r\n后端工程中，我们提供 GraphQL 服务，需要依赖的基本 crate 有 tide、async-std、async-graphql、mongodb，以及 bson。我们使用 `cargo add` 命令来安装，其将安装最新版本。\r\n\r\n``` Bash\r\ncd backend\r\ncargo add tide async-std async-graphql mongodb bson\r\n```\r\n\r\n> 安装依赖较多，如果时间较长，请[配置 Cargo 国内镜像源](https://rust-guide.budshome.com/4-cargo/4.1-source-replacement.html)。\r\n\r\n执行上述命令后，`rust-graphql/backend/Cargo.toml` 内容如下所示——\r\n\r\n``` Toml\r\n...\r\n[dependencies]\r\nasync-graphql = \"2.6.0\"\r\nasync-std = \"1.9.0\"\r\nbson = \"1.2.0\"\r\nmongodb = \"1.2.0\"\r\ntide = \"0.16.0\"\r\n...\r\n```\r\n\r\n至此，我们构建基于 Rust 技术栈的 Graphql 服务的后端基础工程已经搭建完成。暂时休息一会，我们开始构建一个最基本的 GraphQL 服务器。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: false,
+    "created_at": ISODate("2021-03-18T08:47:00.591Z"),
+    "updated_at": ISODate("2021-03-18T08:47:00.591Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60537a0500592e3a00e71d16"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（2）- 查询服务",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "上一篇文章中，我们对后端基础工程进行了初始化。但是未有进行任何开发，本文中，我们将开启基础 GraphQL 服务的历程。包括如下内容：\r\n1、构建 GraphQL Schema；\r\n2、整合 Tide 和 async-graphql；\r\n3、验证 query 服务；\r\n4、连接 MongoDB；\r\n5、提供 query 服务。",
+    slug: "gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(2)--cha-xun-fu-wu",
+    uri: "/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(2)--cha-xun-fu-wu",
+    content: "上一篇文章中，我们对后端基础工程进行了初始化。其中，笔者选择 Rust 生态中的 4 个 crate：tide、async-std、async-graphql、mongodb（bson 主要为 mongodb 应用）。虽然我们不打算对 Rust 生态中的 crate 进行介绍和比较，但想必有朋友对这几个选择有些疑问，比如：tide 相较于 actix-web，可称作冷门、不成熟，postgresql 相较于 mongodb 操作的便利性等。\r\n\r\n笔者在 2018-2019 年间，GraphQL 服务后端，一直使用的是 actix-web + juniper + postgresql 的组合，应用前端使用了 typescript + react + apollo-client，有兴趣可以参阅开源项目 [actix-graphql-react](https://github.com/zzy/actix-graphql-react)。\r\n\r\n2020 年，笔者才开始了 tide + async-graphql 的应用开发，在此，笔者简单提及下选型理由——\r\n\r\n1. Tide：tide 的定位是最小的、实用的 Rust web 应用服务框架，基于 async-std。其相较于 Rust 社区中火热的 actix-web，确实可以说冷门。至于生态成熟度，也有诸多差距。但我们在提供 GraphQL 服务时，主要需要的是基础的 HTTP 服务器。tide 目前的功能和性能是完全满足的，并且经笔者测试后，对其健壮性也很满意。\r\n2. async-graphql：优秀的 crate，性能很棒，以及开发时的简洁性，个人对其喜欢程度胜过 juniper。\r\n3. 至于 postgresql 转为 mongodb，只是一时兴起。本来计划 elasticsearch 的，只是个人服务器跑起来不给力。\r\n\r\nRust 社区生态中，健壮的 web 应用服务框架很多，您可以参考 [Rust web 框架比较](https://rust-web-guide.budshome.com/rust-web-framework-comparison.html) 一文自行比较选择。\r\n\r\n上文中，未有进行任何代码编写。本文中，我们将开启基础 GraphQL 服务的历程。包括如下内容：\r\n\r\n1、构建 GraphQL Schema；\r\n\r\n2、整合 Tide 和 async-graphql；\r\n\r\n3、验证 query 服务；\r\n\r\n4、连接 MongoDB；\r\n\r\n5、提供 query 服务。\r\n\r\n# 构建 GraphQL Schema\r\n\r\n首先，让我们将 GraphQL 服务相关的代码都放到一个模块中。为了避免下文啰嗦，我称其为 GraphQL 总线。\r\n\r\n``` Bash\r\ncd ./rust-graphql/backend/src\r\nmkdir gql\r\ncd ./gql\r\ntouch mod.rs queries.rs mutations.rs\r\n```\r\n\r\n## 构建一个查询示例\r\n\r\n- 首先，我们构建一个不连接数据库的查询示例：通过一个函数进行求合运算，将其返回给 graphql 查询服务。此实例改编自 [async-graphql 文档](https://async-graphql.budshome.com/quickstart.html)，仅用于验证环境配置，实际环境没有意义。\r\n\r\n> 下面代码中，注意变更 EmptyMutation 和订阅 EmptySubscription 都是空的，甚至 `mutations.rs` 文件都是空白，未有任何代码，仅为验证服务器正确配置。\r\n\r\n在 `mod.rs` 文件中，写入以下代码：\r\n\r\n``` Rust\r\n\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse tide::{http::mime, Body, Request, Response, StatusCode};\r\n\r\nuse async_graphql::{\r\n    http::{playground_source, receive_json, GraphQLPlaygroundConfig},\r\n    EmptyMutation, EmptySubscription, Schema,\r\n};\r\n\r\nuse crate::State;\r\n\r\nuse crate::gql::queries::QueryRoot;\r\n\r\npub async fn build_schema() -> Schema<QueryRoot, EmptyMutation, EmptySubscription> {\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mongodb datasource  in the schema object.\r\n    // let mut schema = Schema::new(QueryRoot, MutationRoot, EmptySubscription)\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription).finish()\r\n}\r\n\r\npub async fn graphql(req: Request<State>) -> tide::Result {\r\n    let schema = req.state().schema.clone();\r\n    let gql_resp = schema.execute(receive_json(req).await?).await;\r\n\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(Body::from_json(&gql_resp)?);\r\n\r\n    Ok(resp.into())\r\n}\r\n\r\npub async fn graphiql(_: Request<State>) -> tide::Result {\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(\"graphql\")));\r\n    resp.set_content_type(mime::HTML);\r\n\r\n    Ok(resp.into())\r\n}\r\n```\r\n\r\n上面的示例代码中，函数 `graphql` 和 `graphiql` 作为 tide 服务器的请求处理程序，因此必须返回 `tide::Result`。\r\n\r\n> tide 开发很简便，本文不是重点。请参阅 [tide 中文文档](https://tide.budshome.com/)，很短时间即可掌握。\r\n\r\n## 编写求和实例，作为 query 服务\r\n\r\n在 `queries.rs` 文件中，写入以下代码：\r\n\r\n``` Rust\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    async fn add(&self, a: i32, b: i32) -> i32 {\r\n        a + b\r\n    }\r\n}\r\n```\r\n\r\n# 整合 Tide 和 async-graphql\r\n\r\n终于，我们要进行 tide 服务器主程序开发和启动了。进入 `./backend/src` 目录，迭代 `main.rs` 文件：\r\n\r\n``` Rust\r\n\r\nmod gql;\r\n\r\nuse crate::gql::{build_schema, graphiql, graphql};\r\n\r\n#[async_std::main]\r\nasync fn main() -> Result<(), std::io::Error> {\r\n    // tide logger\r\n    tide::log::start();\r\n\r\n    // 初始 Tide 应用程序状态\r\n    let schema = build_schema().await;\r\n    let app_state = State { schema: schema };\r\n    let mut app = tide::with_state(app_state);\r\n\r\n    // 路由配置\r\n    app.at(\"graphql\").post(graphql);\r\n    app.at(\"graphiql\").get(graphiql);\r\n\r\n    app.listen(format!(\"{}:{}\", \"127.0.0.1\", \"8080\")).await?;\r\n\r\n    Ok(())\r\n}\r\n\r\n//  Tide 应用程序作用域状态 state.\r\n#[derive(Clone)]\r\npub struct State {\r\n    pub schema: async_graphql::Schema<\r\n        gql::queries::QueryRoot,\r\n        async_graphql::EmptyMutation,\r\n        async_graphql::EmptySubscription,\r\n    >,\r\n}\r\n```\r\n\r\n> 注1：上面代码中，我们将 schema 放在了 tide 的状态 State 中，其作用域是应用程序级别的，可以很方便地进行原子操作。\r\n\r\n> 注2：另外，关于 tide 和 async-graphql 的整合，async-graphql 提供了整合 crate：async_graphql_tide。但笔者测试后未使用，本文也未涉及，您感兴趣的话可以选择。\r\n\r\n# 验证 query 服务\r\n\r\n## 启动 tide 服务\r\n\r\n以上，一个基础的基于 Rust 技术栈的 GraphQL 服务器已经开发成功了。我们验证以下是否正常，请执行——\r\n\r\n``` Bash\r\ncargo run\r\n```\r\n\r\n更推荐您使用我们前一篇文章中安装的 `cargo watch` 来启动服务器，这样后续代码的修改，可以自动部署，无需您反复对服务器进行停止和启动操作。\r\n\r\n``` Bash\r\ncargo watch -x \"run\"\r\n```\r\n\r\n但遗憾的是——此时，你会发现服务器无法启动，因为上面的代码中，我们使用了 `#[async_std::main]` 此类的 Rust 属性标记。所以，我们还需要稍微更改一下 `backend/Cargo.toml` 文件。\r\n\r\n> 请注意，不是根目录 `rust-graphql/Cargo.toml` 文件。\r\n\r\n同时，MongoDB 驱动程序中，支持的异步运行时 crate 为 tokio，我们其它如 tide 和 async-graphql 都是基于 async-std 异步库的，所以我们一并修改。最终，`backend/Cargo.toml` 文件内容如下（有强迫症，也调整了一下顺序，您随意）：\r\n\r\n``` Toml\r\n...\r\n[dependencies]\r\ntide = \"0.16.0\"\r\nasync-std = { version = \"1.9.0\", features = [\"attributes\"] }\r\n\r\nasync-graphql = \"2.6.0\"\r\nmongodb = { version = \"1.2.0\", default-features = false, features = [\"async-std-runtime\"] }\r\nbson = \"1.2.0\"\r\n...\r\n```\r\n\r\n再次执行 `cargo run` 命令，您会发现服务器已经启动成功，启动成功后的消息为：\r\n\r\n```\r\ntide::log Logger started\r\n    level Info\r\ntide::server Server listening on http://127.0.0.1:8080\r\n```\r\n\r\n## 执行 GraphQL 查询\r\n\r\n请打开您的浏览器，输入 `http://127.0.0.1:8080/graphiql`，您会看到如下界面（点击右侧卡片 docs 和 schema 查看详细）：\r\n\r\n![graphiql](https://blog.budshome.com/static/articles/161688998877.jpg)\r\n\r\n如图中示例，在左侧输入：\r\n\r\n```\r\nquery {\r\n  add(a: 110, b: 11)\r\n}\r\n```\r\n\r\n右侧的返回结果为：\r\n\r\n```\r\n{\r\n  \"data\": {\r\n    \"add\": 121\r\n  }\r\n}\r\n```\r\n\r\n基础的 GraphQL 查询服务成功！\r\n\r\n# 连接 MongoDB\r\n\r\n## 创建 MongoDB 数据源\r\n\r\n为了做到代码仓库风格的统一，以及扩展性。目前即使只需要连接 MongoDB 数据库，我们也将其放到一个模块中。\r\n\r\n> 下面的示例中，即使本地连接，我也开启了身份验证。请您自行配置数据库，或者免密访问。\r\n\r\n``` Bash\r\ncd ./rust-graphql/backend/src\r\nmkdir dbs\r\ntouch ./dbs/mod.rs ./dbs/mongo.rs\r\n```\r\n\r\n在 `mongo.rs` 中，编写如下代码：\r\n\r\n``` Rust\r\n\r\nuse mongodb::{Client, options::ClientOptions, Database};\r\n\r\npub struct DataSource {\r\n    client: Client,\r\n    pub db_budshome: Database,\r\n}\r\n\r\n#[allow(dead_code)]\r\nimpl DataSource {\r\n    pub async fn client(&self) -> Client {\r\n        self.client.clone()\r\n    }\r\n\r\n    pub async fn init() -> DataSource {\r\n        // 解析 MongoDB 连接字符串到 options 结构体中\r\n        let mut client_options =\r\n            ClientOptions::parse(\"mongodb://mongo:mongo@localhost:27017\")\r\n                .await\r\n                .expect(\"Failed to parse options!\");\r\n        // 可选：自定义一个 options 选项\r\n        client_options.app_name = Some(\"tide-graphql-mongodb\".to_string());\r\n\r\n        // 客户端句柄\r\n        let client = Client::with_options(client_options)\r\n            .expect(\"Failed to initialize database!\");\r\n\r\n        // 数据库句柄\r\n        let db_budshome = client.database(\"budshome\");\r\n\r\n        // 返回值 mongodb datasource\r\n        DataSource { client: client, db_budshome: db_budshome }\r\n    }\r\n}\r\n```\r\n\r\n在 `mod.rs` 中，编写如下代码：\r\n\r\n``` Rust\r\n\r\npub mod mongo;\r\n// pub mod postgres;\r\n// pub mod mysql;\r\n```\r\n\r\n## 创建集合及文档\r\n\r\n在 MongoDB 中，创建集合 `users`，并构造几个文档，示例数据如下：\r\n\r\n``` Json\r\n{\r\n    \"_id\": ObjectId(\"600b7a5300adcd7900d6cc1f\"),\r\n    \"email\": \"iok@budshome.com\",\r\n    \"username\": \"我是ok\",\r\n    \"cred\": \"peCwspEaVw3HB05ObIpnGxgK2VSQOCmgxjzFEOY+fk0=\"\r\n}\r\n```\r\n\r\n- `_id` 是由 MongoDB 自动产生的，，与系统时间相关；\r\n- `cred` 是使用 PBKDF2 对用户密码进行加密（salt）和散列（hash）运算后产生的密码，后面会有详述。此处，请您随意。\r\n\r\n# 提供 query 服务\r\n\r\n## Schema 中添加 MongoDB 数据源\r\n\r\n前文小节我们创建了 MongoDB 数据源，欲在 async-graphql 中是获取和使用 MongoDB 数据源，由如下方法——\r\n\r\n1. 作为 async-graphql 的全局数据；\r\n2. 作为 Tide 的应用状态 State，优势是可以作为 Tide 服务器状态，进行原子操作；\r\n3. 使用 lazy-static.rs，优势是获取方便，简单易用。\r\n\r\n如果不作前后端分离，为了方便前端的数据库操作，那么 2 和 3 是比较推荐的，特别是使用 crate lazy-static，存取方便。笔者看到很多开源实例和一些成熟的 rust-web 应用都采用 lazy-static。\r\n\r\n虽然 2 和 3 方便、简单，以及易用。但是本应用中，我们仅需要 tide 作为一个服务器提供 http 服务，MongoDB 数据源也仅是为 async-graphql 使用。因此，我采用作为 async-graphql 的全局数据，将其构建到 Schema 中。\r\n\r\n基于上述思路，我们迭代 `backend/src/gql/mod.rs` 文件：\r\n\r\n``` Rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse tide::{http::mime, Body, Request, Response, StatusCode};\r\n\r\nuse async_graphql::{\r\n    http::{playground_source, receive_json, GraphQLPlaygroundConfig},\r\n    EmptyMutation, EmptySubscription, Schema,\r\n};\r\n\r\nuse crate::State;\r\n\r\nuse crate::dbs::mongo;\r\n\r\nuse crate::gql::queries::QueryRoot;\r\n\r\npub async fn build_schema() -> Schema<QueryRoot, EmptyMutation, EmptySubscription> {\r\n    // 获取 mongodb datasource 后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 Tide 的应用状态 State；\r\n    // 3. 使用 lazy-static.rs\r\n    let mongo_ds = mongo::DataSource::init().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mongodb datasource  in the schema object.\r\n    // let mut schema = Schema::new(QueryRoot, MutationRoot, EmptySubscription)\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)\r\n        .data(mongo_ds)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(req: Request<State>) -> tide::Result {\r\n    let schema = req.state().schema.clone();\r\n    let gql_resp = schema.execute(receive_json(req).await?).await;\r\n\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(Body::from_json(&gql_resp)?);\r\n\r\n    Ok(resp.into())\r\n}\r\n\r\npub async fn graphiql(_: Request<State>) -> tide::Result {\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(\"graphql\")));\r\n    resp.set_content_type(mime::HTML);\r\n\r\n    Ok(resp.into())\r\n}\r\n```\r\n\r\n## 开发一个查询服务，自 MongoDB 集合 `users` 集合查询所有用户：\r\n\r\n### 增加 users 模块，及分层阐述\r\n\r\n一个完整的 GraphQL 查询服务，在本应用项目——注意，非 Tide 或者 GraphQL 技术分层——我们可以简单将其分为三层：\r\n\r\n- tide handle：发起一次 GraphQL 请求，通知 GraphQL 总线执行 GraphQL service 调用，以及接收和处理响应；\r\n- GraphQL 总线：分发 GraphQL service 调用；\r\n- service：负责执行具体的查询服务，从 MongoDB 数据获取数据，并封装到 model 中；\r\n\r\n基于上述思路，我们想要开发一个查询所有用户的 GraphQL 服务，需要增加 users 模块，并创建如下文件：\r\n\r\n``` Bash\r\ncd ./backend/src\r\nmkdir users\r\ncd users\r\ntouch mod.rs models.rs services.rs\r\n```\r\n\r\n至此，本篇文章的所有文件已经创建，先让我们查看一下总体的 backend 工程结构，如下图所示：\r\n\r\n![backend 完成文件结构](https://blog.budshome.com/static/articles/161616181910.jpg)\r\n\r\n其中 `users/mod.rs` 文件内容为：\r\n\r\n``` Rust\r\npub mod models;\r\npub mod services;\r\n```\r\n\r\n我们也需要将 `users 模块`添加到 `main.rs` 中：\r\n\r\n``` Rust\r\nmod dbs;\r\nmod gql;\r\nmod users;\r\n\r\nuse crate::gql::{build_schema, graphiql, graphql};\r\n\r\n#[async_std::main]\r\nasync fn main() -> Result<(), std::io::Error> {\r\n    // tide logger\r\n    tide::log::start();\r\n\r\n    // 初始 Tide 应用程序状态\r\n    let schema = build_schema().await;\r\n    let app_state = State { schema: schema };\r\n    let mut app = tide::with_state(app_state);\r\n\r\n    // 路由配置\r\n    app.at(\"graphql\").post(graphql);\r\n    app.at(\"graphiql\").get(graphiql);\r\n\r\n    app.listen(format!(\"{}:{}\", \"127.0.0.1\", \"8080\")).await?;\r\n\r\n    Ok(())\r\n}\r\n\r\n//  Tide 应用程序作用域状态 state.\r\n#[derive(Clone)]\r\npub struct State {\r\n    pub schema: async_graphql::Schema<\r\n        gql::queries::QueryRoot,\r\n        async_graphql::EmptyMutation,\r\n        async_graphql::EmptySubscription,\r\n    >,\r\n}\r\n```\r\n\r\n### 编写 `User` 模型\r\n\r\n在 `users/models.rs` 文件中添加：\r\n\r\n``` Rust\r\nuse serde::{Serialize, Deserialize};\r\nuse bson::oid::ObjectId;\r\n\r\n#[derive(Serialize, Deserialize, Clone)]\r\npub struct User {\r\n    pub _id: ObjectId,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::Object]\r\nimpl User {\r\n    pub async fn id(&self) -> ObjectId {\r\n        self._id.clone()\r\n    }\r\n\r\n    pub async fn email(&self) -> &str {\r\n        self.email.as_str()\r\n    }\r\n\r\n    pub async fn username(&self) -> &str {\r\n        self.username.as_str()\r\n    }\r\n}\r\n```\r\n\r\n上述代码中，`User` 结构体中定义的字段类型为 `String`，但结构体实现中返回为 `&str`，这是因为 Rust 中 `String` 未有默认实现 `copy trait`。如果您希望结构体实现中返回 `String`，可以通过 `clone()` 方法实现：\r\n\r\n``` Rust\r\n    pub async fn email(&self) -> String {\r\n        self.email.clone()\r\n    }\r\n```\r\n\r\n> 您使用的 IDE 比较智能，或许会有报错，先不要管，我们后面一并处理。\r\n\r\n### 编写 service\r\n\r\n在 `users/services.rs` 文件中添加代码，如下：\r\n\r\n``` Rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse futures::stream::StreamExt;\r\nuse mongodb::Database;\r\n\r\nuse crate::users::models::User;\r\n\r\npub async fn all_users(db: Database) -> std::result::Result<Vec<User>, async_graphql::Error> {\r\n    let coll = db.collection(\"users\");\r\n\r\n    let mut users: Vec<User> = vec![];\r\n\r\n    // Query all documents in the collection.\r\n    let mut cursor = coll.find(None, None).await.unwrap();\r\n\r\n    // Iterate over the results of the cursor.\r\n    while let Some(result) = cursor.next().await {\r\n        match result {\r\n            Ok(document) => {\r\n                let user = bson::from_bson(bson::Bson::Document(document)).unwrap();\r\n                users.push(user);\r\n            }\r\n            Err(error) => Err(Error::new(\"6-all-users\")\r\n                .extend_with(|_, e| e.set(\"details\", format!(\"Error to find doc: {}\", error))))\r\n            .unwrap(),\r\n        }\r\n    }\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"6-all-users\").extend_with(|_, e| e.set(\"details\", \"No records\")))\r\n    }\r\n}\r\n```\r\n\r\n> 您使用的 IDE 比较智能，或许会有报错，先不要管，我们后面一并处理。\r\n\r\n### 在 GraphQL 总线中调用 service\r\n\r\n迭代 `gql/queries.rs` 文件，最终为：\r\n\r\n``` Rust\r\nuse async_graphql::Context;\r\n\r\nuse crate::dbs::mongo::DataSource;\r\nuse crate::users::{self, models::User};\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // Get all Users,\r\n    async fn all_users(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n    ) -> std::result::Result<Vec<User>, async_graphql::Error> {\r\n        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();\r\n        users::services::all_users(db).await\r\n    }\r\n}\r\n```\r\n\r\nOkay，如果您使用的 IDE 比较智能，可以看到现在已经是满屏的红、黄相配了。代码是没有问题的，我们只是缺少几个使用到的 crate。\r\n\r\n- 首先，执行命令：\r\n\r\n``` Bash\r\ncargo add serde futures\r\n```\r\n\r\n- 其次，因为我们使用到了 serde crate 的 `derive` trait，因此需要迭代 `backend/Cargo.toml` 文件，最终版本为：\r\n\r\n``` Toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"我是谁？\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nfutures = \"0.3.13\"\r\ntide = \"0.16.0\"\r\nasync-std = { version = \"1.9.0\", features = [\"attributes\"] }\r\n\r\nserde = { version = \"1.0.124\", features = [\"derive\"] }\r\nasync-graphql = \"2.6.0\"\r\nmongodb = { version = \"1.2.0\", default-features = false, features = [\"async-std-runtime\"] }\r\nbson = \"1.2.0\"\r\n```\r\n\r\n现在，重新运行 `cargo build`，可以发现红、黄错误已经消失殆尽了。执行 `cargo watch -x \"run\"` 命令会发现启动成功。\r\n\r\n最后，我们来执行 GraphQL 查询，看看是否取出了 MongoDB 中集合 users 中的所有数据。\r\n\r\n左侧输入：\r\n\r\n```\r\n# Write your query or mutation here\r\nquery {\r\n  allUsers {\r\n    id\r\n    email\r\n    username\r\n  }\r\n}\r\n```\r\n\r\n右侧返回结果依赖于您在集合中添加了多少文档，如我的查询结果为：\r\n\r\n```\r\n{\r\n  \"data\": {\r\n    \"allUsers\": [\r\n      {\r\n        \"email\": \"ok@budshome.com\",\r\n        \"id\": \"5ff82b2c0076cc8b00e5cddb\",\r\n        \"username\": \"我谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"oka@budshome.com\",\r\n        \"id\": \"5ff83f4b00e8fda000e5cddc\",\r\n        \"username\": \"我s谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"oka2@budshome.com\",\r\n        \"id\": \"5ffd710400b6b84e000349f8\",\r\n        \"username\": \"我2s谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"afasf@budshome.com\",\r\n        \"id\": \"5ffdb3fa00bbdf3a007a2988\",\r\n        \"username\": \"哈哈\"\r\n      },\r\n      {\r\n        \"email\": \"oka22@budshome.com\",\r\n        \"id\": \"600b7a2700e7c21500d6cc1e\",\r\n        \"username\": \"我22s谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"iok@budshome.com\",\r\n        \"id\": \"600b7a5300adcd7900d6cc1f\",\r\n        \"username\": \"我是ok\"\r\n      },\r\n      {\r\n        \"email\": \"iok2@budshome.com\",\r\n        \"id\": \"600b8064000a5ca30024199e\",\r\n        \"username\": \"我是ok2\"\r\n      }\r\n    ]\r\n  }\r\n}\r\n```\r\n\r\n好的，以上就是一个完成的 GraphQL 查询服务（此处应有掌声 :-)）。\r\n\r\n如果您一步步跟着操作，是很难不成功的，但总有例外，欢迎交流。\r\n\r\n# 下篇摘要\r\n\r\n目前我们成功开发了一个基于 Rust 技术栈的 GraphQL 查询服务，但本例代码是不够满意的，如冗长的返回类型 `std::result::Result<Vec<User>, async_graphql::Error>`，如太多的魔术代码。\r\n\r\n下篇中，我们先不进行 GraphQL mutation 的开发。我将对代码进行重构——\r\n\r\n- 应用配置文件；\r\n- 代码抽象。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: false,
+    "created_at": ISODate("2021-03-18T16:04:21.791Z"),
+    "updated_at": ISODate("2021-03-18T16:04:21.791Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60558b6e005b0a5500ddf9d8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（3）- 重构",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "前 2 篇文章中，我们初始化搭建了工程结构，选择了必须的 crate，并成功构建了 GraphQL 查询服务：从 MongoDB 中获取了数据，并通过 GraphQL 查询，输出 json 数据。本篇文章，本应当进行 GraphQL 变更（mutation）服务的开发。但是，虽然代码成功运行，却存在一些问题，如：对于 MongoDB 数据库的连接信息，应当采取配置文件存储；通用公用的代码，应当组织和抽象；诸如此类以便于后续扩展，生产部署等问题。所以，本篇文章中我们暂不进行变更的开发，而是进行第一次简单的重构。以免后续代码扩大，重构工作量繁重。",
+    slug: "gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(3)--zhong-gou",
+    uri: "/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(3)--zhong-gou",
+    content: "行文开始，先感谢几位指导的老师。根据指导，文章的标题做了更符合撰写目标和使用类库的更改，另外也修改了上篇文章中的笔误。因为笔者是先写 markdown 文件，然后粘贴到 web 页面。尤其是这个博客是笔者“三天打鱼两天晒网”的方式开发的，目前很不完善，所以粘贴时，调整顺序等情形，容易产生张冠李戴的情况。总之，欢迎各位指正。谢谢！\r\n\r\n首先，我们通过 shell 命令 `cd ./rust-graphql/backend` 进入后端工程目录（下文中，将默认在此目录执行操作）。\r\n\r\n# 配置信息的存储和获取\r\n\r\n让我们设想正式生产环境的应用场景：\r\n\r\n- 服务器地址和端口的变更可能；\r\n- 服务功能升级，对用户暴露 API 地址的变更可能。如 rest api，graphql api，以及版本升级；\r\n- 服务站点密钥定时调整的可能；\r\n- 服务站点安全调整，jwt、session/cookie 过期时间的变更可能。\r\n\r\n显然易见，我们应当避免每次变更调整时，都去重新编译一次源码——并且，大工程中，Rust 的编译速度让开发者注目。更优的方法是，将这些写入到配置文件中。或许上述第 4 点无需写入，但是文件存储到加密保护的物理地址，安全方面也有提升。\r\n\r\n当然，实际的应用场景或许有更合适有优的解决方法，但我们先基于此思路来设计。Rust 中，`dotenv` crate 用来读取环境变量。取得环境变量后，我们将其作为静态或者惰性值来使用，静态或者惰性值相关的 crate 有 `lazy_static` 和 `once_cell` 等，都很简单易用。此示例中，我们使用 `lazy_static`。\r\n\r\n## 创建 `.env`，添加读取相关 crate\r\n\r\n增加这 2 个 crate，并且在 `backend` 目录创建 `.env` 文件。\r\n\r\n``` Bash\r\ncargo add dotenv lazy_static\r\ntouch .env\r\n```\r\n\r\n在 `.env` 文件中，写入如下内容：\r\n\r\n```\r\n# 服务器信息\r\nADDRESS=127.0.0.1\r\nPORT=8080\r\n\r\n# API 服务信息，“gql” 也可以单独提出来定义\r\nGRAPHQL_PATH=v1\r\nGRAPHIQL_PATH=v1i\r\n\r\n# 数据库配置\r\nMONGODB_URI=mongodb://mongo:mongo@localhost:27017\r\nMONGODB_BUDSHOME=budshome\r\n\r\n# 站点安全相关，此处仅为内容填充，后面的文章中会使用\r\nSITE_KEY=0F4EHz+1/hqVvZjuB8EcooQs1K6QKBvLUxqTHt4tpxE=\r\nCLAIM_EXP=10000000000\r\n```\r\n\r\n`Cargo.toml` 文件：\r\n\r\n``` Toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"我是谁？\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nfutures = \"0.3.13\"\r\ntide = \"0.16.0\"\r\nasync-std = { version = \"1.9.0\", features = [\"attributes\"] }\r\n\r\ndotenv = \"0.15.0\"\r\nlazy_static = \"1.4.0\"\r\n\r\nasync-graphql = \"2.6.0\"\r\nmongodb = { version = \"1.2.0\", default-features = false, features = [\"async-std-runtime\"] }\r\nbson = \"1.2.0\"\r\nserde = { version = \"1.0.124\", features = [\"derive\"] }\r\n```\r\n\r\n## 读取配置文件并使用配置信息\r\n\r\n对于配置信息的读取和使用，显然属于公用功能，我们将其归到单独的模块中。所以，需要创建 2 个文件：一个是模块标识文件，一个是将抽象出来共用的常量子模块。\r\n\r\n``` Bash\r\ncd ./src\r\nmkdir util\r\ntouch ./util/mod.rs ./util/constant.rs\r\n```\r\n\r\n至此，本篇文章的所有文件都已经创建，我们确认一下工程结构。\r\n\r\n![backend 工程结构](https://blog.budshome.com/static/articles/1616216469.png)\r\n\r\n- 在 `util/mod.rs`，编写如下代码：\r\n\r\n``` Rust\r\npub mod constant;\r\n```\r\n\r\n- 读取配置信息\r\n\r\n在 `util/constant.rs` 中，编写如下代码：\r\n\r\n``` Rust\r\nuse dotenv::dotenv;\r\nuse lazy_static::lazy_static;\r\nuse std::collections::HashMap;\r\n\r\nlazy_static! {\r\n    // CFG variables defined in .env file\r\n    pub static ref CFG: HashMap<&'static str, String> = {\r\n        dotenv().ok();\r\n\r\n        let mut map = HashMap::new();\r\n\r\n        map.insert(\r\n            \"ADDRESS\",\r\n            dotenv::var(\"ADDRESS\").expect(\"Expected ADDRESS to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"PORT\",\r\n            dotenv::var(\"PORT\").expect(\"Expected PORT to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"GRAPHQL_PATH\",\r\n            dotenv::var(\"GRAPHQL_PATH\").expect(\"Expected GRAPHQL_PATH to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"GRAPHIQL_PATH\",\r\n            dotenv::var(\"GRAPHIQL_PATH\").expect(\"Expected GRAPHIQL_PATH to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"MONGODB_URI\",\r\n            dotenv::var(\"MONGODB_URI\").expect(\"Expected MONGODB_URI to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"MONGODB_BUDSHOME\",\r\n            dotenv::var(\"MONGODB_BUDSHOME\").expect(\"Expected MONGODB_BUDSHOME to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"SITE_KEY\",\r\n            dotenv::var(\"SITE_KEY\").expect(\"Expected SITE_KEY to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"CLAIM_EXP\",\r\n            dotenv::var(\"CLAIM_EXP\").expect(\"Expected CLAIM_EXP to be set in env!\"),\r\n        );\r\n\r\n        map\r\n    };\r\n}\r\n```\r\n\r\n- 重构代码，使用配置信息，正确提供 GraphQL 服务\r\n\r\n首先，`src/main.rs` 文件中引入 `util` 模块。并用 `use` 引入 `constant` 子模块，读取其惰性配置值。\r\n\r\n``` Rust\r\nmod dbs;\r\nmod gql;\r\nmod users;\r\nmod util;\r\n\r\nuse crate::gql::{build_schema, graphiql, graphql};\r\nuse crate::util::constant::CFG;\r\n\r\n#[async_std::main]\r\nasync fn main() -> Result<(), std::io::Error> {\r\n    // tide logger\r\n    tide::log::start();\r\n\r\n    // 初始 Tide 应用程序状态\r\n    let schema = build_schema().await;\r\n    let app_state = State { schema: schema };\r\n    let mut app = tide::with_state(app_state);\r\n\r\n    // 路由配置\r\n    app.at(CFG.get(\"GRAPHQL_PATH\").unwrap()).post(graphql);\r\n    app.at(CFG.get(\"GRAPHIQL_PATH\").unwrap()).get(graphiql);\r\n\r\n    app.listen(format!(\r\n        \"{}:{}\",\r\n        CFG.get(\"ADDRESS\").unwrap(),\r\n        CFG.get(\"PORT\").unwrap()\r\n    ))\r\n    .await?;\r\n\r\n    Ok(())\r\n}\r\n\r\n//  Tide 应用程序作用域状态 state.\r\n#[derive(Clone)]\r\npub struct State {\r\n    pub schema: async_graphql::Schema<\r\n        gql::queries::QueryRoot,\r\n        async_graphql::EmptyMutation,\r\n        async_graphql::EmptySubscription,\r\n    >,\r\n}\r\n```\r\n\r\n其次，`src/gql/mod.rs` 文件中，用 `use` 引入 `constant` 子模块，读取其惰性配置值。\r\n\r\n``` Rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse crate::util::constant::CFG;\r\nuse tide::{http::mime, Body, Request, Response, StatusCode};\r\n\r\nuse async_graphql::{\r\n    http::{playground_source, receive_json, GraphQLPlaygroundConfig},\r\n    EmptyMutation, EmptySubscription, Schema,\r\n};\r\n\r\nuse crate::State;\r\n\r\nuse crate::dbs::mongo;\r\n\r\nuse crate::gql::queries::QueryRoot;\r\n\r\npub async fn build_schema() -> Schema<QueryRoot, EmptyMutation, EmptySubscription> {\r\n    // 获取 mongodb datasource 后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 Tide 的应用状态 State；\r\n    // 3. 使用 lazy-static.rs\r\n    let mongo_ds = mongo::DataSource::init().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mongodb datasource  in the schema object.\r\n    // let mut schema = Schema::new(QueryRoot, MutationRoot, EmptySubscription)\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)\r\n        .data(mongo_ds)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(req: Request<State>) -> tide::Result {\r\n    let schema = req.state().schema.clone();\r\n    let gql_resp = schema.execute(receive_json(req).await?).await;\r\n\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(Body::from_json(&gql_resp)?);\r\n\r\n    Ok(resp.into())\r\n}\r\n\r\npub async fn graphiql(_: Request<State>) -> tide::Result {\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(\r\n        CFG.get(\"GRAPHQL_PATH\").unwrap(),\r\n    )));\r\n    resp.set_content_type(mime::HTML);\r\n\r\n    Ok(resp.into())\r\n}\r\n```\r\n\r\n最后，不要忘了 `src/dbs/mongo.rs` 文件中，用 `use` 引入 `constant` 子模块，读取其惰性配置值。\r\n\r\n``` Rust\r\n\r\nuse crate::util::constant::CFG;\r\n\r\nuse mongodb::{Client, options::ClientOptions, Database};\r\n\r\npub struct DataSource {\r\n    client: Client,\r\n    pub db_budshome: Database,\r\n}\r\n\r\n#[allow(dead_code)]\r\nimpl DataSource {\r\n    pub async fn client(&self) -> Client {\r\n        self.client.clone()\r\n    }\r\n\r\n    pub async fn init() -> DataSource {\r\n        // Parse a connection string into an options struct.\r\n        // environment variables defined in .env file\r\n        let mut client_options =\r\n            ClientOptions::parse(CFG.get(\"MONGODB_URI\").unwrap())\r\n                .await\r\n                .expect(\"Failed to parse options!\");\r\n        // Manually set an option.\r\n        client_options.app_name = Some(\"tide-graphql-mongodb\".to_string());\r\n\r\n        // Get a handle to the deployment.\r\n        let client = Client::with_options(client_options)\r\n            .expect(\"Failed to initialize database!\");\r\n\r\n        // Get a handle to a database.\r\n        let db_budshome = client.database(CFG.get(\"MONGODB_BUDSHOME\").unwrap());\r\n\r\n        // return mongodb datasource.\r\n        DataSource { client: client, db_budshome: db_budshome }\r\n    }\r\n}\r\n```\r\n\r\n配置文件读取已经完成，我们测试看看。这次，我们浏览器中要打开的链接为 `http://127.0.0.1:8080/v1i`。\r\n\r\n![graphiql ui](https://blog.budshome.com/static/articles/1616217670.jpg)\r\n\r\n执行查询，一切正常。\r\n\r\n![graphql query](https://blog.budshome.com/static/articles/1616217840.jpg)\r\n\r\n# 代码简洁性重构，定义公用类型\r\n\r\n在上一篇[基于 tide + async-graphql + mongodb 构建 Rust 异步 GraphQL 服务（2）- 查询服务](https://blog.budshome.com/budshome/ji-yu-tide-+-async-graphql-+-mongodb-gou-jian-rust-yi-bu-graphql-fu-wu-(2)-cha-xun-fu-wu)文章中，`gql/queries.rs` 和 `users/services.rs` 代码中，`all_users` 函数/方法的返回值为冗长的 `std::result::Result<Vec<User>, async_graphql::Error>`。显然，这样代码不够易读和简洁。我们简单重构下：定义一个公用的 `GqlResult` 类型即可。\r\n\r\n- 首先，迭代 `util/constant.rs` 文件，增加一行：定义 `GqlResult` 类型别名：\r\n\r\n``` Rust\r\nuse dotenv::dotenv;\r\nuse lazy_static::lazy_static;\r\nuse std::collections::HashMap;\r\n\r\npub type GqlResult<T> = std::result::Result<T, async_graphql::Error>;\r\n\r\nlazy_static! {\r\n    // CFG variables defined in .env file\r\n    pub static ref CFG: HashMap<&'static str, String> = {\r\n        dotenv().ok();\r\n\r\n        let mut map = HashMap::new();\r\n\r\n        map.insert(\r\n            \"ADDRESS\",\r\n            dotenv::var(\"ADDRESS\").expect(\"Expected ADDRESS to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"PORT\",\r\n            dotenv::var(\"PORT\").expect(\"Expected PORT to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"GRAPHQL_PATH\",\r\n            dotenv::var(\"GRAPHQL_PATH\").expect(\"Expected GRAPHQL_PATH to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"GRAPHIQL_PATH\",\r\n            dotenv::var(\"GRAPHIQL_PATH\").expect(\"Expected GRAPHIQL_PATH to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"MONGODB_URI\",\r\n            dotenv::var(\"MONGODB_URI\").expect(\"Expected MONGODB_URI to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"MONGODB_BUDSHOME\",\r\n            dotenv::var(\"MONGODB_BUDSHOME\").expect(\"Expected MONGODB_BUDSHOME to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"SITE_KEY\",\r\n            dotenv::var(\"SITE_KEY\").expect(\"Expected SITE_KEY to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"CLAIM_EXP\",\r\n            dotenv::var(\"CLAIM_EXP\").expect(\"Expected CLAIM_EXP to be set in env!\"),\r\n        );\r\n\r\n        map\r\n    };\r\n}\r\n```\r\n\r\n- 其次，迭代 `gql/queries.rs` 和 `users/services.rs` 文件，引入并让函数/方法返回 `GqlResult` 类型。\r\n\r\n`gql/queries.rs`\r\n\r\n``` Rust\r\nuse async_graphql::Context;\r\n\r\nuse crate::dbs::mongo::DataSource;\r\nuse crate::users::{self, models::User};\r\nuse crate::util::constant::GqlResult;\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // Get all Users,\r\n    async fn all_users(&self, ctx: &Context<'_>) -> GqlResult<Vec<User>> {\r\n        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();\r\n        users::services::all_users(db).await\r\n    }\r\n}\r\n```\r\n\r\n`users/services.rs`\r\n\r\n``` Rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse futures::stream::StreamExt;\r\nuse mongodb::Database;\r\n\r\nuse crate::users::models::User;\r\nuse crate::util::constant::GqlResult;\r\n\r\npub async fn all_users(db: Database) -> GqlResult<Vec<User>> {\r\n    let coll = db.collection(\"users\");\r\n\r\n    let mut users: Vec<User> = vec![];\r\n\r\n    // Query all documents in the collection.\r\n    let mut cursor = coll.find(None, None).await.unwrap();\r\n\r\n    // Iterate over the results of the cursor.\r\n    while let Some(result) = cursor.next().await {\r\n        match result {\r\n            Ok(document) => {\r\n                let user = bson::from_bson(bson::Bson::Document(document)).unwrap();\r\n                users.push(user);\r\n            }\r\n            Err(error) => Err(Error::new(\"6-all-users\")\r\n                .extend_with(|_, e| e.set(\"details\", format!(\"Error to find doc: {}\", error))))\r\n            .unwrap(),\r\n        }\r\n    }\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"6-all-users\").extend_with(|_, e| e.set(\"details\", \"No records\")))\r\n    }\r\n}\r\n```\r\n\r\n第一次重构，我们就到这个程度。下一篇，我们将进行 GraphQL 变更（mutation）的开发。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-20T05:43:10.256Z"),
+    "updated_at": ISODate("2021-03-20T05:43:10.256Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6056a3c20003da4b00968ba8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "国民应用 App 的用户隐私数据窥探",
+    "category_id": ObjectId("601bcaf300b5c70100e2a323"),
+    summary: "但是，作为手机行业巨头的苹果公司，是硬件提供商。其新出的系统升级，则向我们暴露了一些“国民应用”比您更了解您自己的隐私细节。\r\n\r\n最近，看到了凤凰网科技的一条推送。苹果公司即将于 2021 年 9 月份推出的 iOS 14.5 功能，加强了对这些 App 关于用户隐私数据获取的限制。不交叉的软件和硬件业务，因此产生了冲突。",
+    slug: "guo-min-ying-yong-app-de-yong-hu-yin-si-shu-ju-kui-tan",
+    uri: "/budshome/guo-min-ying-yong-app-de-yong-hu-yin-si-shu-ju-kui-tan",
+    content: "微信、抖音等“国民应用”，占据着您手机的过半使用时间和流量。给您带来了诸多方便的同时，也在向您索取更多。\r\n\r\n但是，作为手机行业巨头的苹果公司，是硬件提供商。其新出的系统升级，则向我们暴露了一些“国民应用”比您更了解您自己的隐私细节。\r\n\r\n最近，看到了凤凰网科技的一条推送。苹果公司即将于 2021 年 9 月份推出的 iOS 14.5 功能，加强了对这些 App 关于用户隐私数据获取的限制。不交叉的软件和硬件业务，因此产生了冲突。\r\n\r\n![](https://blog.budshome.com/static/articles/e61a2b12f11aee36afa8b7249f4ebd65.png)\r\n\r\niOS 14.5 版本更新后，应用程序如果要访问用户的信息，就必须先通过弹窗征得用户的同意。因此，腾讯、字节跳动等中国科技巨头正在测试名为互联网广告标识(CAID)的工具，以规避苹果隐私调整。\r\n\r\n# 苹果对用户隐私数据的处理\r\n\r\n作为手机硬件提供商，要获取手机用户的隐私数据，非常容易。看看 x 米、x 为等手机厂商的广告的强制、精准推送即可知晓。\r\n\r\n苹果公司自然也是如此，显然它有能力拿走互联网广告行业的一块大蛋糕。\r\n\r\n但至少在令人厌烦不已的广告推送方面，苹果一向**不按常理出牌**，它虽然削弱了开发者搜集用户数据，并以此描绘用户画像以便用于精准广告推送的能力。但苹果自己没有吃这块蛋糕，而是转身把它丢进了垃圾桶。\r\n\r\n简而言之，为了保护用户隐私，苹果断人财路。\r\n\r\n据《金融时报》报道，苹果近日正式对字节跳动和腾讯下达了最后通牒——不要尝试绕过隐私功能，否则应用将被下架。\r\n\r\n# iOS 14.5 对用户隐私数据获取的限制\r\n\r\n2020 年 6 月的苹果公司发布会，库克着重强调了 iOS 14 系统对用户隐私的保护：如在摄像头、麦克风等信息敏感硬件被使用时提供明显的标识来告知用户；App读取剪切板内容后进行提示；使用模糊位置替代精确位置，满足不同应用对设备位置信息需求的同时，保护用户位置隐私等。\r\n\r\n但最大的改变，在于 iOS 14 新引入了一项机制：“应用跟踪透明度（App Tracking Transparency，即 ATT）”功能，它可以让用户自由选择是否分享自身的数据给应用开发商。\r\n\r\n![应用跟踪透明度](https://blog.budshome.com/static/articles/ae418e7376ce2e57da13ad25f9fae90d.png)\r\n\r\n因此，大陆国民不知道是什么玩意的 Facebook，就和苹果公司一直在互相撕咬。因为，作为“国民应用”的老师，Facebook 搜集的用户隐私数据，基本上涵盖了所有可以搜集的内容。\r\n\r\n![App 获取用户隐私数据](https://blog.budshome.com/static/articles/d8efd51fe992cec3e158999e2d344c1b.png)\r\n\r\n您忘了您的隐私？没关系，“国民引用”记得很清楚哩。\r\n\r\n# 用户隐私数据具体有哪些？\r\n\r\n- **用于追踪的数据**，包括：用户的实际地址、电子邮件、姓名、电话、用户的ID、设备的ID等等，作为识别网络上一个人的标识符，信息可谓相当详尽。\r\n\r\n![用于追踪得数据](https://blog.budshome.com/static/articles/fdf4bd91c880251b841be247734d5ebb.png)\r\n\r\n- **与用户相关联的数据**，主要是您手机的使用内容，第一项也是最重要的一项：用于第三方广告的隐私数据。\r\n\r\n这些数据包括购买项目、财务信息、精准和粗略位置、联系信息、联系人、包括照片等在内的用户内容、搜索和浏览历史记录、标识ID、包括产品交互在内的使用数据等等。\r\n\r\n![与用户相关联的数据](https://blog.budshome.com/static/articles/f9774ccda40cf78866861a84df105431.png)\r\n\r\n- **用于分析的数据**，增加了健康和健身等的身体数据。\r\n\r\n![用于分析的数据](https://blog.budshome.com/static/articles/292c8294aa404bac3c2e4f16fd4f084f.png)\r\n\r\n- **不知道有什么用的分析**，您用的 App 一并帮您打包了，不过放在自己得储物柜。\r\n\r\n产品个性化数据，用于精准推荐主题？\r\n\r\n![产品个性化](https://blog.budshome.com/static/articles/ef5fc8d7948f4b7d1251c457afc3d70a.png)\r\n\r\n用于 **App 功能**的，覆盖内容也很全面。\r\n\r\n![用于 App 功能](https://blog.budshome.com/static/articles/8bbab9b3fc2bd8919e5a3a9a9d4edb4f.png)\r\n\r\n不知所云的用于其它目的数据。具体内容不得而知，获取隐私数据的 App 或许是基于帮您节省手机内存占用的目的。\r\n\r\n![用户其它目的](https://blog.budshome.com/static/articles/ae61ccebbd81dcdc9a373e88d2f2f922.png)\r\n\r\n作为普通群众的我们，可能对于这些 App 拿去用户隐私数据，要么无关紧要？要么无能为力，要么个性暴露……\r\n\r\n但是，对于一个仅仅新闻浏览的客户端，也需要获取您的照片、位置，甚至财务等。足见，无论是在国家还是企业层面上，移动互联网时代的个人隐私保护，依然任重而道远。\r\n\r\n参考资料：凤凰网科技、智能相对论，以及网络资料。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-21T01:39:13.905Z"),
+    "updated_at": ISODate("2021-03-21T01:39:13.905Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60597336001032c400b67a8d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 中将 markdown 渲染为 html",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 中，对于将 markdown 渲染为 html 方面，目前成熟度较高的 crate 主要有 2 个：`markdown.rs` 和 `pulldown-cmark`。功能都非常完善和强大：支持解析文档注脚（footnote）、github 风格的表格、github 风格的任务列表，以及删除线效果（strikethrough）等，但要主要支持是选择性地。\r\n\r\n性能方面，或许测试体量不足，笔者测试感觉差别不大。前者 `markdown.rs` 稍微简单易用一些。后者 `pulldown-cmark` 专注于 `CommonMark`，默认提供命令行工具。采用拉取解析（pull parse）模式，其为 Rust 开发的书籍工具 `mdBook` 所使用。",
+    slug: "rust-zhong-jiang-markdown-xuan-ran-wei-html",
+    uri: "/budshome/rust-zhong-jiang-markdown-xuan-ran-wei-html",
+    content: "轻量级标记语言 markdown 现今不仅在程序员范围内流行，很多的其它行业人员也对 markdown 青睐有加。因此现在的 web 应用中，富文本编辑器越来越多的支持 markdown 语法格式，以及即时渲染功能。在存储时，数据库中存入轻量级标记语言 markdown 文档，方便后续导出再做它用的排版。也可以直接数据库中存入渲染后的 html 文档，对 API 调用者提供方便（如格式和验证等）。\r\n\r\nRust 中，对于将 markdown 渲染为 html 方面，目前成熟度较高的 crate 主要有 2 个：`markdown.rs` 和 `pulldown-cmark`。功能都非常完善和强大：支持解析文档注脚（footnote）、github 风格的表格、github 风格的任务列表，以及删除线效果（strikethrough）等，但要主要支持是选择性地。\r\n\r\n性能方面，或许测试体量不足，笔者测试感觉差别不大。前者 `markdown.rs` 稍微简单易用一些。后者 `pulldown-cmark` 专注于 `CommonMark`，默认提供命令行工具。采用拉取解析（pull parse）模式，其为 Rust 开发的书籍工具 `mdBook` 所使用。\r\n\r\n我们下面通过实例体验一下，这些代码都是完整可用于生产环境的。\r\n\r\n# `markdown.rs`\r\n\r\n`markdown.rs` 使用非常简单：\r\n\r\n``` Rust\r\nuse markdown;\r\n\r\n// 如果您没有异步库 async-std 依赖项，\r\n// 请替换下述前 2 行代码为\r\n// fn main() {\r\n#[async_std::main]\r\nasync fn main() {\r\n    let html: String = markdown::to_html(\"__我是 *markdown*__\");\r\n\r\n    assert_eq!(&html, \"<p><strong>我是 <em>markdown</em></strong></p>\\n\")\r\n}\r\n```\r\n\r\n也可以通过读入 markdown 文件来解析。如我们有一个 markdown 文档 `code.md`：\r\n\r\n``` markdown\r\n    # Rust 代码\r\n\r\n    这是 Tide 中对 **cookie** 进行增、删的例子。\r\n\r\n    ``` Rust\r\n    use tide::http::Cookie;\r\n    use tide::{Request, Response, StatusCode};\r\n\r\n    /// Tide will use the the `Cookies`'s `Extract` implementation to build this parameter.\r\n\r\n    async fn insert_cookie(_req: Request<()>) -> tide::Result {\r\n        let mut res = Response::new(StatusCode::Ok);\r\n        res.insert_cookie(Cookie::new(\"hello\", \"world\"));\r\n        Ok(res)\r\n    }\r\n\r\n    async fn remove_cookie(_req: Request<()>) -> tide::Result {\r\n        let mut res = Response::new(StatusCode::Ok);\r\n        res.remove_cookie(Cookie::named(\"hello\"));\r\n        Ok(res)\r\n    }\r\n    ```\r\n```\r\n\r\n我们通过 Rust 标准库的文件模块读入 `code.md` 并将其转换为 html。\r\n\r\n``` Rust\r\nuse markdown;\r\nuse std::path::Path;\r\n\r\n// 如果您没有异步库 async-std 依赖项，\r\n// 请替换下述前 2 行代码为\r\n// fn main() {\r\n#[async_std::main]\r\nasync fn main() {\r\n    let md = Path::new(\"./code.md\");\r\n    let html = markdown::file_to_html(md);\r\n\r\n    println!(\"{:#?}\", &html);\r\n}\r\n```\r\n\r\n输出的 html 为：\r\n\r\n``` Html\r\n<h1>Rust 代码</h1>\r\n<p>这是 Tide 中对 <strong>cookie</strong> 进行增、删的例子。</p>\r\n<pre><code class=\"language-Rust\">use tide::http::Cookie;\r\nuse tide::{Request, Response, StatusCode};\r\n\r\n/// Tide will use the the `Cookies`'s `Extract` implementation to build this parameter.\r\n\r\nasync fn insert_cookie(_req: Request&lt;()&gt;) -&gt; tide::Result {\r\n    let mut res = Response::new(StatusCode::Ok);\r\n    res.insert_cookie(Cookie::new(&quot;hello&quot;, &quot;world&quot;));\r\n    Ok(res)\r\n}\r\n\r\nasync fn remove_cookie(_req: Request&lt;()&gt;) -&gt; tide::Result {\r\n    let mut res = Response::new(StatusCode::Ok);\r\n    res.remove_cookie(Cookie::named(&quot;hello&quot;));\r\n    Ok(res)\r\n}\r\n</code></pre>\r\n```\r\n\r\n若我们在其顶部引入 `highlight.js` 代码高亮库和 `night-owl.css` 样式，即可达到生产环境使用的效果。\r\n\r\n![markdown.rs 渲染](https://blog.budshome.com/static/articles/1616473445.png)\r\n\r\n当然，也可以通过 `markdown.rs` 渲染 markdown 文档为 html 后，直接通过 file 模块将其存为文件。\r\n\r\n# `pulldown-cmark`\r\n\r\n`pulldown-cmark` 是为 CommonMark 实现的拉取模式的解析器，通过事件迭代来驱动推送。笔者在生产环境中主要以 `pulldown-cmark` 来进行 markdown 文档到 html 的渲染。`pulldown-cmark` 的代码稍微复杂一些，但特性也更丰富一些。\r\n\r\n比如删除线（strikethrough）效果并非 CommonMark 标准的一部分，而是 github 风格的 markdown 语法，因此我们必须明确地启用它。\r\n\r\n``` Rust\r\nuse pulldown_cmark::{Parser, Options, html};\r\n\r\nlet markdown_input = \"各位，请查看~~删除线~~*效果*的示例。\";\r\n\r\n// 设定解析器选项，包括 5 个等级，\r\n// `ENABLE_STRIKETHROUGH` 为第三等级，包括删除线效果。\r\nlet mut options = Options::empty();\r\noptions.insert(Options::ENABLE_STRIKETHROUGH);\r\nlet parser = Parser::new_ext(markdown_input, options);\r\n\r\n// 写入字符串缓冲区\r\nlet mut html_output = String::new();\r\nhtml::push_html(&mut html_output, parser);\r\n\r\n// 检查输出是否符合预期\r\nlet expected_html = \"<p>各位，请查看<del>删除线</del><em>效果</em>的示例。</p>\\n\";\r\nassert_eq!(expected_html, &html_output);\r\n```\r\n\r\n文章的开始提到，`pulldown-cmark` 默认提供命令行工具。因此，对于 markdown 文件的读入解析和渲染，一种是通过命令行。在服务器端代码中，还可以直接将文件读入到字符串，然后进行解析渲染为 html。\r\n\r\n本文主要介绍 markdown 渲染为 html，对于 html 渲染为 markdown，也是同样简单的，都是如同 `markdown.rs` 的实现方法，一行代码即可。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-23T04:48:54.84Z"),
+    "updated_at": ISODate("2021-03-23T04:48:54.84Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("605ab48a001032c400b67a8e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 1.51.0 稳定版本改进介绍",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 1.51.0 将于本周发布，改进包括语法、编译器、类库、已稳定 APIs、Cargo、Rustdoc、Misc，以及兼容性等方面。",
+    slug: "rust-1.51.0-wen-ding-ban-ben-gai-jin-jie-shao",
+    uri: "/budshome/rust-1.51.0-wen-ding-ban-ben-gai-jin-jie-shao",
+    content: "上午查阅 Rust 官网内部博客，看到 Rust 1.51.0 stable 预发布版本已经开放测试。正式发布版本定于 UTC 标准时 2021-03-25，北京时间估计要到本周五。\r\n\r\n因为还未正式发布，不能从 Rust 国内工具链镜像源获取，需要从 `https://dev-static.rust-lang.org` 站点下载，您可以运行如下命令安装 Rust 1.51.0 到本地系统：\r\n\r\n- Linux、macOS\r\n\r\n``` Bash\r\nRUSTUP_DIST_SERVER=https://dev-static.rust-lang.org rustup update stable\r\n```\r\n\r\n- Windows\r\n\r\n``` Bash\r\nset RUSTUP_DIST_SERVER=https://dev-static.rust-lang.org\r\nrustup update stable\r\n```\r\n\r\n安装后，可以看到 `rustc` 和 `cargo` 的版本号。\r\n\r\n``` Bash\r\nrustc -V; cargo -V\r\n    rustc 1.51.0 (2fd73fabe 2021-03-23)\r\n    cargo 1.51.0 (43b129a20 2021-03-16)\r\n```\r\n\r\n关于 Rust 工具链的国内源，可以参阅《[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)》。\r\n\r\nRust 1.51.0 改进包括语法、编译器、类库、稳定 APIs、Cargo、Rustdoc、Misc，以及兼容性等方面。\r\n\r\n# 语法改进\r\n\r\n- `常量泛型（const generics）`。 Rust 1.51.0 中，对可以通过常量值参数化的项做了改进。现在，除了类型（type）和生命周期（lifetime）之外，还包括函数、trait，以及结构体。但目前只允许原始整数类型、布尔型，以及 char 类型。例如，现在您可以编写如下代码（来自于官网内部博客实例）：\r\n\r\n``` Rust\r\nstruct GenericArray<T, const LENGTH: usize> {\r\n    inner: [T; LENGTH]\r\n}\r\n\r\nimpl<T, const LENGTH: usize> GenericArray<T, LENGTH> {\r\n    const fn last(&self) -> Option<&T> {\r\n        if LENGTH == 0 {\r\n            None\r\n        } else {\r\n            Some(&self.inner[LENGTH - 1])\r\n        }\r\n    }\r\n}\r\n```\r\n\r\n# 编译器\r\n\r\n- macOS平台编译器改进：添加了选项 `-Csplit-debuginfo codegen`。此选项控制调试信息是跨多个文件拆分，还是打包到单个文件中。需要注意的是：此选项在其他平台上还不稳定。\r\n- 添加了对 `aarch64_be-unknown-linux-gnu`、`aarch64-unknown-linux-gnu_ilp32`，以及 `aarch64_be-unknown-linux-gnu_ilp32` 的 `tier 3*` 支持。\r\n- 添加了对 `i386-unknown-linux-gnu` 和 `i486-unknown-linux-gnu` 的 `tier 3` 支持。\r\n- CPUs 特性侦测方面，增加了选项 `target-cpu=native`。\r\n- 当与 `LLVM 11.0.1+` 一起使用时，Rust 现在将使用 `inline-asm` 对堆栈侦测。\r\n\r\n# 类库\r\n\r\n- `Box::downcast` 也实现了所有 `dyn Any + Send + Sync` 对象。\r\n- `str` 实现了 `AsMut<str>`。\r\n- `u64` 和 `u128` 实现了 `From<char>`。\r\n- 为 `&T` 实现了 `Error`，其中 `T` 为 `Error` 的具体实现。\r\n- 为 `Poll<Option<Result<T, E>>>`实现了 `Poll::{map_ok, map_err}`。\r\n- 所有有符号整数类型，都实现了 `unsigned_abs`。\r\n- `io::Empty` 实现了 `io::Seek`。\r\n- 为 `T: ?Sized` 类型，实现了 `rc::Weak<T>` 和 `sync::Weak<T>` 的方法，如 `as_ptr`。\r\n\r\n# 已稳定 APIs\r\n\r\n- `Arc::decrement_strong_count`\r\n- `Arc::increment_strong_count`\r\n- `Once::call_once_force`\r\n- `Peekable::next_if_eq`\r\n- `Peekable::next_if`\r\n- `Seek::stream_position`\r\n- `array::IntoIter`\r\n- `panic::panic_any`\r\n- `ptr::addr_of!`\r\n- `ptr::addr_of_mut!`\r\n- `slice::fill_with`\r\n- `slice::split_inclusive_mut`\r\n- `slice::split_inclusive`\r\n- `slice::strip_prefix`\r\n- `slice::strip_suffix`\r\n- `str::split_inclusive`\r\n- `sync::OnceState`\r\n- `task::Wake`\r\n\r\n# Cargo\r\n\r\n- 添加了 `split-debuginfo` 选项，以控制 `-Csplit-debuginfo codegen` 选型。\r\n- `Cargo.toml` 文件中，添加了 `resolver` 域，以启用新的特性解析器和 CLI 执行选项。Cargo 的第二代版本中，将尝试避免统一那些可能不需要的依赖特性。例如，在构建脚本和过程宏中，对 `std` 特性的使用，有相同的依赖关系。而在最终二进制文件中，却使用了 `no-std` 特性。\r\n\r\n# Rustdoc\r\n\r\n- Rustdoc 将包括 `Deref` trait 中的可用方法的文档。\r\n- 可以提供一个标志  `--default-theme`，用于设置文档的默认主题。\r\n\r\n文档内部链接的各种改进：\r\n\r\n- 可以连接到自动产生的非路径主体，如 `slice`。\r\n- 链接到关联项。\r\n- 选项链接方面，包括了泛型参数，如 `Vec<T>`。\r\n\r\n# Misc\r\n\r\n- 可给测试传递参数 `--include-ignored`（例如，`cargo test -- --include-ignored`），以包含标记为 `#[ignore]` 的测试。\r\n\r\n# 兼容性说明\r\n\r\n- WASI 平台不再使用 `wasm-bindgen` ABI，而代替为 wasm32 ABI。\r\n- `rustc` 不再对可能失败的 `const` 进行除法、取模和索引操作。\r\n- 对于分布式工件，以下平台的 `glibc` 最低版本已经升级到 2.31。\r\n  - `armv5te-unknown-linux-gnueabi`\r\n  - `sparc64-unknown-linux-gnu`\r\n  - `thumbv7neon-unknown-linux-gnueabihf`\r\n  - `armv7-unknown-linux-gnueabi`\r\n  - `x86_64-unknown-linux-gnux32`\r\n\r\n# 内置\r\n\r\n- 不执行 `codegen` 时，始终避免构建优化的 `MIR`。\r\n\r\n官网链接：[1.51.0 pre-release testing](https://blog.rust-lang.org/inside-rust/2021/03/23/1.51.0-prerelease.html)\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: false,
+    "created_at": ISODate("2021-03-24T03:39:54.903Z"),
+    "updated_at": ISODate("2021-03-24T03:39:54.903Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("605aecde00674dfb00640341"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 纪元第 382 周最佳 crate：ibig 的实践，以及和 num crate 的比较",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 纪元第 382 周，评出的周最佳 crate 是大数计算方面的 `ibig`。结合目前使用较广的大数计算 crate `num`，采用 2 种阶乘的不同实现方式，进行实践。",
+    slug: "rust-ji-yuan-di-382-zhou-zui-jia-crate:ibig-de-shi-jian-,yi-ji-he-num-crate-de-bi-jiao",
+    uri: "/budshome/rust-ji-yuan-di-382-zhou-zui-jia-crate:ibig-de-shi-jian-,yi-ji-he-num-crate-de-bi-jiao",
+    content: "Rust 纪元第 382 周，评出的周最佳 crate 是大数计算相关的 `ibig`。目前在 github 星星数量不足 50，还处于开发初期。\r\n\r\n虽然以前的 Rust 开发中，大数计算方面使用的是 `num` crate 的 `BigInt` 和 `BigUint`，完全满足需求。但是查阅到 `ibig` 提供的基准测试，性能挺不错。所以本文结合目前使用较广的大数计算 crate `num`，采用 2 种阶乘的不同实现方式，进行实践。尝试一下，看是否进行 crate 替换。\r\n\r\n大数计算的概念，就不赘述。我们设想一个 1000000000 甚至更大的阶乘，不使用大数计算相关 crate，显然是跑不起来的。下面，我们使用 `num` 和 `ibig` 进行测试和比较。\r\n\r\n# 准备\r\n\r\n为了仅测试 `num` 和 `ibig`，我们创建一个单独的工程，并引入 `chrono` 进行时间的简单计算。执行如下命令：\r\n\r\n``` Bash\r\ncargo new bigint\r\ncd ./bigint\r\ncargo add num ibig chrono\r\n```\r\n\r\n# 阶乘测试和比较\r\n\r\n## 第一种阶乘实现方式\r\n\r\n如上一步所示，我们使用的都是最新版本。下面，我们进行阶乘编码的实现，采用两种方式编写。先看第一种：\r\n\r\n``` Rust\r\nuse chrono::prelude::*;\r\nuse ibig::prelude::*;\r\nuse num::bigint::{BigInt, ToBigInt};\r\n\r\nfn factorial_num1(x: u32) -> BigInt {\r\n    if let Some(mut factorial) = 1.to_bigint() {\r\n        for i in 1..(x + 1) {\r\n            factorial = factorial * i;\r\n        }\r\n        factorial\r\n    } else {\r\n        panic!(\"阶乘计算失败\");\r\n    }\r\n}\r\n\r\nfn factorial_ibig1(x: u32) -> UBig {\r\n    if let Some(mut factorial) = Some(UBig::from(1 as u16)) {\r\n        for i in 1..(x + 1) {\r\n            factorial = factorial * UBig::from(i);\r\n        }\r\n        factorial\r\n    } else {\r\n        panic!(\"阶乘计算失败\");\r\n    }\r\n}\r\n\r\nfn main() {\r\n    let n: u32 = 100;\r\n\r\n    // num crate 大数计算\r\n    let start_num: DateTime<Local> = Local::now();\r\n    println!(\"{}! 阶乘，num crate 计算： {:#x}\", n, factorial_num1(n));\r\n\r\n    let end_num: DateTime<Local> = Local::now();\r\n    let time_num = end_num - start_num;\r\n\r\n    println!(\"{:?}\", &time_num);\r\n\r\n    // ibig-rs crate 大数计算\r\n    let start_ibig: DateTime<Local> = Local::now();\r\n    println!(\"{}! 阶乘，ibig crate 计算： {:#x}\", n, factorial_ibig1(n));\r\n\r\n    let end_ibig: DateTime<Local> = Local::now();\r\n    let time_ibig = end_ibig - start_ibig;\r\n\r\n    println!(\"{:?}\", &time_ibig);\r\n\r\n    // ibig-rs 是否更快？\r\n    println!(\"ibig-rs 快了这么多：{:#?}\", time_num - time_ibig);\r\n}\r\n```\r\n\r\n我们以发布模式命令 `cargo run --release` 执行计算，返回结果大抵如下所示（secs 正值时表示 `num` 慢，否则快）：\r\n\r\n```\r\ncargo run --release\r\n\r\n100! 阶乘，num crate 计算： 0x1b30964ec395dc24069528d54bbda40d16e966ef9a70eb21b5b2943a321cdf10391745570cca9420c6ecb3b72ed2ee8b02ea2735c61a000000000000000000000000\r\nDuration { secs: 0, nanos: 1093700 }\r\n\r\n100! 阶乘，ibig crate 计算： 0x1b30964ec395dc24069528d54bbda40d16e966ef9a70eb21b5b2943a321cdf10391745570cca9420c6ecb3b72ed2ee8b02ea2735c61a000000000000000000000000\r\nDuration { secs: 0, nanos: 343900 }\r\n\r\nibig-rs 快了这么多：Duration {\r\n    secs: 0,\r\n    nanos: 749800,\r\n}\r\n```\r\n\r\n因为 100 以上的阶乘中，计算结果非常大，非常占页面空间，所以本文页面就不做结果展示。如果感兴趣，请你通过修改 `n` 值，进行测试。\r\n\r\n笔者的测试结果，在 1000 以下的阶乘中，`ibig` 确实是快了一些，但没有超过 1 秒。在 10000 时，互有领先，总体来说 `num` 还是性能占优，和 `ibig` 相比大约 7:3 的优势。当 100000 时，`num` 会快到 4 秒左右；大于 100000 及以后，运行很慢，笔者只跑了一次，测试结果不具实际意义。\r\n\r\n## 第二种阶乘实现方式\r\n\r\n编码方式的不同，对于性能也有一定的影响，所以细读 `ibig` 的文档后，进行了第二种阶乘实现：\r\n\r\n``` Rust\r\nuse chrono::prelude::*;\r\nuse ibig::prelude::*;\r\nuse num::bigint::{BigInt, ToBigInt};\r\n\r\nfn factorial_num2(a: u32, b: u32) -> BigInt {\r\n    if b == a + 1 {\r\n        a.to_bigint().unwrap()\r\n    } else {\r\n        let mid = a + (b - a) / 2;\r\n        factorial_num2(a, mid) * factorial_num2(mid, b)\r\n    }\r\n}\r\n\r\nfn factorial_ibig2(a: u32, b: u32) -> UBig {\r\n    if b == a + 1 {\r\n        UBig::from(a)\r\n    } else {\r\n        let mid = a + (b - a) / 2;\r\n        factorial_ibig2(a, mid) * factorial_ibig2(mid, b)\r\n    }\r\n}\r\n\r\nfn main() {\r\n    let n: u32 = 100000;\r\n\r\n    // num crate 大数计算\r\n    let start_num: DateTime<Local> = Local::now();\r\n    println!(\r\n        \"{}! 阶乘，num crate 计算： {:#x}\",\r\n        n,\r\n        factorial_num2(1, n + 1)\r\n    );\r\n\r\n    let end_num: DateTime<Local> = Local::now();\r\n    let time_num = end_num - start_num;\r\n\r\n    println!(\"{:?}\", &time_num);\r\n\r\n    // // ibig-rs crate 大数计算\r\n    let start_ibig: DateTime<Local> = Local::now();\r\n    println!(\r\n        \"{}! 阶乘，ibig crate 计算： {:#x}\",\r\n        n,\r\n        factorial_ibig2(1, n + 1)\r\n    );\r\n\r\n    let end_ibig: DateTime<Local> = Local::now();\r\n    let time_ibig = end_ibig - start_ibig;\r\n\r\n    println!(\"{:?}\", &time_ibig);\r\n\r\n    // ibig-rs 是否更快？\r\n    println!(\"ibig-rs 快了这么多：{:#?}\", time_num - time_ibig);\r\n}\r\n```\r\n\r\n我们同样以发布模式命令 `cargo run --release` 执行计算，返回结果大抵和第一种方式类同。\r\n\r\n但是性能比较，有了变化。在 10000 以下时，`ibig` 同样是占优的。在 10000 这个阶乘层次，第 1、2 个 10 次都是 5:5，第 3 个 10 次 `num` 快了一次。100000 及以上，等待时间过长，笔者只跑了一次，测试结果不具实际意义。\r\n\r\n所以，目前所使用的 crate `num` 暂时还是不考虑替换了。\r\n\r\n# `ibig` 官方的基准测试\r\n\r\n最后，附上 `ibig` 官方的基准测试值：每个基准测试运行 5 次，每次重复计算至少 10 秒，结果使用中位数运行。\r\n\r\n| Library | Version | Notes | e 100k | e 1m | e 10m | fib 1m | fib 10m | fib_hex 10m |\r\n| --- | --- | --- | ---:| ---:| ---:| ---:| ---:| ---:|\r\n| [rug](https://crates.io/crates/rug) | 1.11.0 | Links to [GMP](https://gmplib.org/) | 0.016 | 0.296 | 4.520 | 0.015 | 0.336 | 0.060 |\r\n| [rust-gmp](https://crates.io/crates/rust-gmp) | 0.5.0 | Links to [GMP](https://gmplib.org/) | 0.017 | 0.304 | 4.585 | 0.017 | 0.336 | 0.060 |\r\n| [ibig](https://crates.io/crates/ibig) | 0.2.1 | Pure Rust | 0.031 | 0.973 | 30.749 | 0.037 | 1.252 | 0.279 |\r\n| [ramp](https://crates.io/crates/ramp) | 0.5.9 | Uses assembly (requires nightly) | 0.135 | 12.487 | 1233.225 | 0.355 | 34.847 | 0.386 |\r\n| [num-bigint](https://crates.io/crates/num-bigint) | 0.4.0 | Pure Rust | 0.325 | 31.006 | 3098.511 | 1.161 | 115.234 | 0.401 |\r\n\r\n正如前文笔者所述，代码的不同，平台的不同等，测试性能差别有可能也很大。所以这个基准测试结果，仅能参考。所谓实践出真知，还需要自己实际使用后，才晓得是否合适。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-24T07:40:14.992Z"),
+    "updated_at": ISODate("2021-03-24T07:40:14.992Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("605c642e0086af3400b33826"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "为 Async Rust 构建共享的愿景文档—— Rust 社区的讲“故事”，可获奖 ",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 3 月 18 日，Niko Matsakis 代表 Rust 社区的 Async 基础工作组发表了一个倡议书：倡议 Rust 社区共同参与，为 Async Rust 构建一个共享的愿景文档。参与者可以基于自己真实的异步开发经验，提出建议；分享自己在异步开发中，遇到的困难和解决方法；分享自己在异步开发中，为了提高效率而采用的变通方法和技巧；甚至就是基于真实的异步开发经验，切合实际地描述 Async Rust 的美好未来……直至 2021 年 4 月 2 日，都是收集这些关于 Async Rust 现状的“故事”。随后，Async 基础工作组会进行头脑风暴会议，对这些关于 Async Rust 现状的“故事”进行审阅。头脑风暴会议结束后，Async 基础工作组将评选出“最幽默的故事”或“必须支持的贡献者”等奖项，以及获奖者。 ",
+    slug: "wei-async-rust-gou-jian-gong-xiang-de-yuan-jing-wen-dang------rust-she-qu-de-jiang-gu-shi-,ke-huo-jiang",
+    uri: "/budshome/wei-async-rust-gou-jian-gong-xiang-de-yuan-jing-wen-dang------rust-she-qu-de-jiang-gu-shi-,ke-huo-jiang",
+    content: "目前 Rust 生态中，异步开发方面，Rust 团队提出了基础规范。具体的 crate 实现，交给了社区。异步 crate 众多，应用较广的有 `tokio` 和 `async-std` 运行时。虽然没有分裂的实际，但社区中一直有担忧的声音。\r\n\r\n2021 年 3 月 18 日，Niko Matsakis 代表 Rust 社区的 [Async 基础工作组][wg]发表了一个倡议书：倡议 Rust 社区共同参与，为 Async Rust 构建一个共享的愿景文档。\r\n\r\n- 参与者可以基于自己真实的异步开发经验，提出建议；\r\n- 分享自己在异步开发中，遇到的困难和解决方法；\r\n- 分享自己在异步开发中，为了提高效率而采用的变通方法和技巧；\r\n- 甚至仅是基于真实的异步开发经验，切合实际地描述 Async Rust 的美好未来；\r\n- ……\r\n\r\n直至 2021 年 4 月 2 日，都是收集这些关于 Async Rust 现状的“故事”。\r\n\r\n随后，[Async 基础工作组][wg]会进行头脑风暴会议，对这些关于 Async Rust 现状的“故事”进行审阅。头脑风暴会议结束后，[Async 基础工作组][wg]将评选出“最幽默的故事”或“必须支持的贡献者”等奖项，以及获奖者。\r\n\r\n![budshome 微信](https://blog.budshome.com/static/users/budshome-wx.jpg)\r\n\r\n以下为 Niko Matsakis 的倡议书原文翻译（笔者水平有限，不适之处请予指正，联系方式见上图微信或页底邮箱）：\r\n\r\n---\r\n\r\n[Async 基础工作组][wg]认为：在构建分布式系统方面，Rust 可以成为最流行的选择之一，从嵌入式设备到基础云服务。不管用 Rust 做什么，我们希望所有的开发人员都喜欢使用 Async Rust。为了实现这一点，我们需要将 Async Rust 从当前的 “MVP” 状态转移到每个人都可以使用的状态。\r\n\r\n我们正在发起一项协作工作，为 Async Rust 构建一个共享的[愿景文档][vd]。**我们的目标是让整个社区参与到一个集体的愿景活动中**：我们如何才能让使用 Async I/O 的体验不仅成为一个实用的选择，而且是一个 _愉悦_ 的选择？\r\n\r\n### 愿景文档，以应用现状作为出发点……\r\n\r\n“愿景文档”以[一组角色][cc]开始。每个角色都与其使用 Rust 的特定背景（例如：性能、生产率等）相关联；角色的背景，将影响其使用 Rust 时的期望。\r\n\r\n让我给你介绍一个人，[Grace]。作为一名经验丰富的 C 开发人员，Grace 精通于高性能和高操控，但她有了个新的想法：希望使用 Rust 来获得内存安全。以下就是她的传记：\r\n\r\n> 多年以来，Grace 一直在和 C/C++ 作斗争。她习惯于破解大量的底层技术细节，她的代码，可获得最高的性能。她在 C 语言导致的内存错误方面，经历过“史诗般”的调试。她对 Rust 很感兴趣：她希望保持 C 语言中的操控和性能，同时保证内存安全，以获得生产力上的优势。目前，她正在试验将 Rust 引入到她所研究的一些系统中，她还考虑在一些未来的项目中使用 Rust。\r\n\r\n对于每个角色，我们都将写一系列的[“现状”故事][sq]，描述他们在努力实现目标时，所面临的挑战（通常以戏剧性的方式失败！——译者注：太幽默了）。**这些故事不是虚构的**。这些故事融合了 Async Rust 使用者的真实体验，正如通过访谈、博客，以及 tweets 向我们报告的那样。为了让您了解这个想法，我们举出两个例子：一个是 [Grace 必须调试她编写的自定义 future][gsq]，另一个是 [Alan]（一个来自于 GC'd 语言的程序员）[遇到堆栈溢出而进行的调试过程][soflow]。 \r\n\r\n写“现状”故事，有助于我们弥补[认知偏差](https://baike.baidu.com/item/%E8%AE%A4%E7%9F%A5%E5%81%8F%E5%B7%AE/401423?fr=aladdin)：从事 Async Rust 开发的各位开发者，通常都是 Async Rust 方面的专家。我们已经对提高效率所需的[变通方法][workarounds]很熟悉，我们知道一些小技巧和窍门可以让你摆脱困境。这些故事既是资料文献，有助于我们衡量其对学习者的累积影响。这些故事为我们提供了需要优先处理的数据。\r\n\r\n### ……然后，告诉我们如何改变\r\n\r\n当然，愿景文档的最终目标不仅仅是告诉我们现在在何处，而是要告诉我们要去向哪里，以及我们将如何到达。一旦我们在现状故事上取得了良好的进展，下一步，将会开启头脑风暴会议[“光明的未来”][sf]。\r\n\r\n“美好的未来故事”，将讲述 2 到 3 年后异步世界的情景。通常情况下，到时将会重演与“现状”故事相同的场景，但结局会更美满。例如，也许 Grace 可以通过一个调试工具，诊断她所陷入的任务，并告诉她这些任务的阻塞原因，这样她就不必通过 `grep` 浏览日志了。也许，编译器可以警告 Alan，告诉他可能的堆栈溢出，或者（更好的方法）我们可以调整 `select` 的设计，从一开始就避免这个问题。我们的理想非常丰满：首先关注于用户体验；然后走出前进的步伐（如果必要的话，也许会调整目标）。\r\n\r\n> 译者注：此处笔者调皮了下。原文直译为“理想是雄心勃勃的：首先关注于用户体验，然后找出改进的方法”。\r\n\r\n### 涉及整个社区\r\n\r\n异步愿景文档提供了一个论坛，Async Rust 社区可以在论坛为 Async Rust 用户规划一个良好的总体体验。Async Rust 是特意设计的，不具有“一刀切”的思维方式，我们将不会改变这个初衷。我们的目标是为端到端体验构建一个共同的愿景，同时，保持我们松散耦合的构建模式、面向探索的生态系统。\r\n\r\n我们编写愿景文档的过程中，鼓励积极协作，以及“正和博弈”思维。开始于一个集思广益的阶段，在此期间，我们的目标是收集尽可能多的“现状”和“光明未来”的故事。这次头脑风暴会持续六周，直到四月底。前两周（直到 2021-04-02），我们只收集“现状”故事。之后，我们将收受“现状”和“光明未来”的故事，直到头脑风暴期结束。最后，为了结束头脑风暴阶段，我们将评选出“最幽默的故事”或“必须支持的贡献者”等[奖项][awards]，以及获奖者。\r\n\r\n一旦集思广益阶段结束，工作组领导者将会整合各个“现状故事”和“光明的未来”，形成一个连贯的草案。该草案将由社区和 Rust 团队审查，并根据反馈进行调整。\r\n\r\n### 想帮忙吗？\r\n\r\n如果您愿意帮助我们撰写愿景文档，我们将很乐意为您贡献经验和愿景！现在，我们专注于创造现状“故事”。我们正在寻找人来撰写 PRs，或在 issues（github 项目的问题列表）谈论他们的经验，或其它任何地方撰写愿景文档。如果您想开始分享，请查看[现状故事模板][template]——其包含打开 PR 所需的所有信息。或者，您可以查看[如何提出愿景][htv]页面，该页面详细介绍了整个愿景文档的流程。\r\n\r\n---\r\n\r\n各位老师，想参与么？奖项还是很丰富的，以下是全部的奖励类别：\r\n\r\n- 最幽默的故事\r\n- 最具创意的故事\r\n- 最受支持的——谁留下了最有帮助的评论？\r\n- 最多产的——谁写的故事最多？\r\n- 最出乎意料的是——哪一个现状故事（或光明的未来）让你大吃一惊？\r\n- 最痛苦的“现状”故事\r\n- 最雄心勃勃的“光明未来”故事\r\n- 最常见的问题\r\n\r\n并且，还有自定义奖项。如果你有其他奖项类别的想法，工作组也很高兴采纳。但有一条规则：奖励不能是消极的(例如，不能是“最不现实的”)，也不能是关于哪件事是“最好的”。因为，违反规则的奖项，会与头脑风暴精神背道而驰。\r\n\r\n谢谢您的阅读！\r\n\r\n原文链接：[Building a shared vision for Async Rust](https://blog.rust-lang.org/2021/03/18/async-vision-doc.html)\r\n\r\n---\r\n\r\n[wg]: https://rust-lang.github.io/wg-async-foundations/\r\n[vd]: https://rust-lang.github.io/wg-async-foundations/vision.html#-the-vision\r\n[sq]: https://rust-lang.github.io/wg-async-foundations/vision/status_quo.html\r\n[sf]: https://rust-lang.github.io/wg-async-foundations/vision/shiny_future.html\r\n[cc]: https://rust-lang.github.io/wg-async-foundations/vision/characters.html\r\n[htv]: https://rust-lang.github.io/wg-async-foundations/vision/how_to_vision.html\r\n[workarounds]: https://github.com/rust-lang/async-book/tree/a927107bfe501a44dde1560a5942b1471c11c71d/src/07_workarounds\r\n[Grace]: https://rust-lang.github.io/wg-async-foundations/vision/characters/grace.html\r\n[Alan]: https://rust-lang.github.io/wg-async-foundations/vision/characters/alan.html\r\n[soflow]: https://rust-lang.github.io/wg-async-foundations/vision/status_quo/alan_runs_into_stack_trouble.html\r\n[awards]: https://rust-lang.github.io/wg-async-foundations/vision/how_to_vision/awards.html\r\n[gsq]: https://rust-lang.github.io/wg-async-foundations/vision/status_quo/grace_deploys_her_service.html\r\n[template]: https://rust-lang.github.io/wg-async-foundations/vision/status_quo/template.html\r\n",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-25T10:21:34.53Z"),
+    "updated_at": ISODate("2021-03-25T10:21:34.53Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("605ce8520086af3400b33827"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: " Rust 1.51.0 已正式发布，及其新特性详述",
+    slug: "rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    uri: "/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 1.51.0 稳定版，展示了相当长的时段内，Rust 语言和 Cargo 工具的特性迭代，稳定了最具价值的常量泛型（const generics），以及 Cargo 的新特性 `resolver`。另外，还包括适用于 macOS 的拆分调试信息、已稳定 APIs，以及 Clippy 工具的诸多改进。",
+    content: "2021 年 3 月 25 日，Rust 版本团队官宣发布新版本：1.51.0。\r\n\r\n> Rust 是一种编程语言，它赋能每个人都能够构建可靠和高效的软件。\r\n\r\n如果您已通过 `rustup` 安装了早期版本的 Rust，那么获取 Rust 1.51.0 就很容易（各平台通用命令）：\r\n\r\n```console\r\nrustup update stable\r\n```\r\n\r\n> 如果官网下载速度过慢，参考[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)。\r\n\r\n安装成功后，可以查看 `rustc` 和 `cargo` 版本：\r\n\r\n``` console\r\nrustc -V; cargo -V\r\n    rustc 1.51.0 (2fd73fabe 2021-03-23)\r\n    cargo 1.51.0 (43b129a20 2021-03-16)\r\n```\r\n\r\n如果您未安装过 Rust，可以从 Rust 官网页面[获取 `rustup`](https://www.rust-lang.org/install.html)，并可以在 GitHub 站点查看 [Rust 1.51.0 的详细发行说明](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1510-2021-03-25)。\r\n\r\n## Rust 1.51.0 稳定版的新特性\r\n\r\nRust 1.51.0 稳定版，展示了相当长的时段内，Rust 语言和 Cargo 工具的特性迭代，稳定了最具价值的常量泛型（const generics），以及 Cargo 的新特性 `resolver`。让我们详细看一看：\r\n\r\n### 常量泛型（Const Generics）最具价值\r\n\r\nRust 1.51.0 版本之前，Rust 允许您在生命周期（lifetime）或类型（type）中对您的具体类型进行参数化。例如，如果我们想定义一个`结构体（struct）`，其字段类型为具有泛型元素的数组。我们可以编写以下代码：\r\n\r\n```rust\r\nstruct FixedArray<T> {\r\n              // ^^^ 泛型定义\r\n    list: [T; 32]\r\n        // ^ 使用泛型\r\n}\r\n```\r\n\r\n若我们要使用 `FixedArray<u8>`，编译器将构造 `FixedArray` 的单态版本。如下所示：\r\n\r\n```rust\r\nstruct FixedArray<u8> {\r\n    list: [u8; 32]\r\n}\r\n```\r\n\r\n这是一个强大的特性，允许您编写可重用的代码，并且无需运行时开销。但是，在 Rust 1.51.0 版本之前，很难将这些类型的*值（value）* 泛型化。对于类型定义（`[T; N]`）中包含长度的数组而言，这一点尤为明显，以前您无法对其泛型。现在使用 1.51.0，您在编程中，可对任意整数类型、`布尔型（bool）`，或 `char` 类型做到泛型！\r\n\r\n> 使用`结构体（struct）`或`枚举（enum）`值时，仍然不稳定。\r\n\r\n有了这项改进，现在我们可以自定义数组结构体，它的类型**和**长度都是泛型的。让我们看一个定义数组结构体的示例，以及如何使用它。\r\n\r\n```rust\r\nstruct Array<T, const LENGTH: usize> {\r\n    //          ^^^^^^^^^^^^^^^^^^^ 常量泛型定义\r\n    list: [T; LENGTH]\r\n    //        ^^^^^^ 使用常量泛型\r\n}\r\n```\r\n\r\n现在，如果我们使用 `Array<u8, 32>`，编译器将构造一个单态版本的 `Array`。如下所示：\r\n\r\n```rust\r\nstruct Array<u8, 32> {\r\n    list: [u8; 32]\r\n}\r\n```\r\n\r\n常量泛型为类库设计人员带来了一个重要的新工具，以便于他们创建新的、强大的编译时安全 APIs。如果你想了解更多关于常量泛型的信息，你也可以查看博客文章[最具价值的“常量泛型”特性测验](https://blog.rust-lang.org/2021/02/26/const-generics-mvp-beta.html)，了解更多关于这个特性的信息，及其当前限制。\r\n\r\n### `array::IntoIter` 已稳定\r\n\r\n作为常量泛型稳定化的一部分，Rust 团队还稳定了一个使用常量泛型特性的新 API：`std::array::IntoIter`，`IntoIter` 允许您在任何数组上创建值迭代器。以前的版本没有一种方便的方法来迭代数组的所有值，仅是引用它们。\r\n\r\n```rust\r\nfn main() {\r\n  let array = [1, 2, 3, 4, 5];\r\n  \r\n  // 旧版本\r\n  for item in array.iter().copied() {\r\n      println!(\"{}\", item);\r\n  }\r\n  \r\n  // Rust 1.51.0 新版本\r\n  for item in std::array::IntoIter::new(array) {\r\n      println!(\"{}\", item);\r\n  }\r\n}\r\n```\r\n\r\n请注意，`IntoIter` 是作为一个单独的方法添加的，而不是替代数组上的原有方法 `.into_iter()`，这是因为目前的 `.into_iter()` 方法有一些不足；目前，`.into_iter()` 方法是切片引用迭代器。Rust 团队正在探索，未来将使其更符合人体工程学。\r\n\r\n### Cargo 新特性 `resolver`\r\n\r\n依赖项管理，是一个困难的问题。其中最困难的部分之一，是当依赖项被两个不同的包所依赖时，选择使用哪个**版本**的依赖项。这不仅包括它的版本号，还包括被包所启用，或未启用的特性。Cargo 的默认行为是：在依赖关系图中，当单个包被多次引用时，合并该包的特性。\r\n\r\n例如，假设您有一个名为 `foo` 的依赖项，它的特性是 A 和 B，`bar` 和 `baz` 正在使用这个依赖项，但是 `bar` 依赖于 `foo+A`，`baz` 依赖于 `foo+B`。Cargo 将合并这两个特性，并将 `foo` 编译为 `foo+AB`。这样做的好处是，您只需编译 `foo` 一次，然后它就可以被 `bar` 和 `baz` 重用。\r\n\r\n然而，这也带来了不利的一面。如果在构建依赖项时，启用的特性与您构建的目标（target）不兼容怎么办？\r\n\r\n生态系统中，一个常见示例是：许多 `#![no_std]` crate 中包含可选的 `std` 特性，其允许 crate 在 `std` 可用时提供附加功能。现在想象一下，你想在 `#![no_std]` 的可执行文件中，使用用 `foo` 的 `#![no_std]` 版本，并在您 `build.rs` 编译时，使用 `foo`。如果编译时，依赖项依赖于 `foo+std`，那么可执行文件现在也依赖于 `foo+std`，这意味着它将不再编译，因为 `std` 对目标平台不可用。\r\n\r\n在 cargo 中，这是一个长期存在的问题。Rust 1.51.0 版本中，`Cargo.toml` 中将有一个新的可选域 `resolver`。您可以通过设置 `resolver=\"2\"`，来告诉 cargo 尝试一种新的方式来解析特性。您可以查看 [RFC 2957](https://rust-lang.github.io/rfcs/2957-cargo-features2.html) 以获得 `resolver` 行为的详细描述，其总结如下。\r\n\r\n- **Dev dependencies** — 当包被普通依赖项和开发依赖项所共享，仅当当前编译包含开发依赖项时，才启用开发依赖项的特性。\r\n- **Host dependencies** — 当包被普通依赖项和编译依赖项，或过程宏共享时，普通依赖项的特性将独立于编译依赖项或过程宏。\r\n- **Target dependencies** — 当包在编译图中多次出现，并且其中一个实例是特定目标的依赖项，则仅当当前目标正在编译时，才会启用特定目标的依赖项特性。\r\n\r\n虽然，这可能会导致一些 crate 编译不止一次，但在对 cargo 使用特性时，这将提供更直观的开发体验。如果您想了解更多信息，还可以阅读 Cargo 文档中的[“Resolver 特性”](https://doc.rust-lang.org/nightly/cargo/reference/features.html#feature-resolver-version-2)部分。我们要感谢 cargo 团队和所有参与者，在设计和实现新的解析器过程中的辛勤工作！\r\n\r\n```toml\r\n[package]\r\nresolver = \"2\"\r\n# 或者，你使用 workspace\r\n[workspace]\r\nresolver = \"2\"\r\n```\r\n\r\n### 拆分调试信息\r\n\r\n虽然在以往的版本发布中不经常强调，但是 Rust 团队一直在努力改进 Rust 的编译时间。Rust 1.51.0 版本，是 Rust 在 macOS 上长期以来最大的改进之一。调试信息将二进制代码映射回源代码，这样程序就可以提供有关运行时出错的更多信息。在 macOS 中，以前的调试信息，是使用一个名为 `dsymutil` 的工具收集到一个单独的 `.dSYM` 文件夹中，这可能需要一些时间，并占用大量磁盘空间。\r\n\r\n将所有调试信息收集到此目录，有助于在运行时找到它，特别是在二进制文件被移动时。但是，它确实有一个缺点：即使您对程序做了一个小的更改，`dsymutil` 也需要运行整个二进制文件，以来生成最终的 `.dSYM` 文件夹。有时这样做会增加很多编译时间，特别是对于大型项目，因为所有依赖项都会被重新收集。但这又是必要的步骤，因为没有收集和编译，Rust 的标准库将不知道如何在 macOS 上加载调试信息。\r\n\r\n最近，Rust 回溯（backtraces）已切换，将使用不同的后端，该后端支持在不需要运行 `dsymutil` 的情况下加载调试信息。并且，对跳过 `dsymutil` 运行的支持，已经稳定了。这可以显著提升包含调试信息的编译速度，并显著减少磁盘空间量的使用。虽然，Rust 团队还没有运行过广泛的基准测试，但是已经看到了很多关于在 macOS 上使用这种行为后的报告，反映编译速度提升很大。\r\n\r\n在运行 rustc 时，您可以通过设置 `-Csplit-debuginfo=unpacked` 标志，或者将可选项 [`split-debuginfo`](https://doc.rust-lang.org/nightly/cargo/reference/profiles.html#split-debuginfo) `[profile]` 设置为 `unpacked`，用来在 Cargo 中启用此新行为。“unpacked” 选项指示 rustc 将 .o 对象文件保留在编译时的输出目录中，而不是删除它们，并跳过运行 dsymutil 的步骤。Rust 的回溯支持非常聪明，知道如何找到这些 .o 文件。lldb 等工具也知道如何做到这一点。只要你不需要在保留调试信息的同时，将二进制文件移动到其它位置，就应该可以这样做。\r\n\r\n```toml\r\n[profile.dev]\r\nsplit-debuginfo = \"unpacked\"\r\n```\r\n\r\n### 已稳定 APIs\r\n\r\n总体来讲，可以看到，这次发布有 18 种不同类型的新方法已经稳定，比如 `slice` 和 `Peekable`。值得注意的补充是稳定的 `ptr::addr_of!` 和 `ptr::addr_of_mut!`，它允许您创建指向未对齐（unaligned）字段的原始指针。以前这是不可能的，因为 Rust 要求 `&/&mut` 对齐，并指向已经初始化的数据，而 `&addr as *const _` 将导致未定义的行为，因为 `&addr` 需要对齐。这两个宏现在允许您安全地创建未对齐（unaligned）指针。\r\n\r\n```rust\r\nuse std::ptr;\r\n\r\n#[repr(packed)]\r\nstruct Packed {\r\n    f1: u8,\r\n    f2: u16,\r\n}\r\n\r\nlet packed = Packed { f1: 1, f2: 2 };\r\n// `&packed.f2` 将创建一个未对齐（unaligned）引用，因此是不确定的行为！\r\nlet raw_f2 = ptr::addr_of!(packed.f2);\r\nassert_eq!(unsafe { raw_f2.read_unaligned() }, 2);\r\n```\r\n\r\n下述方法已经稳定：\r\n\r\n- [`Arc::decrement_strong_count`](https://doc.rust-lang.org/stable/std/sync/struct.Arc.html#method.decrement_strong_count)\r\n- [`Arc::increment_strong_count`](https://doc.rust-lang.org/stable/std/sync/struct.Arc.html#method.increment_strong_count)\r\n- [`Once::call_once_force`](https://doc.rust-lang.org/stable/std/sync/struct.Once.html#method.call_once_force)\r\n- [`Peekable::next_if_eq`](https://doc.rust-lang.org/stable/std/iter/struct.Peekable.html#method.next_if_eq)\r\n- [`Peekable::next_if`](https://doc.rust-lang.org/stable/std/iter/struct.Peekable.html#method.next_if)\r\n- [`Seek::stream_position`](https://doc.rust-lang.org/stable/std/io/trait.Seek.html#method.stream_position)\r\n- [`array::IntoIter`](https://doc.rust-lang.org/stable/std/array/struct.IntoIter.html)\r\n- [`panic::panic_any`](https://doc.rust-lang.org/stable/std/panic/fn.panic_any.html)\r\n- [`ptr::addr_of!`](https://doc.rust-lang.org/stable/std/ptr/macro.addr_of.html)\r\n- [`ptr::addr_of_mut!`](https://doc.rust-lang.org/stable/std/ptr/macro.addr_of_mut.html)\r\n- [`slice::fill_with`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.fill_with)\r\n- [`slice::split_inclusive_mut`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.split_inclusive_mut)\r\n- [`slice::split_inclusive`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.split_inclusive)\r\n- [`slice::strip_prefix`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.strip_prefix)\r\n- [`slice::strip_suffix`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.strip_suffix)\r\n- [`str::split_inclusive`](https://doc.rust-lang.org/stable/std/primitive.str.html#method.split_inclusive)\r\n- [`sync::OnceState`](https://doc.rust-lang.org/stable/std/sync/struct.OnceState.html)\r\n- [`task::Wake`](https://doc.rust-lang.org/stable/std/task/trait.Wake.html)\r\n\r\n### 其它改进\r\n\r\n在 Rust 1.51.0 版本中，还有一些其它改进：清查阅 [Rust](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1510-2021-03-25)、[Cargo](https://github.com/rust-lang/cargo/blob/master/CHANGELOG.md#cargo-151-2021-03-25)，以及 [Clippy](https://github.com/rust-lang/rust-clippy/blob/master/CHANGELOG.md#rust-151)。\r\n\r\n### Rust 1.51.0 的贡献者\r\n\r\n许多人一起协作，创造了 Rust 1.51.0。[谢谢](https://thanks.rust-lang.org/rust/1.51.0/)！\r\n\r\n参考链接：[Announcing Rust 1.51.0](https://blog.rust-lang.org/2021/03/25/Rust-1.51.0.html)\r\n\r\n---\r\n",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-25T19:45:22.691Z"),
+    "updated_at": ISODate("2021-03-25T19:45:22.691Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60606bc8004dbacc002d3713"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "况属高风晚，山山黄叶飞——彭州葛仙山露营随笔",
+    "category_id": ObjectId("601bcaf300b5c70100e2a323"),
+    summary: "四川成都彭州葛仙山露营随笔。高山之巅，月黑风高。牡丹紫荆，争奇斗艳。",
+    slug: "kuang-shu-gao-feng-wan-,shan-shan-huang-xie-fei-----peng-zhou-ge-xian-shan-lu-ying-sui-bi",
+    uri: "/budshome/kuang-shu-gao-feng-wan-,shan-shan-huang-xie-fei-----peng-zhou-ge-xian-shan-lu-ying-sui-bi",
+    content: "技术不忘生活。\r\n\r\n周六起床，忽然想去露营。与孩子、孩儿妈稍一商量，便决定了：带孩子去体验一次月黑风高的露营夜。\r\n\r\n露营点的选择，作为不远处就是深山老林的成都，可选择的很多，且有些颇具口碑。但商业开发的，担心人多不打算考虑；有些口碑上佳但冷门的，未曾实际看过地点，仅一家三口，担心安全，也不敢轻易去。最终，确定去彭州葛仙山露营一晚。\r\n\r\n我国的葛仙山有三处，分别是四川、江西，以及湖北。此次去的是**四川成都彭州葛仙山**——各自作为有其传说的景区，必须有仙佛从此地羽化升天。当然也会有历史著名文人的笔墨，比如标题的引用诗句，即为四杰之一的王勃所著。这些关于景区的特征，我国无论东西，不分南北，都是如此。所以，葛仙山景区的历史，不做赘述。感兴趣的朋友可以自己搜索了解。\r\n\r\n从自然景观来说，葛仙山地处龙门山国家级地质公园、龙门山风景名胜区地处龙门山断裂带中南段。2000 年底，龙门山被国家国土资源部批准为首批11个国家级地质公园之一，被誉为“地质科学迷宫”。\r\n\r\n至于葛仙山的露营点，并非正式的说法。实际上是这几年修的一个未完成的停车场，在景区大门口下 600米左右的位置。仅是因为前次去葛仙山路过，看到几个越野发烧友在玩泥巴。所以多看了一会，但我记着的却是：平坦、面积大、安全，露营体验不错。\r\n\r\n没有什么需要多准备的，爱好者都不能算，所以装备仅是被褥枕头，简易帐篷（未带睡袋）装包即可。\r\n\r\n# 银定村\r\n\r\n出发后，约 12 点左右，绕到了彭州境内一个称作银定村的地方（好像所属隆丰镇）。遇到一大片紫荆花林，应该是这几年全国各地如火如荼的造景工程之一。已经接近荒废了，但还是值得走走看看。\r\n\r\n![银定村，紫荆花林](https://blog.budshome.com/static/articles/b54909d30da282fecb58429fe8af9c2.jpg)\r\n\r\n用孩子的无人机高空取了一张图，面积不是很大，但溜娃还是可以溜半天的。其中这个草坪上，有位弓弩发烧友，在辛勤射箭。\r\n\r\n![银定村，紫荆花林，无人机](https://blog.budshome.com/static/articles/d39cc4b0568bcd88068912fc983cd0c.jpg)\r\n\r\n在银定村，还有个爱好陶艺的村民自办的陶艺园。可以免费参观，当然要进去看看了。如下图是陶艺园照壁，个人挺喜欢。\r\n\r\n![银定村，陶艺园](https://blog.budshome.com/static/articles/419a492d90f2e432692167829a33733.jpg)\r\n\r\n这个陶艺园里面植物很多，且都用心照顾，值得一去。\r\n\r\n# 葛仙山露营\r\n\r\n大约 15 点左右就到了露营点（工作人员称为停车场，但为了突出笔者是去露营，下述都称作露营点 :-)）。因为有“三月三，葛仙山”的说法，每年 3-4 月是葛仙山的花季，所以人流量很大。不过没关系，笔者晚上不下山，有的是时间去四周转一转。\r\n\r\n葛仙山景区很大，多达 50 平方公里！景区内漫山遍野的各种花草，也有若干地质景点。葛仙山景区主打是山茶花，因为笔者拍照水平差，仅能做到取景在镜头内，就不献丑了。\r\n\r\n这儿要说明的是，有几个特别出彩的葛仙山地质景点是在景区外。目前要去看那几个地质景点，要横穿景区，然后出景区东门去看。好像正在修建的道路——机耕道，可以直接到地质景点，但路修好是否会收费，不确定。成都的朋友，目前可以先走机耕道去免费参观。\r\n\r\n当然，相比于 50 平方公里的景区，葛仙山景区的门票是很地道的，旺季 30 元。笔者前次去是几年前，记得只有 20 元。这个票价，就景点和景色质量来说——不涉及历史，比丹景山要值得。笔者拍照水平低微，所以直接用葛仙山信息港的一张图片展示。\r\n\r\n![葛仙山，山茶花](https://blog.budshome.com/static/articles/1616930831.jpg)\r\n\r\n实际上，笔者认为葛仙山实景远比这个图片漂亮很多很多，50 平方公里，几乎漫山遍野的山茶花，游玩设施也很好。\r\n\r\n18 点左右，人流散尽。约 1-2 个足球场大的停车场，真成了笔者一家三口的露营点。先拍照留念。\r\n\r\n![葛仙山，露营点 18 时](https://blog.budshome.com/static/articles/b4d072bf447346d981f1908be483eb1.jpg)\r\n\r\n虽然现在防火严格，笔者不敢造次生火造饭。但趁着夜色未降，美食一番还是需要的：香蕉、牛奶，以及方便面配调料干吃。饭毕，夜色已浓，手拿棍子（不是给孩子准备的）陪伴孩子远观一下彭州城。\r\n\r\n![葛仙山，露营点 21 时，彭州城](https://blog.budshome.com/static/articles/623820cc1ad00cfcd64fe644eb1f8eb.jpg)\r\n\r\n月色甚好，赏月作为文人墨客的最爱，笔者也要心向往之。\r\n\r\n![葛仙山，露营点 21 时，月色](https://blog.budshome.com/static/articles/681c2a169e21fc274a5392fab226023.jpg)\r\n\r\n坦白地讲，因为高山之巅，仅一家三口。睡得很不安稳，惊醒多次。5 时左右，干脆起来拿着棍子巡游了一小圈。此时的月色、星光，都让笔者感觉这次露营值得。即使手机拍照，也可以看到避开月光直拍时，右侧有星星在探头探脑。\r\n\r\n![葛仙山，露营点 5 时，月色](https://blog.budshome.com/static/articles/d30721f9e18b8f2c581d6efa5eeac17.jpg)\r\n\r\n然后昏睡到天亮，赶紧冲出去完成拍照的任务。\r\n\r\n![葛仙山，露营点 7 时半](https://blog.budshome.com/static/articles/98959488c9618140e26f31c4f2280ff.jpg)\r\n\r\n白天的彭州城，远不如浓夜清晰。\r\n\r\n![葛仙山，露营点 7 时半](https://blog.budshome.com/static/articles/ed43365bac128de13ec12c66d8a99ea.jpg)\r\n\r\n简单收拾后，打算离开去山下吃早饭。这时，遥远的东方有一股势力在酝酿，带孩子去查看一番。\r\n\r\n![葛仙山，露营点日出](https://blog.budshome.com/static/articles/b9152759d1f473b061bb79ba0f578cb.jpg)\r\n\r\n自然是太阳要升起来了，静站看了一会。给孩子、夫人摄影留念。\r\n\r\n![葛仙山，露营点日出](https://blog.budshome.com/static/articles/8ee48dd33443dc340033a99cf19226a.jpg)\r\n\r\n# 葛仙山镇\r\n\r\n昨晚冷食冷水，趁早赶到葛仙山镇吃早饭。饭后，打算经丹景山回成都。路上，偶遇一大片牡丹林。周边茂盛高大的红叶乔木，内部杂草众生，显然是一处荒废的花草园林。劈开荆棘，窜进去看了一番，接近野生，别有风采。\r\n\r\n![葛仙山镇，荒废牡丹林](https://blog.budshome.com/static/articles/7b1fb72ad115d5f0c93651e4aef3102.jpg)\r\n\r\n笔者艳羡专业摄影人士，想给一个花骨朵来张特写。但是未成功，被即将绽放的花朵抢了镜头。\r\n\r\n![葛仙山镇，牡丹花骨朵](https://blog.budshome.com/static/articles/f16513ea46c297b59c38bc2af39bf80.jpg)\r\n\r\n至于丹景山，在成都名气相当大。天彭牡丹，也是世界闻名，今年已经是全球第 37 届牡丹为主的春游节了。喜欢牡丹的朋友，可以搜索了解。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-28T11:43:04.92Z"),
+    "updated_at": ISODate("2021-03-28T11:43:04.92Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60615107004dbacc002d3714"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "2021 年，学习 Rust 的网络资源推荐",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "这篇博文是 Stjepan Golemac 和 Luciano Mammino 两位作者整理的，是关于 2021 年学习 Rust 的资源列表推荐。这些资源列表基本都是国外的英文资料，包括免费和付费的。其中有些资源列表已经有中文翻译，笔者一并做了说明和加了链接。",
+    slug: "2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian",
+    uri: "/budshome/2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian",
+    content: "本文翻译自 Stjepan Golemac 和 Luciano Mammino 两位作者整理的 2021 年 Rust 学习的资源列表，包括书籍、视频，以及博客。资源基本都是英文的，其中有些已经有中文翻译的资料，笔者一并做了说明和加了链接。\r\n\r\n笔者在翻译中，对原文顺序稍作调整：为了尊重作者，将作者介绍提到了文章开始。\r\n\r\n### 关于作者\r\n\r\n#### Stjepan Golemac\r\n\r\nStjepan 是一个全栈工程师，对机器学习、高频交易、p2p、去中心化，以及 Rust 感兴趣。以前，他主要使用 JavaScript 和 TypeScript。主要是因为 Rust 使开发者能够编写安全且正确的代码，并且 Rust 具有极高的性能保证。所以，他成为了 Rust 的超级粉丝。如果你想关注 Stjepan，或者想打招呼，你可以查阅他的[博客](https://sgolem.com)，或者在推特上给他[发信息](https://twitter.com/SGolemac)。\r\n\r\n#### Luciano Mammino\r\n\r\nLuciano 是这个[博客（本文英文原文所在博客）](https://loige.co/where-to-go-to-learn-rust-in-2021/#free-material)的所有者和主要作者。他是一个全栈开发人员，最近几年，他越来越关注可伸缩的云架构。因为 Rust 是一种很好的语言，可以学习和欣赏编程世界中有趣的低级细节，比如内存管理和线程安全。所以他被 Rust 所吸引，如果你想了解更多关于 Luciano 的信息，你可以查看他的[介绍](https://loige.co/about)，或者在 Twitter 上[与他联系](https://twitter.com/loige)。 \r\n\r\n# 原文翻译\r\n\r\n---\r\n\r\n本文中，我们想提供一些免费和付费的资源列表，这些资源是我们 2 人在学习过程中最喜欢的。\r\n\r\nRust 显然不是最容易的编程语言，尤其是在您学习 Rust 的初始阶段。但是，一旦你能够克服起初的“恐惧之墙（wall of fear，译者注：有部大尺度的、不推荐你看的好莱坞惊梀片《Beyond The Wall of Fear 》）”，开始掌握一些关键概念，Rust 就会成为一种你会喜欢的语言，你可能会寻找越来越多的借口和理由，来使用它，并进一步学习它。因此，我们想收集一份资源清单，帮助新的 Rust 冒险者找到通向真正“rustaceans”的道路。\r\n\r\n值得一提的是，这个清单完全是主观的，并不全面。我们只列出了我们有机会去探索和喜欢的资料。我们确信仍然有很多极棒的内容在那浩瀚的互联网世界，但我们还没有找到！因此，如果你认为这里缺少什么，请告诉我们！同时，我们还将提到一些付费内容，但我们提到这些资源时，不收取任何费用，也不向您推荐任何链接。\r\n\r\n# 我们是谁\r\n\r\n本文由 Luciano 和 Stjepan 撰写，我们是两位有着不同背景和专业知识的软件工程师。我们逐渐爱上了 Rust。如果您想了解更多关于我们的信息，了解我们为什么喜欢 Rust，请查看本文末尾的个人介绍（即本文提到开始位置的“关于作者”部分）。 \r\n\r\n# 免费资源\r\n\r\n## 官方指南\r\n\r\nRust 程序设计语言——即 Rust 在github 中的仓库 *book*\r\n\r\n最好的开始是阅读官方的 [Rust 书籍《Rust 程序设计语言》](https://doc.rust-lang.org/book)！《Rust 程序设计语言》是一本由 Steve Klabnik 和 Carol Nichols 编写的开放式书籍，对于每个开始 Rust 旅程的人来说，都是一本必读书。这是一个相当全面的文档，它用非常清晰的示例和几个有趣的项目，探索了 Rust 语言中所有主要的概念。这些项目跨越了多个章节：从 CLI 上的猜谜游戏，到多线程 web 服务器。最棒的是，它是一个免费资源，由 Rust 官方团队亲自维护。在过去的几年里，它一直是最新的 Rust 学习资料。所以如果你想回顾一些你正在苦苦斗争的话题，它会是一个无所不容的资源。\r\n\r\n> 注：《Rust 程序设计语言》已经由国内 KaiserY 主导的团队翻译完成，你可以查阅 KaiserY 的 github 仓库，也可以[在线阅读](https://rust-lang.budshome.com)。\r\n\r\n## 通过例子学习 Rust\r\n\r\n《通过例子学习 Rust》是另一个奇妙的官方资源。它是一本书，但感觉更像是一张便条。它分为多级章节，每一章节都是你可以在 5 分钟内阅读完成的内容，但却可以学习和查阅一个新的 Rust 概念。您可以将其视为参考材料，并且您可以随时回顾。您可以随时记住一些具体细节，例如如何编写单元测试，或者匹配语法块确切来讲是什么。我们之所以喜欢这个资源，是因为它把很多精力放在代码上。当然，代码比文本更多，您将通过阅读代码中嵌入的注释来学习；在学习语言的概念时，进行语法实践，是一个很好的学习方法。\r\n\r\n> 注：《通过例子学习 Rust》已经由国内 rust-lang-cn 团队翻译完成，你可以查阅 rust-lang-cn 的 github 仓库，也可以[在线阅读](https://rust-by-example.budshome.com)。\r\n\r\n## Rust 秘典 - *The Rustonomicon*\r\n\r\n《[Rust 秘典](https://doc.rust-lang.org/nomicon)》也是一个免费的官方书籍，面向那些已经有相当基础的 Rust 开发者，他们希望学习编写关于“不安全的（是指 Rust 的 unsafe 语法，并非字面含义的不安全因素）” Rust 的暗黑艺术！Rust 的 unsafe 代码可能会导致某些不安全的部分，这意味着编译器会让你做一些可能不安全的事情，你应该负责任地使用这种能力。`unsafe` 代码并不一定是不好的，但需要谨慎使用，这本书将指导您在开始编写 `unsafe` 代码之前，了解所有需要注意的细节。如果你想避免释放出难以形容的恐怖，请阅读它！\r\n\r\n# 非官方资料\r\n\r\n## Rust 设计模式\r\n\r\n《[Rust 设计模式](https://rust-unofficial.github.io/patterns)》是另一本聚焦于 Rust 良好实践的开放式书籍。它探索了一些特定于 Rust 的概念，但也重新审视了软件工程中经典的**行为**、**创意**和**结构**设计模式，并将它们改编为 Rust 惯用方式。当然，它也会借此机会探索 RAII 和 NewType 等惯用的 Rust 模式。如果你了解我们，你可能会注意到，我们是设计模式的真正粉丝，所以我们不能跳过这本书！\r\n\r\n## 最优雅的 Rust - Possible Rust\r\n\r\n> 注：这个翻译感觉有些不合适，请您指正。\r\n\r\n[最优雅的 Rust](https://www.possiblerust.com) 是一个设计精美的网站，谈论“什么是真正合理的 Rust 开发”。该网站分为两个主要部分：指南和模式。指南旨在解释一些有趣的概念，如外部函数接口（FFI）、Traits、枚举等，而模式部分则试图探索一些有趣的问题，如“当你不能创建 trait 对象时，你能做什么”。目前还没有太多的资料。但我们确信，这个资源是值得一看的，它会随着时间的推移而增长。保存在你的书签或阅读器！\r\n\r\n## 易学易用 Rust - Easy Rust\r\n\r\n我们是否已经说过 Rust 并非最容易学的语言？嗯，这正是《[Rust 易学易用](https://dhghomon.github.io/easy_rust)》的前提。这是另一本试图简单地处理 Rust 概念的开放式书籍，使它们更容易学习，以及更易于理解，尤其是对第一次接触 Rust 的学习者，或来自其它高级语言的工程师。我们特别喜欢书中的一些类比词，例如指针的比较（译者注：指与资料中列出的其它类似条目或其它语言的类似概念进行比较）。我们认为这个资料是对官方书籍（译者注：《[Rust 程序设计语言](https://rust-lang.budshome.com)》）的一个极好补充。但更有趣的是，最近，这本书的内容也在 YouTube 上提供了视频资料！\r\n\r\n![易学易用 Rust - youtube](https://blog.budshome.com/static/articles/f48dba9be03f2638be0d81156722267.png)\r\n\r\n## 学习 Rust\r\n\r\n《[学习 Rust](https://learning-rust.github.io)》是另一个全面的开放式 Rust 指南。这个漂亮的网站中，分为几个主要部分，它探讨了 Rust 的基础知识，但也有更先进的概念，如所有权，借用，泛型和特性。《学习 Rust》中主要提供简单的解释，并通过阅读 Rust 代码及其丰富的代码样本集，来激励学习。\r\n\r\n## Rust Cookbook\r\n\r\n*Rust Cookbook* 也被称为 “Cookin’ with Rust”，它将自己定义为“简要实例示例集合：展示了在 Rust 生态系统中，使用各类 crate 来完成常见编程任务的良好实践”。到目前为止，已经提供了许多资源。而 *Rust Cookbook* 是一本使用开放式书籍构建工具（Rust 开发的高性能书籍构建工具 [mdBook](https://mdbook.budshome.com)）构建的，因此它完全可以作为一个开放源码项目使用。这本书的重点是补充我们上面已经描述的许多资源。它不试图探索语言的基础知识，而是对常见的日常问题（如并发、压缩、加密和数据结构）采取实际的立场。对于这些领域中的每一个，它都提供了一些有趣的例子，并提出了一些通常用于解决这些问题的最常见的第三方库（crate）。\r\n\r\n> 注：《Rust Cookbook 中文版》笔者已经翻译完成，你可以查阅 [zzy 的 github 仓库](https://github.com/zzy/rust-cookbook-zh-cn)，也可以[在线阅读](https://rust-cookbook.budshome.com)。欢迎您参与，共同准确同步官方内容。\r\n\r\n## 结合完整的超大链表（Linked List）学习 Rust\r\n\r\n链表是……很有趣！我是说有点有趣！如果你获得了计算机科学学位，你肯定对其有头大的认知历程。公平地说，链表没有什么问题，但是，恐怕很少有人喜欢它。\r\n\r\n那么，为什么我们要关心 Rust 的链表呢？《[结合完整的超大链表（Linked List）学习 Rust](https://rust-unofficial.github.io/too-many-lists)》，可能会提供一个关于此问题的合理答案。\r\n\r\n如果你对自己的 Rust 知识感到自信，并且你想开始以一种实用的方式探索更高级的 Rust 话题，那么绝对推荐这个资源。\r\n\r\n# 博客\r\n\r\n## Amos（fasterthanlime）\r\n\r\n如果你想对 Rust 语言进行深入了解，以及为什么它是一个奇妙的语言，为什么和什么时候它可能不是那么好，以及它是如何变得更好，最好的地方进入 [Amos（fasterthanlime）的博客](https://fasterthanli.me)。\r\n\r\nAmos 有着非常迷人的写作风格。他可以写很长的文章，但总是非常有趣。也许是因为他博大精深的学识，也许是因为他娱乐化的写作风格。\r\n\r\n## Yoshua Wuyts\r\n\r\nYoshua 是JavaScript 社区中非常有影响力的开发人员，我们有机会在几次会议上见到他。它总是能鼓舞人心。Yoshua 在最近的几年里越来越多地向 Rust 过渡，他在自己[超棒的博客](https://blog.yoshuawuyts.com)中记录了自己的旅程。\r\n\r\n他的博客是一个非常好的地方，以用来了解 Async Rust，流数据，迭代器等。Yoshua 参与了多个开源项目，并提供了很多关于异步的优点和缺点的独到见解。\r\n\r\n考虑到我们的 web 开发人员背景，到目前为止，我们最喜欢的文章是 [Async HTTP](https://blog.yoshuawuyts.com/async-http)。\r\n\r\n> 注：Yoshua 是 Tide 开发的主力，所以笔者对其非常喜欢。笔者去年始，Rust web 开发框架方面，转向了 Tide，已经有了多个基于 Tide 的产品。Tide 的应用模板项目，可以参阅 [tide-graphql-mongodb](https://github.com/zzy/tide-graphql-mongodb)，或者本博客的开源仓库 [surfer](https://github.com/zzy/surfer)。\r\n\r\n## Steve Klabnik\r\n\r\nSteve Klabnik 是 Rust 社区中最具影响力的人之一。因此一些很有影响力的 Rust 文章都来自[他的博客](https://steveklabnik.com)。在这个博客中，有很多关于软件工程的内容，以及其他语言及其问题（以及解决方案），以及与 Rust 的比较。\r\n\r\n## Tyler Neely\r\n\r\n如果您对数据库、性能优化、分布式系统等感兴趣，请查看 [Tyler Neey 的博客](https://tylerneely.com)。作者写了一些低层次的问题、技巧和窍门，以及 linux 上的开发等。而如果您想使用 Rust 尝试嵌入式数据库的开发，他们的项目 [Sled](https://sled.rs) 是一个非常好的工具。\r\n\r\n## Luca Palmieri\r\n\r\n由 Luca Palmieri 撰写的[学习期刊](https://www.lpalmieri.com)，是另一种探索 Rust 的宝贵学习资源。Luca 是书籍《Zero to Production in Rust》的作者，该书的一些章节已经以博客的形式发表。Luca 是一位非常多产的作者，有很多好的材料，大部分围绕着 web 开发。\r\n\r\n---\r\n\r\n后续还有——\r\n- 视频流媒体；\r\n- 电子期刊；\r\n- 播客；\r\n- 社区和聚会；\r\n- 练习和研讨会；\r\n- 精选开源项目；\r\n- ……\r\n\r\n时间关系，我们放第二部分介绍。\r\n\r\n谢谢您的阅读！\r\n\r\n---\r\n\r\n",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-29T04:01:11.916Z"),
+    "updated_at": ISODate("2021-03-29T04:01:11.916Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6061e9a4004dbacc002d3717"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "2021 年，学习 Rust 的网络资源推荐（2）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "上文《2021 年，学习 Rust 的网络资源推荐》中，我们介绍了 Stjepan Golemac 和 Luciano Mammino 两位作者整理的 Rust 学习资源，都是优秀且免费的。包括：官方书籍、非官方书籍，以及优秀的开发者博客。本文，我们继续看看 2 位作者推荐的视频流媒体、电子期刊、播客、社区和聚会、练习和研讨会，以及精选开源项目等 Rust 学习资源。另外，本文中还推荐了 Rust 优秀的付费学习资源。",
+    slug: "2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian-(2)",
+    uri: "/budshome/2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian-(2)",
+    content: "上文《[2021 年，学习 Rust 的网络资源推荐](https://blog.budshome.com/budshome/2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian)》中，我们介绍了 Stjepan Golemac 和 Luciano Mammino 两位作者整理的 Rust 学习资源，都是优秀且免费的。包括：\r\n\r\n- 官方书籍；\r\n- 非官方书籍；\r\n- 优秀的开发者博客。\r\n\r\n本文，我们继续看看 2 位作者推荐的视频流媒体、电子期刊、播客、社区和聚会、练习和研讨会，以及精选开源项目等 Rust 学习资源。\r\n\r\n另外，本文中还推荐了 Rust 优秀的付费学习资源。\r\n\r\n# 原文翻译\r\n\r\n----\r\n\r\n## 视频流媒体（youtube 和 twitch 频道）\r\n\r\n如果您喜欢一种更直观的学习方式，或者仅仅是喜欢视频材料，这里有 Youtube 和 Twitch 频道可以提供。\r\n\r\n### Ryan Levick\r\n\r\n我们 2 人最喜欢的 Rust YouTube 频道之一，是 [Ryan Levick 的视频讲解 Rust](https://www.youtube.com/channel/UCpeX4D-ArTrsqvhLapAHprQ)。Ryan 是一名微软公司的工程师，他花了很多时间来制作 Rust 视频。他的视频内容非常丰富，有入门视频，也有更高级的视频，如[静/动态调度](https://www.youtube.com/watch?v=tM2r9HD4ivQ&t=2064s)、FFI 等。我们最喜欢 Ryan 的是：他擅长解释概念，既简单又复杂。每一个视频都是一个小小的宝石，而且总是有关注点的实例。\r\n\r\n如果你喜欢看 Ryan 的视频直播，你也可以[在 Twitch 上联系他](https://www.twitch.tv/ryanlevick)。\r\n\r\n![Ryan Rust 视频](https://blog.budshome.com/static/articles/1617018730.jpg)\r\n\r\n### Jon Gjengset\r\n\r\nJon Gjengset 是另一位才华横溢的内容创作者，我们钦佩他，他有将复杂的话题变得简单易懂的能力。关于 Rust 学习视频，他现在有两个主要系列：\r\n\r\n- [Rust 的外壳（Crust of Rust）](https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa)：对于中级的 Rust 开发者来说，这是一个非常好的系列。中级的 Rust 开发者希望理解更高级的概念，如迭代器、智能指针、生命周期等，以让自己的 Rust 代码实现更好的效果。\r\n- [Unsafe 编年史（The Unsafe Chronicles）](https://www.youtube.com/playlist?list=PLqbS7AVVErFj1t4kWrS5vfvmHpJ0bIPio)：深入到 unsafe Rust 的内部世界。\r\n\r\n目前，《Unsafe 编年史》系列只有一个视频，但作者最近在 Twitter 上宣布将制作更多的《Unsafe 编年史》系列视频，我们应该期待他花更多的时间，创造新的令人兴奋的内容！\r\n\r\n![Jon Rust 视频](https://blog.budshome.com/static/articles/1617019336.jpg)\r\n\r\n如果你更喜欢看 Jon 的直播，你可以[在 Twitch 上联系他](https://www.twitch.tv/jonhoo)。\r\n\r\n### Tim McNamara\r\n\r\nTim 是《Rust in Action》（稍后将详细介绍）一书的作者，但他也是一个多产的视频流作者。他一直在做一个优秀的视频，叫做[学习 Rust 编程](https://www.youtube.com/playlist?list=PLwtLEJr-BkXZ9PmoAlqaFdoj47o61TWrS)。我们认为这个系列在 Rust 学习起步方面，是一个非常好的选择。Tim 的视频中，我们最喜欢的是[关于 Rust 中的错误处理](https://www.youtube.com/watch?v=K_NO5wJHFys&list=PLwtLEJr-BkXZ9PmoAlqaFdoj47o61TWrS&index=9&t=187s)。\r\n\r\n如果你想跟着 Tim 一起学习 Rust，你可以在 [YouTube](https://www.youtube.com/c/timClicks) 和 [Twitch](https://www.twitch.tv/timclicks) 上找到他。\r\n\r\n### Genus-v 程序设计\r\n\r\n[Genus-v 程序设计](https://www.youtube.com/c/GenusvProgramming)是 YouTube 上另一个很棒的频道，有一些有趣的素材。它主要集中在 Rust 的 web 开发上，这可能是它被我们关注的原因。\r\n\r\nGenus-v 程序设计的播放列表中，我们最喜欢的是[使用 Rust 进行 Web 开发](https://www.youtube.com/playlist?list=PLECOtlti4Psr4hXVX5GuSvLKp0-RZjz93)，它展示了如何使用 Actix 构建 GraphQL api，以及身份验证。\r\n\r\n### Systems with JT\r\n\r\n*[Systems with JT](https://www.youtube.com/channel/UCrW38UKhlPoApXiuKNghuig)* 是 Jonathan Turner 的 YouTube 频道。Jonathan 是一个非常活跃的 Rust 开发者。他是 [Nushell](https://www.nushell.sh) 的作者。当然，在他的频道里，有很多关于 Rust 的视频。现在，我们最喜欢的系列是 Jonathan 对《[如何在 Rust 中创建一个编辑器](https://www.youtube.com/watch?v=xXVyHsRR168&list=PLP2yfE2-FXdQw0I6O4YdIX_mzBeF5TDdv)》的讲解。\r\n\r\n## 电子期刊\r\n\r\n我们推荐两个主要的电子期刊，我们的建议是：*[Awesome Rust Newsletter](https://rust.libhunt.com/newsletter)* 和 *[This Week in Rust](https://this-week-in-rust.org)*。两者都是极好的资源，可以让自己跟上 Rust 世界中最新的新闻。\r\n\r\n另一个值得推荐的电子期刊资源是 *[Read Rust](https://readrust.net)*，尽管它不是严格意义上的电子期刊，而是提供了一个关于 Rust 的高质量文章的集合。如果您想接收即时通知的新内容，可以进行 RSS 订阅。\r\n\r\n## 播客\r\n\r\n据我们所知，现在还没有太多关于 Rust 的播客。我们偶尔收听的两个节目是 *[Rustacean 电台](https://rustacean-station.org)* 和 *[New Rustacean](https://newrustacean.com/)*。\r\n\r\n另一个很不错的，虽然主题不是 Rust，而是 [Bikeshed](https://www.bikeshed.fm)（译者注：主要为 Ruby、Rails、JavaScript 的开发经验谈），但其中偶尔包含探索 Rust 的情节（见 [#133](https://www.bikeshed.fm/133) 和 [#134](https://www.bikeshed.fm/134)）。\r\n\r\n## 社区和聚会\r\n\r\n如果你想与 Rust 社区其它开发者有更多的互动，我们可以推荐这几个“地方”。\r\n\r\n第一个是[官方的 Discord 社区](https://discord.gg/jrJFDJuTcu)。\r\n\r\n然后，有几个聚会小组，我们一直零星参加（在这个时间段，都是虚拟聚会。译者注：因为新冠）：[Rust London](https://www.meetup.com/Rust-London-User-Group)、[Rust Berlin](https://www.meetup.com/Rust-Berlin)，以及 [Rust Dublin](https://www.meetup.com/Rust-Dublin/)。\r\n\r\n![Rust Dublin](https://blog.budshome.com/static/articles/1617021954.jpg)\r\n\r\n## 练习和研讨会\r\n\r\n学习 Rust 方面，最推荐的的方法是……练习，练习，练习！但有可能，你现在还不知道应做什么……而且，即使你知道，但你具体的想法，却可能不会提供最简单的学习曲线。\r\n\r\n如果您愿意不断地编写的 Rust 代码，以更好地使用 Rust，我们可以推荐一些资源。\r\n\r\n首先，我们提到的是 [Rustlings](https://github.com/rust-lang/rustlings)。这是一个官方资源，允许您通过练习和测试（您可以使用它来验证您的解决方案），以实践 Rust 概念。这些练习与官方 Rust 书籍中涉及的主题相关，因此您可以在阅读官方书籍的过程中进行练习。\r\n\r\n另一个有趣的资源是 Luca Palmieri 的一个名为“[用 Rust 构建自己的 Jira](https://github.com/LukeMathWalker/build-your-own-jira-with-rust)”的研讨会。在这个研讨会上，你将从一个半成品的项目开始，然后去“填空”。每一个文件都是一个小小的“坑”，通过提供正确的实现，您将学到一两个新概念。\r\n\r\n最后，当您开始对 Rust 编程感到舒服一些的时候，我们建议您尝试 Rust 最佳代码挑战活动，这是由 [Advent of Code](https://adventofcode.com) 提议的。我们真的在做这件事，到目前为止，很有趣！\r\n\r\n## 开源项目\r\n\r\n另一件有趣的事情是，你可以通过参阅著名的开源项目的代码，以巩固你对 Rust 的理解和学习。\r\n\r\n你不必逐行阅读所有的代码，因为有些项目代码量非常庞大。但是，只要随意浏览一下代码中的一些地方，或者简单地查看一下代码结构和文档，都会非常有益，您可以从中学到很多东西。\r\n\r\n以下是我们建议您查看的库列表：\r\n\r\n- Tokio、Async-std、Smol（异步运行时，参阅[应用示例](https://rust-guide.budshome.com/23-web/23.5-clients/23.5.1-requests/23.5.1.1-get.html?highlight=tokio#%E5%BC%82%E6%AD%A5)）\r\n- Serde（序列化/反序列化库，参阅[应用示例](https://rust-guide.budshome.com/14-encoding/14.2-csv/14.2.6-serde-serialize.html)）\r\n- Clap（CLI 辅助库，参阅[应用示例](https://rust-guide.budshome.com/6-cli/6.1-arguments/6.1.1-clap-basic.html)）\r\n- Rand（随机值库，参阅[应用示例](https://rust-guide.budshome.com/5-algorithms/5.1-randomness.html)）\r\n- Chrono（日期和时间库，参阅[应用示例](https://rust-guide.budshome.com/12-datetime/12.1-duration.html)）\r\n- Nannou（创意编码框架）\r\n- Amethyst、Bevy（游戏开发）\r\n- Sled（嵌入式数据库）\r\n- mdBook（书籍构建工具，参阅[中文资料](https://mdbook.budshome.com/)）\r\n\r\n# 付费资源\r\n\r\n## 书籍\r\n\r\n如果你更喜欢通过阅读书籍来学习，如下清单应该可以满足你。\r\n\r\n### Rust in Action（Tim McNamara）\r\n\r\nTim McNamara 编写的 *[Rust in Action](https://www.manning.com/books/rust-in-action)* 可能是我们最喜欢的书籍之一。此书已经筹备了好几年，应该很快就会正式出版。目前，这本书已经可以通过 *Manning MEAP 计划* 购买（你可以得到书籍的数字版本，以及后期的所有更新。然后，当纸质版本出版时，你会通过邮寄方式收到纸质书籍）。\r\n\r\n> 译者注： MEAP 是一个早期阅读计划，边写边读。详见[什么是 MEAP](https://www.manning.com/meap-program)。\r\n\r\n我们之所以如此喜欢这本书，是因为它采取了非常实际的立场。Rust 概念是通过构建有趣的项目来教授的，例如浮点数抽象、CPU 模拟器、自定义文件格式、k-v 数据库等。\r\n\r\n![Rust in Action](https://blog.budshome.com/static/articles/1617026349.jpg)\r\n\r\n### Zero to Production in Rust（Luca Palmieri）\r\n\r\n> 译者注：这本书相当棒，并且以前是可以从 Luca Palmieri 的博客免费阅读，以及下载电子书的——可能目前已有变化，笔者也曾在很长时间内跟随和啃着这本书。这本书的 web 框架是 actix-web，笔者后来转到 Tide，未继续阅读，但还是经常关注。笔者根据个人站点的粗略数据统计，国内还是对 actix-web 感兴趣的朋友多，建议阅读。\r\n\r\nLuca Palmieri 自己出版的 *[Zero to Production in Rust](https://www.zero2prod.com)* 是一本关于 Rust 后端 web 开发的优秀书籍。我们特别喜欢这本书，有着各种原因。\r\n\r\n首先，这显然是一个奉献和爱的过程。我们不止一次有机会和 Luca Palmieri 交谈过，很明显，他在这个项目上投入了大量的时间和精力。\r\n\r\n由于这本书是一部正在进行中的作品，你可以在新的章节出版后尽快阅读。很高兴看到社区参与到这个项目中，帮助作者充分完善这本书。\r\n\r\nLuca 在这本书中，围绕着一个主要的例子：构建电子邮件订阅平台。乍一看，开发者可能会认为这是一个非常简单的例子。但实际上，这个领域有足够的复杂性，可以用来填满整本书。最重要的是，在这个过程中可以深入学习 Rust！\r\n\r\n除此之外，我们还喜欢作者在整本书中所使用的独特风格。在每一章中，在编写任何一段代码之前，都会有一个完整的部分来说明需求是什么，以及为什么我们真的需要构建某个特性。然后，每一段代码都有它自己的测试，实际上，任何迭代都是通过严格的测试驱动方法引入的。这对于一本技术书籍来说，是很不寻常的，但这就是我们喜欢这本书的原因。在阅读时，你似乎正在和你的产品经理，或团队负责人交谈，你意识到你实际上可以在工作中使用 Rust，不会遇到什么大不了的阻碍！\r\n\r\n我们认为从这本书中可以学到很多东西，不仅仅是关于 Rust，甚至还有关于产品开发，以及良好的软件工程实践。强烈推荐！\r\n\r\n![Zero to Production in Rust](https://blog.budshome.com/static/articles/1617027157.jpg)\r\n\r\n### Rust 编程\r\n\r\nJim Bland、Jason Orendorff，和 Leonora F.S. Tindall（O’Reilly 出版）联合奉献的《[Rust 编程](https://www.oreilly.com/library/view/programming-rust-2nd/9781492052586)》是最受欢迎的 Rust 书籍之一。我们有机会读了第一版，这是一本非常可靠的书。第二版应该在今年夏天出版。\r\n\r\n在第一版中，有一些章节（特别是第一章）有点难以理解，但我们听说作者一直在努力听取读者的反馈，以确保第二版更加完善和可被接受。\r\n\r\n鉴于第一版的成功，我们期待着第二版。\r\n\r\n![Rust 编程](https://blog.budshome.com/static/articles/1617027536.jpg)\r\n\r\n### Rust 程序设计语言（Steve Klabnik、Carol Nichols）\r\n\r\n这本书既是第一篇博文《[2021 年，学习 Rust 的网络资源推荐](https://blog.budshome.com/budshome/2021-nian-,xue-xi-rust-de-wang-luo-zi-yuan-tui-jian)》中提到的 Rust 团队的官方书籍 *Rust book*，也有其纸质书籍出版。所以这儿就没有什么需要补充的，如果你喜欢阅读印刷书籍（并且想支持作者），这是一本非常棒的书籍！\r\n\r\n![Rust 编程](https://blog.budshome.com/static/articles/1617027861.jpg)\r\n\r\n## 视频课程\r\n\r\n为了结束本文，在最后一节中，我们将探讨一些付费视频课程。您可以确认后再决定您是否喜欢，以将视频作为学习材料。\r\n\r\n### Rust in Motion\r\n\r\n由 [Carol Nichols 和 Jake Goulding](https://www.manning.com/livevideo/rust-in-motion)（Manning）制作的 Rust 视频课程，很棒。这些视频材料是面向初学者的，所以这是学习 Rust 的极佳方式。\r\n\r\n在这个视频课程中，我们最喜欢的部分是：对 Rust 生命周期的讲解。我们特别喜欢视频中对生命周期的形象化解释，其中的例子，使得我们很容易理解 Rust 生命周期这个基本概念。\r\n\r\n![Rust in Motion](https://blog.budshome.com/static/articles/1617028289.jpg)\r\n\r\n### 使用 Rust 构建 web APIs\r\n\r\nParis Liakos（Udemy）制作的[使用 Rust 构建 web APIs](https://www.udemy.com/course/web-dev-with-rust-rocket-diesel) 视频系列，是一个非常好的入门级课程，介绍了如何使用 Rocket 作为 web 框架，结合 Diesel ORM 构建 Rust web 应用程序。\r\n\r\n这个视频课程中，通过大约 2 个半小时的时间，你就可以感受到，用 Rust 进行 web 开发意味着什么。\r\n\r\n# 结论\r\n\r\n我们的学习资源列表，到此就结束了。\r\n\r\n我们真的希望，你发现这里所有的资料都有用。我们期待着听到你的反馈，以及了解您如何成为一员“rustacean”的旅程。\r\n\r\n如果你遇到了一些其它有趣的 Rust 学习资料，而我们在这篇文章中没有提到，请告诉我们。\r\n\r\n在那之前……享受编写 Rust 代码的乐趣吧！\r\n\r\n拜拜 👋\r\n\r\n---\r\n\r\n# 译者按\r\n\r\n我们可以看到，国外的 Rust 社区发展迅猛，而国内仍然处于萌芽期。如果您有优秀的 Rust 经验心得，或者您遇到了中文方面有趣的 Rust 学习资源，欢迎您投稿或者联系笔者，我们一起集中分享给对 Rust 感兴趣的国内开发者。\r\n\r\n谢谢您的阅读！\r\n\r\n原文链接：[Where to go to learn Rust in 2021](https://loige.co/where-to-go-to-learn-rust-in-2021/#free-material)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-29T14:52:20.888Z"),
+    "updated_at": ISODate("2021-03-29T14:52:20.888Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6062beb0004dbacc002d3718"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "HPy - 为 Python 扩展提供更优秀的 C API",
+    "category_id": ObjectId("6052d1239528000070004cf3"),
+    summary: "HPy 提供了一个新的 API，以用 C 扩展 Python。有零开销、更快速、方便调试、通用的二进制文件（不用任何修改，可在 CPython、PyPy、GraalPython 等解释器上直接加载），以及更加符合时代标准等优点。",
+    slug: "hpy---wei-python-kuo-zhan-ti-gong-geng-you-xiu-de-c-api",
+    uri: "/budshome/hpy---wei-python-kuo-zhan-ti-gong-geng-you-xiu-de-c-api",
+    content: "官方的 Python/C API 是针对 CPython 的实现的：公开了许多内部细节，使得 API 实现难度较大；而且，如果要为 PyPy、GraalPython、Jython、IronPython 等替代实现开发 API，更是各类问题多多。最近发现了一个性能更好的开源 Python 扩展，HPy。简单试用后，感觉值得推荐。\r\n\r\n# HPy 介绍\r\n\r\nHPy 提供了一个新的 API，以用 C 扩展 Python，有零开销、更快速、方便调试、通用的二进制文件（不用任何修改，可在 CPython、PyPy、GraalPython 等解释器上直接加载），以及更加符合时代标准等优点。换句话说，如果您做过 C 中嵌入 Python 的开发，必定熟悉这行代码：\r\n\r\n``` c\r\n#include <Python.h>\r\n```\r\n\r\n现在，如果你使用 HPy，则可以替换为：\r\n\r\n``` c\r\n#include <hpy.h>\r\n```\r\n\r\n# HPy 优点\r\n\r\n但是，虽然直接介绍了代码，但为什么要用 HPy？作为一个 2019 年才诞生的项目，HPy 设计挺优秀，官方言其具有如下优点：\r\n\r\n- CPython 之上的零开销：用 HPy 编写的扩展相比于官方 CPython，未有任何额外开销。\r\n- 在 PyPy、GraalPython（目前比较热火的 Python3 实现，性能提升极大，但对 C 扩展） 等 CPython 替代实现上，运行更快。\r\n- 更友好的调试模式：HPy 调试模式可以自动检测诸多错误。在 HPy 的调试模式下，您可以很容易地识别常见问题，如内存泄漏、对象的无效生存期、API 的无效使用等。\r\n- 通用的二进制文件：为 HPy 通用 ABI 构建的扩展，可以在 CPython、PyPy、GraalPython 之上不用任何修改，直接加载运行。\r\n- 更好的 API：标准的 Python/C API 具有其产生时代的特性限制，而 HPy 的设计可以克服一些限制。让扩展 API 更加一致，更易写易读，并且可使 bug 更易于暴露。\r\n\r\n# HPy 类库\r\n\r\n目前，已经有 ultrajson-hpy（ultrajson 是 Python 生态中极速的 JSON 编解码器）、piconump（类似于 ndarray），以及 numpy-hpy（大名鼎鼎的 numpy）等模块可与 HPy 兼容试用。可以看到，还处于开发初期，但科学计算、数据解析已经可以尝试了。\r\n\r\n# HPy 示例\r\n\r\n概念和优点，都是官方的说法，我们实际代码操练一下，看看试用体验，以及 HPy 是否具有优势。示例很简单，即实现一个 `add` 运算的扩展。\r\n\r\n## 首先，我们用标准 Python/C 扩展方式实现\r\n\r\n命名文件为 `hello_old.c`：\r\n\r\n``` c\r\n#include <Python.h>\r\n\r\nstatic PyObject* add(PyObject* self, PyObject* args) {\r\n    long a, b;\r\n    if (!PyArg_ParseTuple(args, \"ll\", &a, &b))\r\n        return NULL;\r\n    return PyLong_FromLong(a+b);\r\n}\r\n\r\nstatic PyMethodDef HelloMethods[] = {\r\n    {\"add\", (PyCFunction)add, METH_VARARGS, \"两个整数相加\"},\r\n    {NULL, NULL, 0, NULL}\r\n};\r\n\r\nstatic struct PyModuleDef moduledef = {\r\n    PyModuleDef_HEAD_INIT,\r\n    \"hello_old\",\r\n    \"使用标准 Python/C API\",\r\n    -1,\r\n    HelloMethods,\r\n};\r\n\r\nPyMODINIT_FUNC\r\nPyInit_hello_old(void) {\r\n    return PyModule_Create(&moduledef);\r\n}\r\n```\r\n\r\n我们通过 `setup.py` 编译扩展文件：\r\n\r\n``` python\r\nfrom setuptools import setup, Extension\r\nsetup(\r\n    name=\"hello\",\r\n    ext_modules = [\r\n        Extension('hello_old', ['hello_old.c']),\r\n    ],\r\n)\r\n```\r\n\r\n最后，我们运行 `setup.py` 并使用此扩展实现：\r\n\r\n``` python\r\n$ python setup.py build_ext --inplace\r\n...\r\n\r\n$ python \r\n>>> import hello_old\r\n>>> hello_old.add(10, 20)\r\n30\r\n```\r\n\r\n## 然后，我们用 HPy 方式实现\r\n\r\n命名文件为 `hello_new.c`：\r\n\r\n``` c\r\n#include <hpy.h>\r\n\r\nHPyDef_METH(add, \"add\", add_impl, HPyFunc_VARARGS,\r\n            .doc = \"两个整数相加\");\r\n\r\nstatic HPy add_impl(HPyContext ctx, HPy self, HPy *args, HPy_ssize_t nargs) {\r\n    long a, b;\r\n    if (!HPyArg_Parse(ctx, NULL, args, nargs, \"ll\", &a, &b))\r\n        return HPy_NULL;\r\n    return HPyLong_FromLong(ctx, a+b);\r\n}\r\n\r\nstatic HPyDef *hello_defines[] = {\r\n    &add,\r\n    NULL\r\n};\r\n\r\nstatic HPyModuleDef moduledef = {\r\n    HPyModuleDef_HEAD_INIT,\r\n    .m_name = \"hello_new\",\r\n    .m_doc = \"使用 HPy API\",\r\n    .m_size = -1,\r\n    .defines = hello_defines,\r\n};\r\n\r\nHPy_MODINIT(hello_new)\r\nstatic HPy init_hello_new_impl(HPyContext ctx) {\r\n    return HPyModule_Create(ctx, &moduledef);\r\n}\r\n```\r\n\r\n同样，我们需要通过 `setup.py` 编译扩展文件。我们在 `setup.py` 加入 `hpy_ext_modules` 定义项，一次将两种方式实现的扩展全部编译：\r\n\r\n``` python\r\nfrom setuptools import setup, Extension\r\nsetup(\r\n    name=\"hello\",\r\n    ext_modules = [\r\n        Extension('hello_old', ['hello_old.c']),\r\n    ],\r\n    hpy_ext_modules = [\r\n        Extension('hello_new', ['hello_new.c']),\r\n    ],\r\n    setup_requires=['hpy.devel'],\r\n)\r\n```\r\n\r\nHPy 扩展实现方式的编译，需要将参数 ` --hpy-abi=universal` 传递给 `setup.py`：\r\n\r\n``` console\r\n$ python setup.py --hpy-abi=universal build_ext --inplace\r\n$ ls -1 *.so\r\nhello_new.hpy.so\r\nhello_old.cpython-38-x86_64-linux-gnu.so\r\n```\r\n\r\n我们可以看到，是兼容 32位和 64 位处理器的。好，我们看看能不能跑的通：\r\n\r\n``` python\r\n$ python\r\n>>> import hello_old, hello_new\r\n>>> hello_old.add(10, 20)\r\n30\r\n>>> hello_new.add(30, 40)\r\n70\r\n>>> hello_new\r\n<module 'hello_new' from '/.../hello-hpy/hello_new.py'>\r\n>>> hello_new.__file__\r\n'/.../hello-hpy/hello_new.hpy.so'\r\n```\r\n\r\n简单试用就是以上所述，总体说来体验还行。但是上面提到，HPy 还处于开发初期，建议使用 github 仓库版本。\r\n\r\n本次体验到此结束，以后在使用过程中，如果有新的推荐点，笔者再分享。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-30T06:01:20.983Z"),
+    "updated_at": ISODate("2021-03-30T06:01:20.983Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6062d797004dbacc002d3719"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "毕马威（KPMG）调查报告：人工智能的实际采用，在新冠疫情（COVID-19）期间大幅提升",
+    "category_id": ObjectId("601bcaf300b5c70100e2a323"),
+    summary: "在 2020 年，新冠疫情（COVID-19）期间，人工智能的实际采用得到了大幅度提升。但是否进展太快？毕马威（KPMG）的调查显示：普通民众、政府领导人，以及商界领袖，这些不同阶层的人士，对此有截然不同的观点。",
+    slug: "bi-ma-wei-(kpmg)diao-cha-bao-gao-:ren-gong-zhi-neng-de-shi-ji-cai-yong-,zai-xin-guan-yi-qing-(covid-19)qi-jian-da-fu-ti-sheng",
+    uri: "/budshome/bi-ma-wei-(kpmg)diao-cha-bao-gao-:ren-gong-zhi-neng-de-shi-ji-cai-yong-,zai-xin-guan-yi-qing-(covid-19)qi-jian-da-fu-ti-sheng",
+    content: "最近看到了一张图，出自于毕马威（KPMG）关于人工智能实际采用的调查报告。从这张图中可以看出，在 2020 年，新冠疫情（COVID-19）期间，人工智能的实际采用得到了大幅度提升。具体提升显著的行业包括：工业制造（93%）、金融服务（84%）、科技（83%）、零售（81%）、生命科学（77%），医疗保健（67%），以及政府应用（61%）。\r\n\r\n![毕马威（KPMG）关于人工智能实际采用的调查报告](https://blog.budshome.com/static/articles/1617086407.jpg)\r\n\r\n这几年人工智能应用方面，媒体炒作的厉害。看到过一个文章，有一句话印象深刻，大意是“技术一旦跟上了炒作，那么很快就会进入大众生活”。所以人工智能应用，进入普通民众的日常生活，并不令人意外。但因为新冠疫情（COVID-19），2020 年人工智能的应用增长幅度如此之大，并非潜移默化地进入大众生活。以致于毕马威（KPMG）的报告解读中，普通民众、政府领导人，以及商界领袖等不同阶层人士有截然不同的观点，却是令人意外的。\r\n\r\n毕马威（KPMG）的报告中说：拜登政府对人工智能应用前景很乐观，并且认为“更多人希望政府监管”；商界领袖则相信，人工智能能够帮助解决当今最严峻的挑战，包括新冠（COVID-19）及其疫苗；而普通民众，则绝大部分认为，人工智能接管自己日常生活的趋势，进展太快了。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-03-30T07:47:35.288Z"),
+    "updated_at": ISODate("2021-03-30T07:47:35.288Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60673d6800472b6800425054"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 中的解析器组合因子（parser combinators）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "正则表达式，有着内在的问题，这意味着只能使用简短的表达。现在，一个更好的解析方法正在成为主流，可用作所有流行语言的工作库，它被称为“析器组合因子（parser combinators）”，可满足 99% 的实际场景。解析器组合因子（parser combinators），是一种用高阶函数构造的，可组合计算的方法。如果解析过程不是你产品或者你开发库的主要目标，那么解析器组合因子很可能对你的任务有足够的表现力和可执行力。",
+    slug: "rust-zhong-de-jie-xi-qi-zu-he-yin-zi-(parser-combinators)",
+    uri: "/budshome/rust-zhong-de-jie-xi-qi-zu-he-yin-zi-(parser-combinators)",
+    content: "> 本文为翻译，原文题目是 *Parser combinators in Rust*。由英国布里斯托尔市的 doma 团队，于 2021 年 3 月 30 日（星期二）撰写。\r\n\r\n# 内容提要\r\n\r\n- 不使用正则表达式（regular expressions）做解析；\r\n- 解析器组合因子（parser combinators），是一种用高阶函数构造的，可组合计算的方法。例如：\r\n  - `many1(digit1)`\r\n  - `alt((tag(\"hello\")`，`tag(\"sveiki\")))`\r\n  - `pair(description, preceded(space0, tags))`\r\n- 解析器组合因子（parser combinators）易于使用，并且可快速高效地获得结果；\r\n- 解析器组合因子可满足 99% 的实际场景。仅当，你开发库的唯一目标是解析过程时，才会不太适合（译注：是指实现偏复杂了）。\r\n\r\n# 解析在计算中的担当\r\n\r\n数据处理，是计算的支柱。要运行一个算法，首先，必须在内存中建立一些数据结构。然后，对数据结构进行填充，一般方法是获取一些原始数据，并将其加载到内存中。数据科学家处理原始数据时，要清理数据，并创建格式良好的数据集。然后由编程语言设计人员标记源代码文件，将它们解析为抽象语法树。最后， web 采集人员正确采集 HTML，并提取感兴趣的值。\r\n\r\n通俗地讲，每个步骤都可以称为“解析（parsing）”。本篇文章讨论了如何快速完成完整地、可组合地，以及正确地解析。具体包括那些方面？\r\n\r\n- 快速地解析，意味着从实用的角度考虑了数据转换的问题，不需要理论上的最优解。我们的目标是，尽可能地快速编写正确的解析器。\r\n- 可组合解析，意味着实现的解析器，可能由“较小”的组件组成。这些“较小”的解析器组件，以后可以在“更大”的解析器中用作组件。\r\n- 完整地解析，意味着输入数据将被完全使用。如果输入数据可能偏差或错误，开发者应在实现的解析器中对其进行编码，而不是调整输入数据。\r\n\r\n那么，我们如何实现呢？我们先来谈谈什么是不应该做的。\r\n\r\n# 忘记正则吧\r\n\r\n“谢谢”已经近乎“消亡”的 Perl 语言的流行，整整一代计算机程序员都在[徒劳地尝试用正则表达式解析非正则语言](https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags/1732454#1732454)（译注：链接为 stackoverflow 站点 11 年前发表的热帖，是关于使用正则解析 HTML 的，被查阅次数超过 310 万次）。正则表达式，不过是有限状态自动机的编码。\r\n\r\n![有限状态自动机](https://blog.budshome.com/static/articles/20210402192252.jpg)\r\n\r\n> 箭头最上方的项，是关于字母字符的正则表达式。实心圆表示状态，如 `q1` 表示“接受状态”。箭头，则表示状态转换。\r\n\r\n非确定的有限状态自动机，可以相当优雅地接受许多有意义的语言表达。经典的子是，正则表达式例不接受 “ab”、“aabb”、“aaabbb”……类似地，不能用正则表达式解决插入语的匹配难题，而需要使用最简单的堆栈机器模型。\r\n\r\n![堆栈机器模型](https://blog.budshome.com/static/articles/20210402194055.jpg)\r\n\r\n> 堆栈自动机，可以同时处于几种状态。没有转换状态，对任何输入都“视觉增强”。`(@\\*` 将字符 `'('` 与任何堆栈状态匹配；仅当堆栈为空时，`ε@ε` 在自动机到达 `p` 状态时即刻匹配。\r\n\r\n因此，正则表达式远远不能提供足够的工具，以用来处理上下文无关语法。但是它们可能足够强大，可以清理数据或提取一些值。但是，为什么我们说您永远不应该使用它们呢？实用性原因！\r\n\r\n让我们看看 *Regex Cookbook* 中的一个例子（[来自于于 medium 站点](https://medium.com/factory-mind/regex-cookbook-most-wanted-regex-aa721558c3c1)），这样我们就晓得，这是一个在业界使用的实际案例。以下是作者提供的正则表达式之一：\r\n\r\n```\r\n^(((h..ps?|f.p):\\/\\/)?(?:([\\w\\-\\.])+(\\[?\\.\\]?)([\\w]){2,4}|(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\r\n\\[?\\.\\]?){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)))*([\\w\\/+=%&_\\.~?\\-]*)$\r\n```\r\n\r\n许多人都能从表面上理解这个正则表达式。似乎，这个正则表达式与链接有关，但即使我们求助于[正则的自动化诠释（译注：一个正则表达式解释和测试站点）](https://regex101.com/r/6qUtv2/1/)，事情也没有变得更清楚。嗯，根据作者的说法，这个正则表达式应该检测“无效的” URL。现在让我们分析下这个正则表达式的失败之处，其它复杂庞大的正则表达式，也是类似地。\r\n\r\n1. 错误：不能匹配 `https://​ctflearn​.​com/`（注意没有空格）。\r\n2. 需要外部标记，因此没有即插即用：不匹配 `␣https://ctflearn.com/`（注意前导空格）。\r\n3. 外部标记，特定于此表达式：不匹配 `https://ctflearn.com,`（注意后面的逗号）。\r\n4. 修复它？不可能的：在每个可打印字符周围匹配可选字符，将使它从一个大的、可读性差的代码段，变成一个巨大的、完全不可读的代码段。你的大脑甚至半猜不出 `h..ps` 和 `f.p ` 的半点含义。\r\n5. 它不能用于提取值。正则表示法不“将数据解析为数据结构”，他们只接受或拒绝字符串。因此，需要对它们的输出，进行额外的后续处理。\r\n\r\n正则表达式，有着内在的问题。对我们来说，这意味着只能使用简短的表达。作者将它们专门用于 `grep、`find`，以及 `vim\\`。\r\n\r\n现在，很高兴，一个更好的解析方法正在成为主流，可用作所有流行语言的工作库。从标题中可以猜到，它被称为“析器组合因子（Parser combinators）”。\r\n\r\n# 可组合解析的逐步实现\r\n\r\n遵循我们往期博客的精神，让我们来解决一些实际问题。考虑到完全地进行实践，您必须编写一个交互式 `TODO` 应用程序。它实现以下命令：\r\n\r\n- `add ${some word}* ${some #hashtag}*`（附加项 ID）\r\n- `done ${some item ID}`（将附加项 ID 标记为已解析）\r\n- `search ${some word or some #hashtag}+`（搜索，并返回匹配项 ID 列表）\r\n\r\n让我们首先定义一个枚举，表示已解析的数据。省略了那些无聊的部分：\r\n\r\n``` Rust\r\npub enum Entry {\r\n    Done (Index),\r\n    Add (Description, Vec<Tag>),\r\n    Search (SearchParams),\r\n}\r\n```\r\n\r\n现在，让我们使用 nom 库（译注：面向字节的、零拷贝的解析器组合因子库），享受富有表现力的、声明式的解析。它有宏 API，以及函数 API。由于在 v5 中，nom 库的宏 API 非常容易出错，因此我们将使用函数 API。并且，我们已经用 v6 测试过了。\r\n\r\n我们将逐行解析命令。首先，声明一行的顶级解析；然后，遇到第一个解析器组合因子：`alt`。\r\n\r\n``` rust\r\npub fn command(input: &str) \r\n-> IResult<&str, Entry> { /* A */\r\n    alt((done, add, search))(input) /* B */\r\n}\r\n```\r\n\r\n在`（A）`中（译注：以下注释标记 A 的部分），我们声明的函数 `command`，是一个解析器。[IResult](https://docs.rs/nom/6.1.2/nom/type.IResult.html) 捕获解析的类型（本例中为 `str&`），以及输出数据结构（本例中为 `Entry`）。\r\n\r\n在`（B）`中，我们使用 `nom::branch::alt` 组合了三个解析器：`add`、`done` 和 `search`。它尝试从最左边开始，应用这些解析器中的每一个，直到一个成功为止。\r\n\r\n现在，让我们看看三个解析器中最简单的一个：\r\n\r\n``` rust\r\nfn done(input: &str) -> IResult<&str, Entry> {\r\n    let (rest, value) = preceded( /* A */\r\n        pair(tag(\"done\"), ws), /* B */\r\n        many1(digit1) /* C */\r\n    )(input)?; \r\n    Ok((\r\n      rest,\r\n      Entry::Done( /* D */\r\n        Index::new( vec_to_u64(value) )\r\n      ) \r\n    ))\r\n}\r\n```\r\n\r\n我们直接看到的第一个组合因子是 `preceded`。它忽略解析`（B）`，只保留`（C）`的输出。但`（B）`仍将接受输入！一般来说，它将两个计算**组合**成一个组合器，组合器将运行两个计算，返回第二个计算的结果。这和按顺序运行它们，是不一样的。因为这里我们建立了一个计算，我们稍后会运行它！\r\n\r\n有趣的是，如果我们在编写 Haskell 代码，那么在[解析器库（译注：参阅 Megaparsec 文档）](https://markkarpov.com/tutorial/megaparsec.html)中就找不到 `preceded` 组合器。这是因为，我们在上一段中所描述的，被称为“右应用箭头”，或者，正如 Ben Clifford 的[精彩演讲](https://www.youtube.com/watch?v=r_Enynu_TV0)“右侧的麻雀”中所说：\r\n\r\n``` haskell\r\nλ> :t (*>)\r\n(*>) :: Applicative f => f a -> f b -> f b\r\n```\r\n\r\n另外两个组合因子，是相当一目了然的。`pair` 将解析器组合成一个序列，具有一个接收单个空格的 `ws` 解析器。`ws` 具有一个简单定义：`one_of(\" \\t\")`。`many1` 至少重复一次 `digit1` 解析才能成功，其中 `digit1` 是在 `nom` 库中实现的。\r\n\r\n现在，在确保我们的解析器可以被其他人使用方面，让我们对其理解做以巩固。\r\n\r\n我们已经讨论过，要实现这一点，我们需要返回 `IResult`。我们要记住，`IResult` 仍然是一个 **Result** 类型，所以它的构造函数仍然是 `Err` 和 `Ok`：\r\n\r\n- `Result` 中的 `Err` 变量，通过 `?` 修饰符构造，将通过解析`（A）`传递出现的任何潜在错误。\r\n- `Result` 中的 `Ok` 变量在`（D）`中构造，通过将 `many1` 输出（数值的动态数组），转换成一个无符号 64 位整数。转换用 `vec_to_u64` 函数完成的，为了简洁起见，这里省略了。\r\n\r\n`IResult<in, out>` 中，`Ok` 值的具体形式是 `Ok((rest: in, value: out))`。其中 `rest` 是要解析的剩余输入，`value` 是解析器的输出结果。您可以看到`（A）`中 `preceded` 解析，遵循了完全相同的模式。\r\n\r\n下面的部分，是一些更高级的解析器。关于在如何快速地使用解析器组合因子方面，它们将巩固您的知识：\r\n\r\n``` rust\r\nfn add(input: &str) -> IResult<&str, Entry> {    \r\n  let (rest, (d, ts)) = preceded( /* B */\r\n    pair(tag(\"add\"), ws),                     \r\n    pair(description, preceded(space0, tags)) /* A */\r\n  )(input)?;\r\n  Ok( (\r\n    rest,\r\n    Entry::Add( Description::new(&d), ts )\r\n  ) )\r\n}\r\n\r\nfn search(input: &str) -> IResult<&str, Entry> {\r\n  let (rest, mash) = preceded(\r\n    pair(tag(\"search\"), ws),\r\n    separated_list(\r\n      tag(\" \"),\r\n      alt((tag_contents, search_word)) /* C */\r\n    )\r\n  )(input)?;\r\n  Ok((rest, mash_to_entry(mash)))\r\n}\r\n\r\nfn mash_to_entry(mash: Vec<SearchWordOrTag>) -> Entry /* D */\r\n{ /* ... */ }\r\n```\r\n\r\n使用组合因子进行解析，是如此的简单明了，甚至很难找到需要澄清的东西，但这里有几个补充：\r\n\r\n- 重复 `preceded` 步骤，将重点放在需要解析的数据上，请参见`（A）`和`（B）`中的绑定。\r\n- 有时，您必须解析异构数据。根据我们的经验，最好的方法是：创建一个单独的数据类型，用来封装这种异构性（本例中为 `SearchWordOrTag`）。然后，在 `alt` 选项上,使用 `separated_list` 解析器，具体如`（C）`中所示。最后，当您有一个匹配的数组时，您可以根据需要，使用转换函数将其折叠成更整洁的数据结构（参见`（D）`）。\r\n\r\n帮助您开始舒适地熟悉这个令人惊讶的、基于组合因子的解析方法论方面，本文应该做了足够的指导。以下是一些结束前想法：\r\n\r\n- 请密切注意空格，这可能有点棘手。尤其是我们不知道 `nom` 库中的自动化标记选项时。\r\n- 查阅和您正在使用的 `nom` 库版本对应的文档，特别是[选择一个组合器](https://github.com/Geal/nom/blob/master/doc/choosing_a_combinator.md)章节（注意！目录中指向组合器的宏版本，而不是函数版本）。\r\n- 如果你愿意的话，你可以查看[这个极速编写的代码](https://git.sr.ht/%7Ejonn/todo-rs-public/tree/main/item/src/parser.rs)，它激发了本篇博文的灵感。代码的作者是 Chris Höppner 和 Jonn Mostovoy。\r\n\r\n如果解析过程不是你产品或者你开发库的主要目标，那么解析器组合因子很可能对你的任务有足够的表现力和可执行力。我们希望你喜欢这篇文章，并且用解析器组合因子快乐地做解析。\r\n\r\n谢谢您的阅读。\r\n\r\n原文链接：[Parser combinators in Rust](https://doma.dev/blog/parsing-stuff-in-rust/)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-02T15:51:04.635Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.635Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e6d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 384 期（2021-03-31）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 384 期：Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘，以及 Rust 开发者引语等。第 384 期的技术文章很棒，值得深读。",
+    slug: "rust-guan-fang-zhou-bao-384-qi-(2021-03-31)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-384-qi-(2021-03-31)",
+    content: "大家好，欢迎查阅第 384 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一种系统语言，主要追求三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github [向我们发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n本周无资讯。\r\n\r\n### 官方\r\n\r\n* [Rust 1.51.0 官宣发布](https://blog.rust-lang.org/2021/03/25/Rust-1.51.0.html)，中译版本：[Rust 1.51.0 已正式发布，及其新特性详述](https://blog.budshome.com/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu)\r\n* \\[Rust 基金会\\] [介绍 Mark Rousskov](https://foundation.rust-lang.org/posts/2021-03-25-introducing-mark-rousskov/)（Rust 核心团队，项目主管）\r\n* \\[Rust 基金会\\] [介绍 Nell Shamrell-Harrington](https://foundation.rust-lang.org/posts/2021-03-25-introducing-nell-shamrell-harrington/)（董事会成员，微软公司）\r\n\r\n### 项目/工具 更新\r\n\r\n* [rust-analyzer 更新日志 #70](https://rust-analyzer.github.io/thisweek/2021/03/29/changelog-70.html)\r\n* [IntelliJ Rust 更新日志 #144](https://intellij-rust.github.io/2021/03/29/changelog-144.html)\r\n* [Knurling-rs 财务报告和筹资公告](https://ferrous-systems.com/blog/knurling-financial-update/)，Knurling-rs 致力于提升嵌入式 Rust 开发体验。\r\n* [Ockam | 分布式应用程序之间的端到端加密信息传递，以及交互式身份验证](https://github.com/ockam-network/ockam)\r\n* [Deno 公司宣布成立](https://deno.com/blog/the-deno-company)，JavaScript/TypeScript 的运行时，原 NodeJS 作者主导开发。\r\n\r\n### 观测/思考\r\n\r\n* [使用 Rust 极致提升 Python 性能-中文版](https://blog.budshome.com/budshome/shi-yong-rust-ji-zhi-ti-sheng-python-xing-neng-:tu-biao-he-hui-tu-ti-sheng-24-bei-,shu-ju-ji-suan-ti-sheng-10-bei)：图表和绘图提升 24 倍，数据计算提升 10 倍。\r\n* [Rust web 框架现状-中文版](https://blog.budshome.com/budshome/rust-web-kuang-jia-xian-zhuang--(2021-nian-1-ji-du-)-)，如下图为 Rocket 框架调试工具 LogRocket 界面。\r\n\r\n![LogRocket](https://blog.budshome.com/static/articles/1617386708.jpg)\r\n\r\n* [GhostCell：分离权限与数据的 Rust API](http://plv.mpi-sws.org/rustbelt/ghostcell/)\r\n* [在 slipstream 库中使用常量泛型（const generics）](https://vorner.github.io/2021/03/28/const-generic-slipstreem.html)\r\n* [Rust 迭代器（Iterator trait ）的要诀和技巧-中文版](https://blog.budshome.com/budshome/rust-die-dai-qi-(iterator-trait-)de-yao-jue-he-ji-qiao)\r\n\r\n### Rust 演练\r\n\r\n* [重点和痛点](https://fasterthanli.me/articles/pin-and-suffering)，async Rust 演练，主要是 tokio。\r\n* [使用 C-bindgen 将 Rust 嵌入 Zephyr（物联网操作系统）固件](https://www.jaredwolff.com/embedding-rust-into-zephyr-using-cbindgen/)\r\n* [Rust 中的解析器组合因子](https://blog.budshome.com/budshome/rust-zhong-de-jie-xi-qi-zu-he-yin-zi-(parser-combinators))（中译版本），英文[原文链接](https://doma.dev/blog/parsing-stuff-in-rust/)。\r\n* [Rust 中的网格，第二部分：常量泛型](https://blog.adamchalmers.com/grids-2/)\r\n* [Rust 中，符合人类工程学的错误处理](https://dev.to/senyeezus/ergonomic-error-handling-with-rust-13bj)，即处理方式舒适，不生硬。\r\n* [使用 Rust 常量泛型实现 SHA2 (256/512) 算法](https://dev.to/dandyvica/implementing-sha2-256-512-algorithm-with-rust-const-generics-5ap)\r\n* [使用 GNU 调试器分析内存分配](https://dev.to/ignaciojvig/analisando-alocacoes-de-memoria-em-rust-utilizando-gnu-debugger-34kb)\r\n* [测试嵌入式 Rust 应用程序](https://ferrous-systems.com/blog/test-embedded-app/)\r\n* [使用常量泛型为电子图形建模](https://mkhan45.github.io/2021/03/28/Using-const-generics-to-model-an-electronics-graph.html)\r\n* [Rust 的模块系统](https://aloso.github.io/2021/03/28/module-system.html)\r\n* \\[系列\\] [使用 crate：trust-dns-resolver](https://dev.to/basman/series/11934)\r\n* \\[视频\\] [更安全的 Rust：和 Creusot 一起检查程序](https://youtu.be/BPt987BRdDw)\r\n\r\n### 其它\r\n\r\n* [在 Linux 内核中，Linus Torvalds 对 Rust 语言进行评估](https://arstechnica.com/gadgets/2021/03/linus-torvalds-weighs-in-on-rust-language-in-the-linux-kernel/)\r\n* [所有权的概念图](https://www.reddit.com/r/rust/comments/mgh9n9/ownership_concept_diagram/)\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [tide-acme](https://github.com/http-rs/tide-acme)，使用 Let's Encrypt for Tide，自动进行 HTTPS 认证。\r\n\r\n由 [Josh Triplett](https://users.rust-lang.org/t/crate-of-the-week/2704/894) 提议，谢谢！\r\n\r\n[关于下周最佳 crate，请您提议，并投票](https://users.rust-lang.org/t/crate-of-the-week/2704)!\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n* [AWS 项目：Rust lambda 运行时，以及生物信息项目 BioIT](https://umccr.org/blog/aws-bioinformatics-rust/)\r\n* [darpi-rs/darpi 寻求用户和贡献者](https://github.com/darpi-rs/darpi)\r\n* [RoaringBitmap/roaring-rs 请求 PR 复核](https://github.com/RoaringBitmap/roaring-rs/pull/92)\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n# Rust 核心更新\r\n\r\n327 PR 在\\[上一周被合并\\]\\[merged\\]\r\n\r\n# 近期活动\r\n\r\n### 线上活动\r\n\r\n* [April 1, Berlin, DE - Rust Hack and Learn - Berline.rs](https://www.meetup.com/opentechschool-berlin/events/txcprryccgbcb/)\r\n* [April 6, Buffalo, NY, US - Buffalo Rust User Group - Buffalo Rust Meetup](https://www.meetup.com/Buffalo-Rust-Meetup/events/276717867/)\r\n* [April 7, Johannesburg, ZA - Monthly Joburg Rust Chat! - Johannesburg Rust Meetup](https://www.meetup.com/Johannesburg-Rust-Meetup/events/277133126/)\r\n* [April 7, Indianapolis, IN, US - Indy.rs - with Social Distancing - Indy Rust](https://www.meetup.com/indyrs/events/jhfstryccgbkb/)\r\n* [April 13, Seattle, WA, US - Monthly Meetup - Seattle Rust Meetup](https://www.meetup.com/Seattle-Rust-Meetup/events/gskksryccgbrb/)\r\n\r\n### 北美\r\n\r\n* [April 8, Columbus, OH, US - Monthly Meetup - Columbus Rust Society](https://www.meetup.com/columbus-rs/events/dpkhgryccgblb/)\r\n* [April 14, Atlanta, GA, US - Grab a beer with fellow Rustaceans - Rust Atlanta](https://www.meetup.com/Rust-ATL/events/qxqdgryccgbsb/)\r\n\r\n# Rust 招聘信息\r\n\r\n**e.ventures**\r\n\r\n* [Rust 后端工程师（远程，美国）](https://old.reddit.com/r/rust/comments/mfstaz/official_rrust_whos_hiring_thread_for_jobseekers/gspq9v1/)\r\n\r\n**Wallaroo**\r\n\r\n* [软件工程师（远程）](https://wallaroo.breezy.hr/p/30939dc4e5c7-software-engineer)\r\n\r\n**Ockam**\r\n\r\n* [招聘若干 Rust 岗位](https://www.ockam.io/team#open-roles)\r\n\r\n*Tweet us at [@ThisWeekInRust](https://twitter.com/ThisWeekInRust) to get your job offers listed here!*\r\n\r\n# 本周引语\r\n\r\n> 尽管存在所有负面影响，但我必须说：我确实非常喜欢 Rust 所采用的基于民意调查的方法。遇到的大多数问题，并非错误而引起，而是因为：没有其它语言，真正将这个原则推进到如此远的地步。编程语言的设计，首要是“艺术性”，而非技术性。并且，预见所选择设计的后果，那几乎是不可能的。\r\n\r\n– [tomaka on medium](https://tomaka.medium.com/a-look-back-at-asynchronous-rust-d54d63934a1c)\r\n\r\n谢谢 [Michael Howell](https://users.rust-lang.org/t/twir-quote-of-the-week/328/1028) 的提议。\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman).*\r\n\r\n原文链接： [This Week in Rust 384](https://this-week-in-rust.org/blog/2021/03/31/this-week-in-rust-384/)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-02T19:37:48.942Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.942Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e79"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust web 框架现状【2021 年 1 季度】",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "介绍了 Rust web 框架的开发状态、应用选择考量点等，涵盖安全性、灵活性、社区生态，以及项目规模等衡量因素。涵盖了包括 web 前端框架、Wasm 以及 web 后端框架。译者增加了对应的中文资源链接，方便感兴趣的朋友快速学习。",
+    slug: "rust-web-kuang-jia-xian-zhuang--(2021-nian-1-ji-du-)-",
+    uri: "/budshome/rust-web-kuang-jia-xian-zhuang--(2021-nian-1-ji-du-)-",
+    content: "> 本文翻译自 Abiodun Solomon 发表于 2021 年 1 月 15 日的文章，阅读时间大约 3-5 分钟。\r\n\r\n# 引文\r\n\r\n基于开源、快速开发、可靠性，以及高性能的特性，Rust 正在成为最流行的编程语言之一。在 Rust 中构建新的 web API 时，需要着重考虑前端和后端开发，以及所采用 web 框架的优缺点。\r\n\r\n在本文中，我们将讨论 web 框架是什么，并在前端和后端开发中，关于当前框架的使用，提供一些建议。\r\n\r\n# web 框架是什么？\r\n\r\nweb 框架是支持 web 应用开发的软件工具；web 框架的范围涵盖了从微应用的小型代码库，到企业应用的大型代码库，以及介于两者之间的所有层级。\r\n\r\n几乎所有 web 框架均为数据库、模板、会话、迁移，以及其它实用程序提供了支持库，以加快开发过程。较简单的 web 框架，更关注于呈现静态内容的前端管理。无论您的项目需要什么技术和工具，web 框架都可以提供。如 web 服务、web 资源，以及 web API 等，以帮助开发团队实现他们的想法。\r\n\r\n在为您的项目选择合适的 web 框架时，您的开发团队应着重考虑以下方面：\r\n\r\n- 安全性\r\n- 灵活性\r\n- 社区生态\r\n- 项目规模\r\n\r\n根据您项目中需求的优先级，不同的 web 框架将帮助您解决最为紧迫的开发任务。本文中，我们将专门讨论用 Rust 构建的 web 框架。\r\n\r\n![rust-web](https://blog.budshome.com/static/articles/1617419910.jpg)\r\n\r\n# web 框架的优势是什么？\r\n\r\nWeb 框架使开发人员更容易进行 web 开发，以及构建桌面应用程序。通过标准化构建过程，和其常见的自动化活动和任务，web 框架可以节省开发人员的时间，甚至可以促进代码重用，以提高效率。\r\n\r\n在下面的内容中，我们将回顾 Rust 中的 web 框架，因为它们与使用 Rust 进行前端和后端的开发相关。然后，我们将评估每个框架阶段的稳定性、生产就绪性，以及适用项目规模。\r\n\r\n# web 前端框架，以及 Wasm\r\n\r\nWebAssembly，简称 Wasm，是一种新的编码方式，可以在现代的网络浏览器中运行 － 它是一种低级的类汇编语言，具有紧凑的二进制格式。wasm 被设计为可以与 JavaScript 共存，允许两者一起工作。它支持包括 C/C++、Golang，以及 Rust 语言，并对字节码进行目标编译，以便它们可以以近乎本地的性能，运行在 Web 之上。Wasm 的输出可与 JS 一起运行，并可以发布到 `npm` 和其他包。\r\n\r\nRust 使用一个名为 `wasm-pack` 的工具，以组装和包装为目标 wasm 应用的 crate。详细请参阅 [Rust 及其 Wasm 应用开发指南](https://blog.logrocket.com/getting-started-with-webassembly-and-rust/)。\r\n\r\n以下是一些为 Rust（Wasm）设计的前端 web 框架。\r\n\r\n## [stdweb](https://github.com/koute/stdweb)（译注：已超过一年半未更新）\r\n\r\nstdweb 是一个前端标准库，它提供了直接与 JavaScript web API 通信的能力。它是为了让开发人员能够在 Rust 中创建成熟的 JavaScript 应用而精心设计的，通过在语言之间提供简单的 API 绑定，以提高速度和性能。\r\n\r\nstdweb 支持闭包、任意结构，以及 web API 的标准组件，包括 DOM、event，和 window。请参阅这几个[示例项目](https://github.com/koute/stdweb/tree/master/examples)，以了解它是如何工作的。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：否\r\n- 项目规模：小\r\n\r\n## [Yew](https://yew.rs/docs/en/intro/)（译注：最为成熟）\r\n\r\nYew 是 stdweb 的改进版本。它是一个基于组件的框架（类似于 React 和 Elm），支持多线程、基于组件的模式，以及其它类似于 stdweb 的特性。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：否\r\n- 项目规模：小、中、大\r\n\r\n## [Percy](https://chinedufn.github.io/percy/)\r\n\r\nPercy 是一个用于构建单页应用程序（SPA），以及 UI 管理的工具包，包括针对特定浏览器和屏幕（桌面、移动）的优化。Percy 的开发工作正在进行；需要很多改进，以获得更好的结构、优化的样板文件和一些 bug 修复。\r\n\r\n概述：\r\n\r\n- 稳定：否\r\n- 生产就绪：否\r\n- 项目规模：小、中、大\r\n\r\n## [Sauron](https://docs.rs/sauron/0.31.2/sauron/)\r\n\r\nSauron 是一个微前端框架，它的灵感来自 [Elm 体系结构](https://guide.elm-lang.org/architecture/)。它支持事件、状态管理和组件。Sauron `使用一个名为html2sauron` 的库，将 html 转换为 Sauron 视图代码，然后进行渲染优化。\r\n\r\n概述：\r\n\r\n- 稳定：否\r\n- 生产就绪：否\r\n- 项目规模：小\r\n\r\n## [Seed](https://seed-rs.org/)（译注：译者测试过此框架，比较推荐）\r\n\r\nSeed 是一个前端框架，用于创建性能驱动的，且可靠的 web 应用程序，该应用程序还具有[类似 Elm 的体系结构](https://guide.elm-lang.org/architecture/)。它有最小的配置和样板文件，并有清晰的文档，使得任何人都可以很容易地开始。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：否\r\n- 项目规模：小、中、大\r\n\r\n## [Smithy](https://www.smithy.rs/)\r\n\r\nSmithy 为开发人员提供了一个简单的学习曲线。它支持注入和子组件、事件、状态管理、与 JavaScript 交互、`smd!` 宏（受 React 的 Jsx 启发），以及对服务器部署的支持。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是（译注：原文如此，实际 smithy 仅为 0.07 版本，2 个开发者）\r\n- 项目规模：小、中、大\r\n\r\n# web 后端框架\r\n\r\n后端开发，是指 web 应用的服务器端操作。后端开发是应用程序的核心操作，这些操作通常控制和处理其数据和行为，例如提交表单或登录帐户。后端开发主要关注于数据管理，以及处理数据所需的数据库、脚本、自动化实践，以及体系结构。\r\n\r\nRust 为后端开发提供了多种 web 框架，包括来自不同开发者的工具和库。旨在提供一种高效、安全和灵活的方法，以构建、测试和运行应用程序。\r\n\r\n后端开发框架的一些最典型功能包括：\r\n\r\n- 数据库管理\r\n- 会话\r\n- 模板\r\n- 对象关系映射（ORM）\r\n- 迁移和部署\r\n\r\n## [Rocket](https://rocket.rs/)\r\n\r\nRocket 是一个流行的、成熟的 web 框架，它使开发人员可以轻松、[快速地编写 web 应用](https://blog.logrocket.com/rust-web-apps-using-rocket-framework/)。而不必考虑安全性、灵活性或功能。它支持测试库、cookie、数据流、路由、模板、数据库、ORM，以及项目样板等。Rocket 还拥有一个庞大而活跃的开发者社区。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小、中、大\r\n\r\n## [Actix](https://actix.rs/)\r\n\r\n- [actix-web v3 中文文档](https://actix-web.budshome.com/)\r\n- [清洁的 actix-graphql-react 模板项目](https://github.com/zzy/actix-graphql-react)：actix-web + juniper(GraphQL server) + diesel(ORM); Frontend: react + apollo(GraphQL client)。\r\n\r\n类似 Rocket，Actix 是一个强大的后端 web 框架。Actix 采用了一种基于 [actor 模型的架构模式](https://docs.rs/axiom/0.2.1/axiom/#:\\~:text=Getting%20Started,actors%20for%20all%20processing%20activities.&text=An%20actor%20can%20be%20interacted,process%20a%20message%20only%20once.)，并为构建服务和微应用开发做好了充分的准备。它支持路由、中间件、测试、websocket、数据库，以及服务重载等，并且可以托管在 NGINX 之上。Actix 可以用来构建一个全面的 web 应用程序和 web API。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小、中、大\r\n\r\n## [Gotham](https://gotham.rs/)\r\n\r\nGotham 是一个灵活的 web 框架，为稳定版 Rust 构建。其是静态类型的，从而确保应用程序在编译时总是正确表达。Gotham 基于 Tokio 和 hyper，提供异步支持。\r\n\r\nGotham 支持路由、提取器（类型安全数据请求）、中间件、状态共享和测试。Gotham 没有工程结构、样板文件，或数据库支持。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小、中、大\r\n\r\n## [Rouille](https://github.com/tomaka/rouille)\r\n\r\nRouille 是一个微框架，它通过一个监听 socket 解析 HTTP 请求，采用线性请求和响应设计。它是为了方便用户学习而构建的。Rouille 通过 CGI、输入（请求头和请求体）、内容编码、代理、会话和 websocket 支持请求处理。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：否\r\n- 项目规模：小\r\n\r\n## [Nickels](https://nickel-org.github.io/)\r\n\r\nNickels 是一个小型而轻量级的框架，其 API 受到了流行的 JavaScript Express 框架的启发。它提供了灵活的路由、中间件、JSON 处理、自定义错误处理程序、模板，以及样板文件等。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小、中\r\n\r\n## [Thruster](https://github.com/thruster-rs/Thruster)\r\n\r\nThruster 是一个快速而可靠的 Rust web 框架，灵感来自于分层设计的 Koa 和 Express。Thruster 的 SSL 特性已就绪，可提供安全访问和测试的。Thruster 是为适应 async/await 而构建的，并为中间件、错误处理、数据库和测试提供支持。\r\n\r\n概述：\r\n\r\n- 稳定：否\r\n- 生产就绪：否\r\n- 项目规模：小型\r\n\r\n## [Iron](https://github.com/iron/iron/)\r\n\r\nIron 是一个内置于 hyper 中的 web 框架，关注并发性、可扩展性和最小负载。它可以在多台机器上水平扩展，或者在更强大的机器上多种方式扩展。因为它被设计成可扩展和可插拔的，所以 Iron 主要将中间件、插件，可选扩展（第三方扩展）作为其主要组件。\r\n\r\nIron 提供对路由、JSON 解析、URL 编码解析、会话，以及静态文件的支持。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小型\r\n\r\n## [Tide](https://github.com/http-rs/tide)\r\n\r\n- [Tide 中文文档（最新版）](https://tide.budshome.com/)\r\n- [清洁的 tide-graphql-mongodb 模板项目](https://github.com/zzy/tide-graphql-mongodb)：\r\n  - 后端（backend）主要提供 graphql 服务，使用了 tide, async-graphql, jsonwebtoken, mongodb 等相关 crate。\r\n  - 前端（frontend）提供 web 应用服务，使用了 tide, rhai, surf, graphql_client, handlebars-rust, cookie 等相关 crate。\r\n- [Tide 在生产环境的实践示例项目](https://github.com/zzy/surfer)\r\n\r\nTide  是小型而实用的 Rust web 应用程序框架，为快速开发而构建（类似于 python 的 flask，或 nodejs 的 express，或 Ruby 的 Sinatra），专注于以异步 Rust 版本构建 web 应用。\r\n\r\nTide 提供对路由、身份验证、侦听器、日志、模板引擎、中间件、测试，以及其它实用程序的支持。\r\n\r\n概述：\r\n\r\n- 稳定：是\r\n- 生产就绪：是\r\n- 项目规模：小、中、大\r\n\r\n对于构建高级 web 应用的后端 web 框架，我推荐 Rocket、Actix，以及 Tide（异步支持）。它们也都被 Rust 社区所接受，并且各自框架社区都提供了完善的支持库。\r\n\r\n# 结语\r\n\r\nRust web 开发中，为前端或后端开发项目选择正确的 web 框架时，必须考虑以下几点：框架是否稳定？为生产环境中使用，准备就绪了吗？它适合你的项目规模吗？\r\n\r\n根据您的实际情况进行选择，然后，您使用的 Rust web 框架将帮助您，提高开发效率、运行性能，以及生产率。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-03T06:07:13.067Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.067Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e83"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "【2021-04-03】Rust 核心团队人员变动",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021-04-03 Rust 内部博客发文：Niko Matsakis 正在逐步退出 Rust 核心团队，他将集中精力带领 Rust 语言团队。",
+    slug: "-(2021-04-03)--rust-he-xin-tuan-dui-ren-yuan-bian-dong",
+    uri: "/budshome/-(2021-04-03)--rust-he-xin-tuan-dui-ren-yuan-bian-dong",
+    content: "*2021-04-03，Pietro Albini 代表 Rust 核心团队发文——*\r\n\r\nNiko Matsakis 正在[逐步退出](https://smallcultfollowing.com/babysteps/blog/2021/04/02/my-shiny-future/) Rust [核心团队](https://www.rust-lang.org/governance/teams/lang)，他将集中精力带领 Rust [语言团队](https://www.rust-lang.org/governance/teams/lang)。多年来，Niko Matsakis 为 Rust 项目做了大量工作。从一开始，Niko 就是核心团队的一员，并在 Rust 的治理过程中，发挥了关键作用。关于 Niko 将为专注的新焦点带来什么特性，Rust 团队都很期待！\r\n\r\n谢谢 Niko！\r\n\r\n> 注1：Rust *治理* 一词为**官方用语**，指社区如何构筑 Rust 方面，包括：年度路线图、RFC 流程，以及团队建设等。\r\n\r\n> 注2：Niko 对 Rust 的规划，请参与他的博文《[我的“美好未来”](https://smallcultfollowing.com/babysteps/blog/2021/04/02/my-shiny-future/)》。Niko 宣布他退出 Rust 核心团队后，计划将所有的精力集中在语言设计团队负责人的角色上，以及作为 AWS Rust 平台团队的技术负责人（AWS 是 Rust 基金会的 6 个创始人之一，Rust 基金会 6 个创始人包括国内华为公司）。\r\n\r\n*参阅资料：*\r\n\r\n- Rust 内部博客文章：[Core Team updates](https://blog.rust-lang.org/inside-rust/2021/04/03/core-team-updates.html)\r\n- Niko 博客文章：[My \"shiny future\"](https://smallcultfollowing.com/babysteps/blog/2021/04/02/my-shiny-future/)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-03T14:25:02.548Z"),
+    "updated_at": ISODate("2021-04-03T14:25:02.548Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e8b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "使用 Rust 极致提升 Python 性能：图表和绘图提升 24 倍，数据计算提升 10 倍",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "有时候，仅采用标准方法还不够好。本篇文章，是关于在重要的地方做最小的改变，从而达到最大的效果。处理来自船舶的 GPS 信号时，使用 Python 各种类库优化后，性能仍然不能满足。通过大约 300 行 Rust 代码，包含细节的整个实现，甚至包括 Rust 文档和单元测试！使得数据处理的速度大幅提升：图表和绘图提升 24 倍，数据计算提升 10 倍。生产环境中的体现，表明这是经过深思熟虑的、有针对性的优化。这次改进，不仅仅是学术上的，也不仅仅是为了降低工作成本。",
+    slug: "shi-yong-rust-ji-zhi-ti-sheng-python-xing-neng-:tu-biao-he-hui-tu-ti-sheng-24-bei-,shu-ju-ji-suan-ti-sheng-10-bei",
+    uri: "/budshome/shi-yong-rust-ji-zhi-ti-sheng-python-xing-neng-:tu-biao-he-hui-tu-ti-sheng-24-bei-,shu-ju-ji-suan-ti-sheng-10-bei",
+    content: "# 关于作者\r\n\r\n## Edward Wright\r\n\r\nVortexa 公司的首席 GIS 工程师。不写代码的时候，他忙着跑步机、山地自行车、建筑、修理东西，以及油画。\r\n\r\n> **有时候，仅采用标准方法，还不够好。本篇文章，是关于在重要的地方做最小的改变，从而达到最大的效果。**\r\n\r\n# 问题的边界\r\n\r\n在 vortex 公司，我们广泛使用 Python。Python 非常适合于原型设计，也非常适合于数据的科学计算。虽然 Python 不是最快的语言，但它通常是非常棒的。\r\n\r\n然而，最近我们发现一个特定的 Python 任务，需要 30 小时才能运行完毕。由于一些模型的变更，当我们想对一些业务调用重新计算时，这个运行时间真的影响了我们的 QA 反馈周期，使得将更新的模型引入到生产环境，变得更加困难。如果我们能够解决这个问题，将会加速模型的改进，为团队和我们的客户带来真正的好处。\r\n\r\n在没有太多无关细节的情况下，我们的任务是处理来自船舶的 GPS 信号，并在应用其它算法之前，通过一组多边形算法，对信号进行过滤。\r\n\r\n# 为什么这段代码如此慢？\r\n\r\n无需做假设，我们的出发点必须是先测量这段代码。\r\n\r\n我创建了代码的一个副本（复制/粘贴即可），但对其进行了修改，以便于可以处理一个小数据集。并在将来，对不同的技术进行比较。这段测试的代码，仍然忠实地再现了生产环境中所部署代码的运行负载。我使用优秀的 [pyinstrument 模块](https://github.com/joerick/pyinstrument)，深入了解了 Python 代码中正在发生的事情。为了防止由于运行时间过短而扭曲结果，在所有初始化工作完成后，我才开始分析。\r\n\r\n结果如下：\r\n\r\n![测量 Python 代码](https://blog.budshome.com/static/articles/1617455184.jpg)\r\n\r\n时间单位为秒。\r\n\r\n`main` 方法，代表了算法在完成整个初始化之后的处理过程。`test_python` 方法，正在测试我认为很慢的部分代码的逻辑。当然，所有其它代码的逻辑仍然是存在的。\r\n\r\n所以在 34.3 秒的运行时间中，29.8 秒花在了我前面提到的过滤逻辑中，25.1 秒消耗在 `matplotlib` 处理中，主要是做多边形绘图运算。\r\n\r\n# 哪儿有问题？\r\n\r\n我进行的测试数据，使用了近 8 米的船舶定位。我们正在研究全世界的数百个区域，数百个实现过滤功能的多边形算法要运行。我们使用的是 pandas，船舶的位置存储在 dataframe，但是我们需要将这个 dataframe 传递给 matplotlib，用于我们要测试的每个多边形区域。\r\n\r\n我们对一个库进行了数百次调用，每次都要传递数百万条记录。在生产环境中，我们处理的数据可能要增加到 2500 倍，因此使用者才能看到 30 小时内，船舶的位置数据来自何处。\r\n\r\n# 如何处理？\r\n\r\n或许，在生产环境中进行繁重的任务处理，matplotlib 不是合适的工具？既然代码中已经在使用 pandas 了，为什么不试试 [geopandas](https://geopandas.org/) 呢？然后，我们可以在一个库调用中，计算所有多边形区域。\r\n\r\n然而，这是一个灾难，我们增加了 10 倍的运行时间！Geopandas（以及它依次调用的其它库）使用了 423 个堆栈帧，而 matplotlib 只使用了 5 个堆栈帧，我觉得这非常惊人。测试跟踪还显示，即使创建 GeoDataFrames，也要比基于 matplotlib 的整体处理，花费更长的时间。\r\n\r\n所以，我们有一个选择题。我们可以：\r\n\r\n1. 尝试将数据分块，然后使用多进程 multi-processing 模块处理（在 Python 中是不推荐的），从而利用更强大的云虚拟机，用来支撑 matplotlib 计算。\r\n2. 使用线程，编写一个非常小的本地自定义库，用来完成我们想要的数学运算。\r\n\r\n第一种方法可以工作，但不太可能是非常经济高效的，因为我们只是并行地运行多个较慢代码的副本。于是，我决定试试第二种选择。\r\n\r\n# 规划自定义本地库\r\n\r\n考虑到在早期的 [Java point-in-polygon](https://www.vortexa.com/insight/whats-the-point-in-polygon) 开发中，吸取到的一些经验教训，这次我们可以使用一些技巧。例如：\r\n\r\n1. 避免为每个多边形计算都进行库调用，为每个 dataframe 只进行一次调用，可以大量减少库调用的开销。\r\n2. 避免在实际问题非常简单的情况下，使用重量级几何计算库，否则开销会严重影响性能。\r\n3. 对每个多边形进行边界测试。\r\n4. 尽可能基于 32 位整数（比浮点更快）。\r\n5. 使用线程。\r\n\r\n需要说明的是，Java 肯定不是这里的答案。Java 与 Python 的集成，真是太吓人了。\r\n\r\n# Rust\r\n\r\n最近，我一直在使用 [PyO3](https://github.com/PyO3/pyo3) 做一些实验性的工作，它允许 Rust / Python 的双向集成。这里，我们将重点介绍 Python 导入和使用 Rust 实现的模块。\r\n\r\n![PyO3](https://blog.budshome.com/static/articles/pyo3.png)\r\n\r\n以下是实现的功能明细：\r\n\r\n1. 在 Rust 中实现 Python 类。\r\n2. 在构造函数中，存放 geojson 字符串数组，表示我们的多边形区域。\r\n3. 从船舶位置 dataframe，获取纬度/经度坐标，存入 numpy 数组。\r\n4. 返回结果为 numpy 数组（便于与 Python pandas 集成），表示每个坐标集对应的多边形（如果有的话）。\r\n\r\n**包含细节的整个实现，需要大约 300 行 Rust 代码，甚至包括 Rust 文档和单元测试**！并且，还替换了大约 30 行 Python 代码（增加对 matplotlib 的调用）。PyO3 可以很好地与 [numpy](https://crates.io/crates/numpy) 和 [ndarray](https://crates.io/crates/ndarray) crate（Rust 库）配合使用，允许其轻松地与 pandas 以及 numpy array 集成。并行处理方面，我们使用了 [rayon](https://crates.io/crates/rayon)。\r\n\r\n# 有用吗？\r\n\r\n当然有用。否则，这篇博文会很无聊的……\r\n\r\n![Python 调用 Rust](https://blog.budshome.com/static/articles/1617455249.jpg)\r\n\r\n测试数据是完全相同的。\r\n\r\n**“使用 Rust，我们已经将 matplotlib 的处理时间，从 29.8 秒减少到 2.9 秒。”**\r\n\r\nPython 只使用一个线程，而 Rust 使用了 8 个线程（intel i7，超线程 4 核，所以称之为 4-5 倍的有效计算）。这还包括 Python 将结果集插回 pandas dataframe 的时间消耗。将实际的 matplotlib 与 Rust 库调用进行比较，可以得到 24 倍的改进。输出数据已经检查过，结果显示完全相同。\r\n\r\n我们的新解决方案（在功能级别，即 dataframe 输入/输出），速度提高了 10 倍。当我们的目标是更快的 QA 周期时，需要最终部署在 AWS 中的 Kubernetes 集群中。集群中运行的代码，将其计算核心数量增加到 4 个，是完全合理的。考虑到后续的过滤算法，Rust 处理时间约占任务总运行时间的 20%，因此添加更多线程几乎没有意义，除非任务的其他部分可以受益。\r\n\r\n# 生产环境的提升\r\n\r\n以上小修改的具体代码，已经部署在正式生产环境中。上文提到，数据量会扩大到 2500 倍。\r\n\r\n**“这个处理过程，过去需要 30 个小时，现在需要 6 个小时，速度提升 500%。”**\r\n\r\n这次改进，不仅仅是学术上的，也不仅仅是为了降低工作成本。\r\n\r\n**“我们为客户带来模型变更后的内部流程，包括 QA，现在比以前快了一天——每次都快。”**\r\n\r\n这是经过深思熟虑的、有针对性的优化。\r\n\r\n我们必须考虑到，我们在这里添加了一项新技术，使代码复杂化了，并使维护源代码存储库变得更加困难。但是，通过限制新库的功能实现范围，具体地小改进，可以缓解这种情况。业务逻辑没有改变，但实现方式已经改变了，只要 `point-in-polygon` “正常工作”——我们有单元测试来证明这一点——这次代码改进就不会造成任何伤害。\r\n\r\n原文链接：[Using Rust to corrode insane Python run-times](https://medium.com/vortechsa/our-python-is-getting-a-bit-rusty-e2b6fd6d3344)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-03T17:20:17.85Z"),
+    "updated_at": ISODate("2021-04-03T17:20:17.85Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e93"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 迭代器（Iterator trait ）的要诀和技巧",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "迭代器（Iterator trait ）,是 Rust 中最有用的 trait 之一。通过两个要诀：为自定义集合（collection）添加 iter() 函数；从不同类型的多个迭代器中，返回其中之一，我们对其做以认知。",
+    slug: "rust-die-dai-qi-(iterator-trait-)de-yao-jue-he-ji-qiao",
+    uri: "/budshome/rust-die-dai-qi-(iterator-trait-)de-yao-jue-he-ji-qiao",
+    content: "最近，敲 Rust 代码的过程中，对于其中`迭代器（Iterator trait ）`的使用，遇到了一些不明所以的问题，求助于万能的搜索引擎，找到了一些资料。因此，对于 Rust 中`迭代器（Iterator trait ）`的使用，有了一些新的认知。特此写文以记之。\r\n\r\n> 主要参考自 [Robin Moussu](https://robinmoussu.gitlab.io/blog/page/about/) 的博客文章，以及他的 [github 仓库](https://github.com/robinmoussu)。\r\n\r\n# 要诀1：为自定义集合（collection）添加 `iter()` 函数\r\n\r\n如果您要创建自己的集合，例如一个封装`动态数组 Vec` 的结构体，那么，您可能需要为其提供一个 `iter()` 函数。这样，集合的使用者，就可以访问集合的元素，而不会暴露集合的实现细节。当然，您也可以创建一个新类型，为其实现 `Iterator` trait，但客观地讲，即使[实现 `Iterator` trait 并不复杂](https://doc.rust-lang.org/std/iter/index.html#implementing-iterator)，但也有诸多需要特别注意的细节！幸运的是，还有一种更简单的方法：\r\n\r\n``` rust\r\nstruct MyCollection {\r\n    data: Vec<i32>, // 或者其它自身具有 `iter()` 方法的类型\r\n    // ...\r\n}\r\n\r\nimpl MyCollection {\r\n    fn iter(&self) -> impl Iterator {\r\n        self.data.iter()\r\n    }\r\n    // ...\r\n}\r\n```\r\n\r\n上述代码可以吗？跑一跑看看有没有问题。\r\n\r\n``` bash\r\nerror[E0759]: `self` has an anonymous lifetime `'_` but it needs to satisfy a `'static` lifetime requirement\r\n --> src/lib.rs:8:19\r\n  |\r\n7 |     fn iter(&self) -> impl Iterator {\r\n  |             ----- this data with an anonymous lifetime `'_`...\r\n8 |         self.data.iter()\r\n  |         --------- ^^^^\r\n  |         |\r\n  |         ...is captured here...\r\n  |\r\nnote: ...and is required to live as long as `'static` here\r\n --> src/lib.rs:7:23\r\n  |\r\n7 |     fn iter(&self) -> impl Iterator {\r\n  |                       ^^^^^^^^^^^^^\r\nhelp: to declare that the `impl Trait` captures data from argument `self`, you can add an explicit `'_` lifetime bound\r\n  |\r\n7 |     fn iter(&self) -> impl Iterator + '_ {\r\n  |                                     ^^^^\r\n```\r\n\r\n根据编译器的提示，是因为我忘了为 `iter()` 的返回类型设置生命周期标记 `'_`。我们来解决这个问题：\r\n\r\n``` rust\r\nfn iter(&self) -> impl Iterator + '_ {\r\n    self.data.iter()\r\n}\r\n```\r\n\r\n这称之为生命周期省略，对于省略的详细描述，可以[参考文档](https://rust-by-example.budshome.com//scope/lifetime/elision.html)。这段代码，和如下代码是等价的：\r\n\r\n``` rust\r\nfn iter<'a>(&'a self) -> impl Iterator + 'a {\r\n    self.data.iter()\r\n}\r\n```\r\n\r\n幸运的是，编译器足够聪明，能够理解匿名生存期 `'_`，并可以将其绑定到唯一引用 `&self` 的生命周期。\r\n\r\n如果你不想自己编写上述代码，请移步 [Rust 官方演练场（Playground）](https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=dc814831f73fdd1dcd1945be94a44c0b)。\r\n\r\n# 要诀2：从不同类型的多个迭代器中，返回其中之一\r\n\r\n如果您熟悉其它高级编程语言，您可能会尝试创建如下函数：\r\n\r\n``` rust\r\nfn forward_or_backward<T>(v: &Vec<T>, forward: bool) -> impl Iterator + '_\r\n{\r\n    if forward {\r\n        v.iter()\r\n    } else {\r\n        v.iter().rev()\r\n    }\r\n}\r\n```\r\n\r\n`v.iter()` 和 `v.iter().rev()`，各自都返回一个实现了 `Iterator` trait 的类型。这段代码跑的通吗？\r\n\r\n> 任何条件表达式（如 `if`、`match`、任何类型的循环等）的所有分支，其具体类型必须匹配。\r\n\r\n我寄希望于编译器，希望它足够聪明，能够自动创建一个新类型，但目前情况并非如此。不过 Rust 语言团队已经在开发更重要、更令人兴奋的特性。\r\n\r\n让我们看看编译器怎么说：\r\n\r\n``` bash\r\nerror[E0308]: `if` and `else` have incompatible types\r\n --> src/main.rs:6:9\r\n  |\r\n3 | /     if forward {\r\n4 | |         v.iter()\r\n  | |         -------- expected because of this\r\n5 | |     } else {\r\n6 | |         v.iter().rev()\r\n  | |         ^^^^^^^^^^^^^^ expected struct `std::slice::Iter`, found struct `Rev`\r\n7 | |     }\r\n  | |_____- `if` and `else` have incompatible types\r\n  |\r\n  = note: expected type `std::slice::Iter<'_, _>`\r\n           found struct `Rev<std::slice::Iter<'_, _>>`\r\nhelp: you could change the return type to be a boxed trait object\r\n  |\r\n1 | fn forward_or_backward<T>(v: &Vec<T>, forward: bool) -> Box<dyn Iterator<Item=&T> + '_>\r\n  |                                                         ^^^^^^^                       ^\r\nhelp: if you change the return type to expect trait objects, box the returned expressions\r\n  |\r\n4 |         Box::new(v.iter())\r\n5 |     } else {\r\n6 |         Box::new(v.iter().rev())\r\n```\r\n\r\n编译器的建议并不难读懂，但是为什么我们要为动态内存分配和动态调度付出代价呢？如果我们使用静态调度呢？让我们来实现它：\r\n\r\n首先，我们需要一个枚举来存储所有分支。在这里，我们完全可以使用类似于 [`either` crate](https://docs.rs/either/1.6.1/either/enum.Either.html) 的库来实现。但是，为了解释实现细节，我们将自己实现。\r\n\r\n``` rust\r\nenum Either<Left, Right> {\r\n    Left(Left),\r\n    Right(Right),\r\n}\r\n```\r\n\r\n现在，我们要为新类型实现 `Iterator` trait。当然，我们只能在枚举元素 `Left` 和 `Right` 都是迭代器的情况下，才能这样做。这两个迭代器必须产生相同类型的元素。\r\n\r\n``` rust\r\nimpl <Left, Right, Item> Iterator for Either<Left, Right>\r\nwhere\r\n    Left: Iterator<Item=Item>,\r\n    Right: Iterator<Item=Item>,\r\n{\r\n    type Item = Item;\r\n    fn next(&mut self) -> Option<Self::Item> {\r\n        match self {\r\n            Self::Left(it) => it.next(),\r\n            Self::Right(it) => it.next(),\r\n        }\r\n    }\r\n}\r\n```\r\n\r\n> 我们应该实现 `nth()` 和 `fold()` 方法吗？\r\n\r\n[文档](https://doc.rust-lang.org/std/iter/index.html)是这样讲的：\r\n\r\n- 需要注意到，迭代器提供了一个默认的方法实现，比如 `nth` 和 `fold`，它们在内部调用 `next`。\r\n- 但是，如果迭代器不调用 `next`，就可以更有效地进行计算。那么，也可以自定义 `nth` 和 `fold` 的实现。\r\n\r\n所以，`nth()` 和 `fold()` 方法的实现不是必需的。但是，将对 `nth()` 和 `fold()` 方法的调用，委托给 `Left` 和 `Right` 的实现，可能是个好主意，就像我们对 `next()` 方法所做的那样。因为 `Iterator` trait 的任何方法，都可以被专门实现为 `Left` 和 `Right` 类型。所以，最好对所有函数都这样做。\r\n\r\n同样的逻辑，也可以应用于如 `DoubleEndedIterator`、`ExactSizeIterator`，和 `FusedIterator` 等 trait。\r\n\r\n让我们以 `ExactSizeIterator` trait 为例，我们希望将实现转发给基础类型：\r\n\r\n``` rust\r\nimpl<Left, Right> ExactSizeIterator for Either<Left, Right>\r\nwhere\r\n    Left: ExactSizeIterator,\r\n    Right: ExactSizeIterator,\r\n{\r\n    fn len(&self) -> usize {\r\n        match self {\r\n            Self::Left(it) => it.len(),\r\n            Self::Right(it) => it.len(),\r\n        }\r\n    }\r\n    fn is_empty(&self) -> bool {\r\n        match self {\r\n            Self::Left(it) => it.is_empty(),\r\n            Self::Right(it) => it.is_empty(),\r\n        }\r\n    }\r\n}\r\n```\r\n\r\n代码是否正确？我们跑一下，看看编译器怎么说：\r\n\r\n``` bash\r\nerror[E0271]: type mismatch resolving `<Right as Iterator>::Item == <Left as Iterator>::Item`\r\n  --> src/main.rs:50:19\r\n   |\r\n50 | impl<Left, Right> std::iter::ExactSizeIterator for Either<Left, Right>\r\n   |      ----  -----  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected type parameter `Right`, found type parameter `Left`\r\n   |      |     |\r\n   |      |     expected type parameter\r\n   |      found type parameter\r\n   |\r\n   = note: expected associated type `<Right as Iterator>::Item`\r\n              found associated type `<Left as Iterator>::Item`\r\n   = note: a type parameter was expected, but a different one was found; you might be missing a type parameter or trait bound\r\n   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters\r\n   = note: required because of the requirements on the impl of `Iterator` for `Either<Left, Right>`\r\n```\r\n\r\n编译器检查后告知，应当明确指出，`Right` 和 `Left` 都是产生相同类型的迭代器。我们做些小修改：\r\n\r\n``` rust\r\nimpl<Left, Right, T> std::iter::ExactSizeIterator for Either<Left, Right>\r\nwhere\r\n    Left: std::iter::ExactSizeIterator + Iterator<Item=T>,\r\n    Right: std::iter::ExactSizeIterator + Iterator<Item=T>,\r\n```\r\n\r\n好像该做的都做了？我们开始测试。\r\n\r\n``` rust\r\nfn main() {\r\n    let v = vec![0, 1, 3, 7];\r\n\r\n    let forward: Vec<_> = forward_or_backward(&v, true).collect();\r\n    let backward: Vec<_> = forward_or_backward(&v, false).collect();\r\n    println!(\"forward: {:?}\", forward); // 0, 1, 3, 7\r\n    println!(\"backward: {:?}\", backward); // 7, 3, 1, 0\r\n}\r\n```\r\n\r\n又出错了：\r\n\r\n``` bash\r\nerror[E0277]: `<impl Iterator as Iterator>::Item` doesn't implement `Debug`\r\n  --> src/main.rs:87:31\r\n   |\r\n87 |     println!(\"forward: {:?}\", forward); // 0, 1, 3, 7\r\n   |                               ^^^^^^^ `<impl Iterator as Iterator>::Item` cannot be formatted using `{:?}` because it doesn't implement `Debug`\r\n   |\r\n   = help: the trait `Debug` is not implemented for `<impl Iterator as Iterator>::Item`\r\n   = note: required because of the requirements on the impl of `Debug` for `Vec<<impl Iterator as Iterator>::Item>`\r\n   = note: required by `std::fmt::Debug::fmt`\r\n   = note: this error originates in a macro (in Nightly builds, run with -Z macro-backtrace for more info)\r\n```\r\n\r\n太奇怪了，我们是对整数进行迭代，整数本身就实现了调试特性的，为什么这儿不起作用呢？\r\n\r\n让我们想一想……\r\n\r\n当我们实现 `forward_or_backward()` 时，我们并没有对迭代项的类型进行转发。我们上面的代码是：\r\n\r\n``` rust\r\nfn forward_or_backward<T>(v: &Vec<T>, forward: bool) -> impl Iterator + '_\r\n```\r\n\r\n可以看到，迭代器`产生项`的类型是未知的。如果我们在收集 vector 的值时，不使用类型推断。那么，很明显：\r\n\r\n``` rust\r\nlet forward: Vec<i32> = forward_or_backward(&v, true).collect();\r\n```\r\n\r\n``` bash\r\nerror[E0277]: a value of type `Vec<i32>` cannot be built from an iterator over elements of type `<impl Iterator as Iterator>::Item`\r\n  --> src/main.rs:85:59\r\n   |\r\n85 |     let forward: Vec<i32> = forward_or_backward(&v, true).collect();\r\n   |                                                           ^^^^^^^ value of type `Vec<i32>` cannot be built from `std::iter::Iterator<Item=<impl Iterator as Iterator>::Item>`\r\n   |\r\n   = help: the trait `FromIterator<<impl Iterator as Iterator>::Item>` is not implemented for `Vec<i32>`\r\n```\r\n\r\n所以，我们仅需要修改 `forward_or_backward` 的声明：\r\n\r\n``` rust\r\nfn forward_or_backward<T>(v: &Vec<T>, forward: bool) -> impl Iterator<Item=T> + '_\r\n```\r\n\r\n现在，代码正确了。\r\n\r\n如果你不想自己编写上述代码，请移步 [Rust 官方演练场（Playground）](https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=62eb57c493513ca2b7a287f40f2d8552)。\r\n\r\n关于迭代器，还有很多要掌握的，它是 Rust 中最有用的 trait 之一，但今天就到此为止。\r\n\r\n谢谢您的阅读！\r\n\r\n原文链接：[Rust iterators tips and tricks](https://robinmoussu.gitlab.io/blog/post/2021-03-25_rust_iterators_tips_and_tricks/)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-04T04:14:08.172Z"),
+    "updated_at": ISODate("2021-04-04T04:14:08.172Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rustic：完善的纯粹 Rust 技术栈实现的国际象棋引擎，多平台支持（甚至包括嵌入式设备树莓派 Raspberry Pi、Buster）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "`rustic` 国际象棋游戏引擎，纯粹 Rust 技术栈实现，未从任何其它国际象棋引擎做任何派生。rustic 集成了许多近几十年产生的新概念，包括国际象棋的玩法和编程开发方面，该引擎站在过去的国际象棋引擎巨人的肩膀上。支持多平台支持（甚至包括嵌入式设备树莓派 Raspberry Pi、Buster），可与其它开源的游戏用户界面集成。",
+    slug: "rustic:wan-shan-de-chun-cui-rust-ji-zhu-zhan-shi-xian-de-guo-ji-xiang-qi-yin-qing-,duo-ping-tai-zhi-chi-(shen-zhi-bao-gua-qian-ru-shi-she-bei-shu-mei-pai-raspberry-pi,-buster)",
+    uri: "/budshome/rustic:wan-shan-de-chun-cui-rust-ji-zhu-zhan-shi-xian-de-guo-ji-xiang-qi-yin-qing-,duo-ping-tai-zhi-chi-(shen-zhi-bao-gua-qian-ru-shi-she-bei-shu-mei-pai-raspberry-pi,-buster)",
+    content: "一个朋友咨询想自己做一个游戏平台，特别提到棋类的完善。在游戏概念发展上，要比目前的游戏平台全面，跟上时代潮流。比如拿国际象棋来说，要引入近几十年国际象棋发展中，产生的新概念。\r\n\r\n但笔者并不懂游戏开发，所以说不出什么门道。笔者偶尔玩的游戏也有限，最喜欢的莫过于国际象棋。和朋友沟通后，一时兴起搜索了下开源界。仅就国际象棋而言，发现了一个很有趣的游戏引擎，特此发个短文分享给 Rust 爱好者。\r\n\r\n这款国际象棋游戏引擎叫做 [`rustic`](https://rustic-chess.org/)，是 2019 年下半年开始开发的。纯粹 Rust 技术栈实现，目前仅有星星 30 个左右。作者完全是从头开发的，未从任何其它国际象棋引擎做任何派生。但是，rustic 集成了许多近几十年产生的新概念，包括国际象棋的玩法和编程开发方面。作者说：该引擎站在过去的国际象棋引擎巨人的肩膀上。\r\n\r\n![rustic](https://blog.budshome.com/static/articles/1617587474.jpg)\r\n\r\n# 引擎特性\r\n\r\n国际象棋的概念和新发展，笔者不做赘述，感兴趣的可以自行搜索。仅就游戏引擎的编程开发和实现方面，`rustic` 实现了如下功能特性：\r\n\r\n- 游戏引擎\r\n  - 位板展示\r\n  - 魔术移动\r\n  - 换位表\r\n  - UCI 协议\r\n- 游戏搜索\r\n  - Alpha/Beta 搜索\r\n  - 静默搜索\r\n  - “将”位扩展\r\n- 移位顺序\r\n  - TT 移位优先级\r\n  - MVV-LVA\r\n- 游戏评估\r\n  - 棋子盘点\r\n  - 游戏桌计算\r\n\r\n目前正在开发的功能特性包括：\r\n\r\n- XBoard 协议\r\n- 搜索中的修建项完善\r\n- 游戏暂停/结束时的锥形评估\r\n- 更多评估术语\r\n- 惰性 SMP\r\n- ……\r\n\r\n# 用户界面\r\n\r\n一款游戏，直接展示给玩家，并和其交互的用户界面非常重要。目前，一些开源的用户界面已经非常完善和精美。所以 `rustic` 引擎不提供自己的用户界面，而是使用 `UCI` 和 `XBoard` 协议，与图形用户界面进行通信。\r\n\r\n当前，`rustic` 引擎已经可以与以下游戏用户界面集成：\r\n\r\n- [Arena Chess GUI](http://www.playwitharena.de/)\r\n- [XBoard/Winboard](https://www.gnu.org/software/xboard/FAQ.html)\r\n- [CuteChess](https://cutechess.com/)\r\n- [Tarrasch](https://www.triplehappy.com/)\r\n- [The Shredder GUI](https://www.shredderchess.com/)\r\n- [Fritz / Chessbase series](https://en.chessbase.com/)\r\n- [Scid vs PC (database)](http://scidvspc.sourceforge.net/)\r\n- [Banksia GUI](https://banksiagui.com/)\r\n\r\n有些用户界面未有列出，但 `rustic` 引擎作者很热情。如果 `rustic` 引擎使用者想集成到其它自己感兴趣的用户界面，可以提出 PR，`rustic` 引擎作者将免费（免费程度未知）支持。\r\n\r\n# 平台支持，包含桌面版本\r\n\r\n目前，`rustic` 引擎提供很多平台支持，甚至包括嵌入式设备树莓派 Raspberry Pi、Buster 等。\r\n\r\n- Windows（包括 Windows 10）\r\n  - 32 位，通用版\r\n  - 64 位，通用版\r\n  - 64 位，旧版本\r\n  - 64 位，popcnt\r\n  - 64 位，bmi2\r\n- Linux（目前主要是测试在 Debian 8 稳定版及以上，但其它 Linux 版本也支持)\r\n  - 64 位，通用版\r\n  - 64 位，旧版本\r\n  - 64 位，popcnt\r\n  - 64 位，bmi2\r\n- 树莓派（Raspberry Pi、Buster）\r\n  - 32 位\r\n\r\n如前文所述，最主要的是，`rustic` 引擎作者很有激情，支持力度相当大。如果喜欢国际象棋游戏，又不想在网上乱七八糟的游戏平台泄露个人隐私的话，可以自己架一个游戏服务器，和好友，或者其它匿名玩家快乐地下棋。\r\n\r\n当然，`rustic` 引擎和其支持的用户界面，对于用户注册、聊天、记分，以及其它互动是完全支持的。只不过笔者个人，喜欢匿名游戏平台，不用注册，没有聊天交友一类乱七八糟的拓展，就是去随机下一盘棋。\r\n\r\n谢谢您的阅读！\r\n\r\n*参考资料：*\r\n\r\n- [rustic github 仓库](https://github.com/mvanthoor/rustic)\r\n- [rustic 官网及文档](https://rustic-chess.org/)\r\n- 开源的游戏类用户界面，见文章“用户界面”一节\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-05T03:03:13.388Z"),
+    "updated_at": ISODate("2021-04-05T03:03:13.388Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "RustyHermit——基于 Rust 实现的下一代容器 Unikernel",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "RustyHermit，基于 Rust 实现的下一代容器 Unikernel，和 Linux 主机系统相比，性能表现差别极小。由于映像直接包含 OS 内核，unikernel 可以直接在虚拟机中引导运行，并且不需要在 VM 中包含 Linux 内核，也不需要包含用户区的典型软件堆栈。unikernel 不提供传统意义上的系统调用，因为所有操作都是以内核的特殊级别运行的。通常，unikernel 中，通过系统调用完成的操作，是通过公共函数调用提供的。这些内核是在虚拟机中运行，这将应用程序与实际系统隔离开来。此外，利用通用编译器分析方法检查软件栈的完整性，甚至可以删除不需要的组件，减少应用程序的占用。",
+    slug: "rustyhermit----ji-yu-rust-shi-xian-de-xia-yi-dai-rong-qi-unikernel",
+    uri: "/budshome/rustyhermit----ji-yu-rust-shi-xian-de-xia-yi-dai-rong-qi-unikernel",
+    content: "> 本文主要摘选自 [stlankes](https://github.com/stlankes) 发表于 2021 年 3 月的文章 [The RustyHermit Unikernel](https://rust-osdev.com/showcase/rusty-hermit/)。\r\n\r\n[RustyHermit](https://github.com/hermitcore/rusty-hermit)，是一个 Unikernel 应用，它完全是由 Rust 开发的。[Unikernel](http://unikernel.org/) 是直接将内核作为库方式包含的应用程序映像，因此不需要安装操作系统（OS）。它们通常用于构建典型云应用，或者基础设施建设的核心虚拟化环境。\r\n\r\n> 这篇文章是我们 [Showcase](https://rust-osdev.com/showcase/) 系列的一部分，在这里，我们展示了 Rust 操作系统生态系统中有趣的项目。如果您愿意，可以通过[创建 PR](https://github.com/rust-osdev/homepage/pulls) 来添加您自己的项目。\r\n\r\n# 虚拟化的设计体系\r\n\r\n常见的虚拟化环境，是基于**经典虚拟机**的。在这种情况下，将模拟或虚拟化完整的机器，并在主机和来客户机上运行通用操作系统：\r\n\r\n![虚拟化环境设计](https://blog.budshome.com/static/articles/1617761158.jpg)\r\n\r\n> 这项技术已经在 VMware、Hyper-V 等虚拟产品中得到了广泛应用。然而，它引入了额外的开销，特别是在内存消耗和性能方面。\r\n\r\n通用虚拟机的另一种设计方法是：从**操作系统级别**虚拟化，其内核，允许存在多个独立的用户空间实例。这些孤立实例即称为容器。一个典型的代表是 LXC 或 Docker，与普通虚拟机相比，它的开销更小。但是，进程之间的隔离性较弱，可能提供的安全性较差。\r\n\r\n# Unikernel\r\n\r\n通常只有一个应用程序，如 web 服务器，在容器或虚拟机中运行。在这种情况下，单核是一个很有吸引力的解决方案。内核作为静态库，提供并链接到应用程序。由于映像直接包含 OS 内核，unikernel 可以直接在虚拟机中引导运行，并且不需要在 VM 中包含 Linux 内核，也不需要包含用户区的典型软件堆栈。\r\n\r\nunikernel 不提供传统意义上的系统调用，因为所有操作都是以内核的特殊级别运行的。通常，unikernel 中，通过系统调用完成的操作，是通过公共函数调用提供的。乍一看，这听起来比以前的方法更不安全。但是，这些内核是在虚拟机中运行，这将应用程序与实际系统隔离开来。此外，利用通用编译器分析方法检查软件栈的完整性，甚至可以删除不需要的组件，减少应用程序的占用。\r\n\r\n![unikernel](https://blog.budshome.com/static/articles/1617761999.jpg)\r\n\r\n比较流行的 unikernel，是诸如 [MirageOS](https://mirage.io/) 和 [Unikraft](http://www.unikraft.org/) 这样的内核。其中 MirageOS 是用 OCaml 语言开发的，而 Unikraft 仍然是使用经典的 C 语言。与这些内核不同，RustyHermit 完全用 Rust 编写，以受益 Rust 的高性能和安全性。\r\n\r\n# RustyHermit\r\n\r\n原则上，每个现有的 Rust 应用，都可以构建于 RustyHermit 之上。然而，unikernel 是一个单任务操作系统。因此，缺少对系统调用 `fork`，以及进程间通信的支持。此外，还缺少一个经典的 C 语言库，它通常用作操作系统的接口。目前，那些绕过标准运行时，并试图直接与操作系统通信的 Rust crate，需要做对应修改。然而，绝大部分应用程序并不依赖于这些特性，所以可在 RustyHermit 上正常运行。\r\n\r\n# 性能\r\n\r\n单核，意味着可以高度优化。例如，我们优化了 RustyHermit 的网络堆栈。RustyHermit 使用 [smolcp](https://github.com/smoltcp-rs/smoltcp) 作为网络堆栈，smolcp 完全是用 Rust 编写的。作为客户机和主机操作系统之间的接口，我们使用 [Virtio](https://www.linux-kvm.org/page/Virtio)，Virtio 包含在 KVM 的准虚拟化驱动程序之中，被广泛用于虚拟化 Linux 环境。\r\n\r\n下图比较了 Linux 和 RustyHermit 的性能，两者都作为 guest 用户，在基于 Linux 主机系统上的虚拟机中运行：\r\n\r\n![rustyhermit 性能](https://blog.budshome.com/static/articles/1617763128.jpg)\r\n\r\n# 实例项目\r\n\r\n> **注：如果要测试实例，请注意下述各自配置文件和配置细节。**\r\n\r\n为了完整演示一个构建 RustyHermit 应用的示例，让我们创建一个新的 cargo（[中文文档](https://cargo.budshome.com/)）项目：\r\n\r\n``` bash\r\ncargo new hello_world\r\ncd hello_world\r\n```\r\n\r\nRustyHermit 目前需要 Rust 工具链的 `nightly` 版本。为了简化工作流程，我们建议按如下方式创建和配置工具链，以定义所需的组件，并测试 `nightly` 编译器的版本：\r\n\r\n> Rust 工具链的安装和配置，以及国内镜像，请参与参考文档：[Rust 环境配置（Linux、macOS、Windows）](https://rust-guide.budshome.com/3-env/3.2-linux-wsl-macos.html)、[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)。\r\n\r\n``` toml\r\n[toolchain]\r\nchannel = \"nightly-2020-12-23\"\r\ncomponents = [ \"rustfmt\", \"rust-src\", \"llvm-tools-preview\"]\r\ntargets = [ \"x86_64-unknown-hermit\" ]\r\n```\r\n\r\n配置文件指定所需的组件，以及要使用的 `nightly` 编译器的版本。\r\n\r\nRustyHermit 的构建目标是 `target x86_64-unknown-hermit`，其是 Rust 支持平台的一部分，但是不属于第 1 层平台，所以我们需要做编译配置。在 `.cargo/config` 中配置：\r\n\r\n``` bash\r\n[unstable]\r\nbuild-std = [\"std\", \"core\", \"alloc\", \"panic_abort\"]\r\n\r\n[build]\r\ntarget = \"x86_64-unknown-hermit\"\r\n```\r\n\r\n为了将操作系统库绑定到应用程序，我们必须将 crate [hermit-sys](https://crates.io/crates/hermit-sys) 添加到文件中的依赖项中。在 `Cargo.toml` 中配置：\r\n\r\n```\r\n# Cargo.toml\r\n\r\n[target.'cfg(target_os = \"hermit\")'.dependencies]\r\nhermit-sys = \"0.1.*\"\r\nfeatures = [\"smoltcp\"]\r\n```\r\n\r\n如果您的应用程序需要建立 TCP 连接，则需要 smoltcp crate。\r\n\r\n此实例结果，是一个 64 位的[可执行链接格式（ELF）](https://refspecs.linuxfoundation.org/elf/elf.pdf)。要在公共的虚拟机中启动此应用程序，需要一个加载程序，它初始化处理器，并启动应用程序。我们在 [GitHub](https://github.com/hermitcore/rusty-loader) 上提供了一个简单的加载程序。注意 `makefile`，用于构建加载程序，是项目的一部分。之后，在 VM 中，Qemu 可用于启动 RustyHermit，如下所示：\r\n\r\n``` bash\r\nqemu-system-x86_64 -display none -smp 1 -m 64M -serial stdio  -kernel path_to_loader/rusty-loader -initrd path_to_app/app -cpu qemu64,apic,fsgsbase,rdtscp,xsave,fxsr\r\n```\r\n\r\n为了提高性能，可以使用 KVM 进行处理器的虚拟化扩展。\r\n\r\n# 路线图\r\n\r\n将来，RustyHermit 计划稳定与硬件的接口。例如，[Virtio-fs](https://virtio-fs.gitlab.io/) 的支持。此外，与 Rust 标准库的集成还没有最终确定……\r\n\r\n> 此项目还是起步阶段，目前 github 星星数 240 左右。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-07T03:19:00.309Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.309Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606e76380034b56e00ac1eb0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Android 团队宣布 Android 开源项目（AOSP），已支持 Rust 语言来开发 Android 系统本身",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "对于 Android 来说，如果代码是用 C/C++ 编写的，并且在解析不可信的输入，那么它应该包含在一个严格受约束和特殊的沙箱中。但沙盒的开销昂贵：需要引入新进程，消耗额外的开销，并且由于 IPC 和额外的内存使用，而引入了延迟机制。沙箱技术，并不能消除代码中的漏洞，它的效率，会随着高 bug 密度而降低，从而允许攻击者将多个漏洞链接在一起。像 Rust 这样的内存安全语言，通过两种方式帮助 Android 克服这些限制：降低了代码中 bug 的密度，从而提高了当前沙盒的有效性；减少了 Android 的沙箱技术需求，允许引入更安全、资源更轻的新功能。",
+    slug: "android-tuan-dui-xuan-bu-android-kai-yuan-xiang-mu-(aosp),yi-zhi-chi-rust-yu-yan-lai-kai-fa-android-xi-tong-ben-shen",
+    uri: "/budshome/android-tuan-dui-xuan-bu-android-kai-yuan-xiang-mu-(aosp),yi-zhi-chi-rust-yu-yan-lai-kai-fa-android-xi-tong-ben-shen",
+    content: "> 2021 年 4 月 6 日，Android 团队及 Android 安全团队宣布：Android 开源项目（AOSP），现在支持 Rust 编程语言来开发操作系统本身。本文由由 Android 团队成员 Jeff Vander Stoep 和 Stephen Hines 发布，官方原文链接和转载链接见文末（若 google 站点不能访问请阅读转载链接）。\r\n\r\nAndroid 平台中，代码的正确性，是每个版本 Android 系统的安全性、稳定性，及其质量的重中之重。C/C++ 语言中的内存安全漏洞，仍然是最难解决的错误来源。我们投入了大量的精力和资源来检测、修复和缓解这类 bug，这些努力有效地防止了大量 bug 进入 Android 系统。然而，尽管做出了这些努力，内存安全漏洞仍然是稳定性问题的主要原因。并且，在 Android 系统高严重性的安全漏洞中，其始终占据[大约 70% 的比例](https://security.googleblog.com/2021/01/data-driven-security-hardening-in.html)。\r\n\r\n除了[正在进行的](https://android-developers.googleblog.com/2020/02/detecting-memory-corruption-bugs-with-hwasan.html)和[即将进行的](https://security.googleblog.com/2019/08/adopting-arm-memory-tagging-extension.html)改进内存错误检测的工作之外。首当其冲地，我们正在加大力度防止它们。内存安全类编程语言，是防止内存错误的最经济有效方法。除了像 Kotlin 和 Java 这样的内存安全语言之外，我们很高兴地宣布：Android 开源项目（AOSP），现在支持 Rust 编程语言来开发 Android 操作系统本身。\r\n\r\n![aosp](https://blog.budshome.com/static/articles/1617851592.jpg)\r\n\r\n# 系统级编程\r\n\r\nJava 和 Kotlin 等受监管/托管类语言，是 Android 应用开发的最佳选择。这些语言是为易于使用、可移植性，以及安全性而设计的。[Android 运行时（ART）](https://source.android.com/devices/tech/dalvik)，代表开发者管理内存。Android 操作系统广泛使用 Java，有效地保护了大部分 Android 平台不受内存缺陷的影响。不幸的是，对于操作系统的底层，Java 和 Kotlin 不是一个选项。\r\n\r\n较低级别的操作系统，需要系统级编程语言，如 C、C++，以及 Rust。这些语言的设计目标是控制性和可预测性。它们提供对底层系统资源和硬件资源的访问。它们占用资源较少，并且具有更可预测的性能特征。\r\n\r\n对于 C/C++，开发人员需要负责管理内存生命周期。不幸的是，这样做很容易出错，特别是在复杂的多线程代码中。\r\n\r\n# 沙箱技术（sandboxing）的极限\r\n\r\nC/C++ 语言，不提供相同的安全保证，需要强大的手动隔离。所有 Android 进程，都是基于沙箱技术（sandboxing）的，我们遵循 [规则 2](https://chromium.googlesource.com/chromium/src/+/master/docs/security/rule-of-2.md)（译注：是指 Android 开发中关于 App 沙箱的规则限制，下同），以决定功能是否需要额外的隔离和剥离。规则 2 很简单：给定三个选项，开发人员只能选择三个选项中的两个。\r\n\r\n对于 Android 来说，这意味着：如果代码是用 C/C++ 编写的，并且在解析不可信的输入，那么它应该包含在一个严格受约束和特殊的沙箱中。虽然[遵守规则 2](https://android-developers.googleblog.com/2019/05/queue-hardening-enhancements.html)，在降低安全漏洞的严重性和可访问性方面是有效的，但它确实有局限性。沙盒的开销昂贵：[需要引入新进程，消耗额外的开销，并且由于 IPC 和额外的内存使用，而引入了延迟机制](https://www.usenix.org/conference/enigma2021/presentation/palmer)。沙箱技术，并不能消除代码中的漏洞，它的效率，会随着高 bug 密度而降低，从而允许攻击者将多个漏洞链接在一起。\r\n\r\n像 Rust 这样的内存安全语言，通过两种方式帮助我们克服这些限制：\r\n\r\n- 降低了代码中 bug 的密度，从而提高了当前沙盒的有效性。\r\n- 减少了我们的沙箱技术需求，允许引入更安全、资源更轻的新功能。\r\n\r\n# 那么，现有的 C++ 呢？\r\n\r\n当然，引入一种新的编程语言，并不能解决现有 C/C++ 代码中的问题。即使我们重新调整了 Android 团队中每个软件工程师的工作方向，重写数千万行代码，也是很难解决的。\r\n\r\n上文中，对 Android 平台中内存安全漏洞的历史分析（从它们第一次引入时，就已经测量过），表明了为什么我们的内存安全语言工作，最关注的是新开发，而不是重写成熟的 C/C++ 代码。我们的大多数内存错误都发生在新的，或最近修改的代码中，大约 50% 的错误发生在不到一年的时间里。\r\n\r\n比较稀疏的老旧内存错误，可能会让一些人感到惊讶，但我们发现旧代码并不是我们最迫切需要改进的地方。随着时间的推移，软件缺陷会被发现并修复，因此我们预计正在维护的，但未积极开发的代码中，其缺陷数量会随着时间的推移而减少。正如减少 bug 的数量和密度，可以提高沙盒的有效性一样，它也可以提高 bug 检测的有效性。\r\n\r\n# 检测的局限性\r\n\r\n通过健壮的测试、[清理（sanitization）](https://github.com/rust-lang/rust/pull/81506)，以及[模糊测试（fuzzing ）](https://android-review.googlesource.com/c/platform/build/soong/+/1403607/)，进行 bug 检测，对于提高所有软件（包括用 Rust 编写的软件）的质量和正确性至关重要。最有效的内存安全检测技术，其一个关键限制是：为了检测到错误状态，必须在代码中实际触发错误状态。即使在具有出色的 test/fuzz 覆盖的代码库中，这也会导致许多错误未被发现。\r\n\r\n另一个限制是，[bug 检测比 bug 修复扩展得更快](https://lore.kernel.org/dri-devel/20200710103910.GD1203263@kroah.com/)。在一些项目中，检测到的 bug 并不总是得到修复。错误修复是一个漫长而昂贵的过程。\r\n\r\n这些步骤都很昂贵，缺少其中任何一个，都可能导致某些或所有用户无法对 bug 进行调度。对于复杂的 C/C++ 代码库，通常只有少数人能够开发和检查修复，即使花费大量的精力来修复错误，[有时修复后也不完全正确](https://googleprojectzero.blogspot.com/2015/09/stagefrightened.html)（译注：按下葫芦浮起瓢）。\r\n\r\n当错误相对较少时，bug 检测最有效，并且可以给予它们紧急性和优先级。我们从改进 bug 检测中，获益的能力要求我们优先考虑：防止引入新的 bug。\r\n\r\n# 优先性任务\r\n\r\nRust 对一系列语言特性，进行了现代化的设计和开发，从而提高了代码的正确性：\r\n\r\n- **内存安全**——通过编译器和运行时检查的组合，以强制执行内存安全。\r\n- **数据并行**——防止数据争用。这使得开发者能够轻松地编写高效、线程安全的代码，这也催生了 “Rust [无畏并行（Fearless Concurrency）](https://doc.rust-lang.org/book/ch16-00-concurrency.html)”的口号。\r\n- **更具表现力的类型系统**——有助于防止逻辑编程错误（例如：newtype 包装、包含内容的枚举变量等）。\r\n- **默认情况下，引用和变量在是不可变的**——帮助开发人员遵循最小特权的安全原则，仅当他们真正希望引用或变量可变时，才将其标记为可变。尽管 C++ 有一定的特点，但它往往不经常使用，也不一致。相比之下，Rust 编译器通过为从不突变的可变值提供警告，来帮助避免不必要的可变注释。\r\n- **在标准库中，有更好的错误处理方式**——在结果中，包装可能失败的调用，这会导致编译器要求用户检查失败原因，甚至是没有返回所需值的函数。这可以防止诸如 [Rage Against the Cage](https://android.googlesource.com/platform/system/core/+/44db990d3a4ce0edbdd16fa7ac20693ef601b723%5E%21/) 漏洞之类的 bug，该漏洞即是由未处理的错误导致的。\r\n- **初始化赋值**——要求在使用前，初始化所有变量。未初始化的内存漏洞一直是 Android 平台上 3-5% 比例的安全漏洞的根本原因。在 Android 11 中，我们开始[在 C/C++ 中自动初始化内存](https://security.googleblog.com/2020/06/system-hardening-in-android-11.html)，以减少这个问题。但是，初始化为零并不总是安全的，特别是对于返回值这样的情况，这可能成为错误处理的新来源。Rust 要求每个变量在使用前，都初始化为其类型的合法成员，避免了无意中初始化为不安全值的问题。类似于 C/C++ 的编译器 Clang，Rust 编译器知道初始化要求，并且避免了多次初始化的任何潜在性能开销。\r\n- **更安全的整数处理**——默认情况下，对 Rust 调试和构建，启用溢位清理（overflow sanitization），鼓励程序员指定一个 `wrapping_add`（如果他们真的希望溢位计算），或 `saturating_add`（如果他们不希望溢位计算）。我们打算为 Android 平台中的所有构建，都启用溢位清理。此外，所有整数类型转换，都是显式强制转换：当分配给变量或尝试对其他类型执行算术运算时，开发人员不能在函数调用期间，意外地强制转换。\r\n\r\n# 未来计划\r\n\r\n为 Android 平台添加一种新的编程语言，是一项艰巨的任务。有需要维护的工具链，以及依赖项。也必须有更新的测试基础设施和工具，以及需要培训的开发人员。在过去的 18 个月里，我们一直在为 Android 开源项目添加 Rust 支持。我们有几个早期采用者项目，我们将在未来几个月内分享。将其扩展到更多的操作系统，是一个多年的项目。请继续关注，我们将在这个博客上发布更多更新。\r\n\r\n谢谢您的阅读！\r\n\r\n*参考资料：*\r\n\r\n- google 博客原文链接：[Rust in the Android platform](https://security.googleblog.com/2021/04/rust-in-android-platform.html)\r\n- slacker 页面链接：[Rust in the Android platform](https://slacker.ro/2021/04/06/rust-in-the-android-platform/)\r\n- 1stcybersecurity 页面链接：[Rust in the Android platform](https://1stcybersecurity.com/index.php/2021/04/06/rust-in-the-android-platform/)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-08T03:19:20.905Z"),
+    "updated_at": ISODate("2021-04-08T03:19:20.905Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606e7ebd0034b56e00ac1eb5"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Android 平台基础支持转向 Rust",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 4 月 7 日，zdnet 发布文章：Android 平台基础支持转向 Rust。2021 年 4 月 6 日，谷歌宣布，Rust 可以在 Android 开源项目内部使用。虽然 Android 平台上的应用程序可以用 java 和 Kotlin 等受监管的/托管类语言编写，但这些语言没有用于构建 Android 操作系统的低级语言（如 C/C++）的“控制和可预测性”。",
+    slug: "android-ping-tai-ji-chu-zhi-chi-zhuan-xiang-rust",
+    uri: "/budshome/android-ping-tai-ji-chu-zhi-chi-zhuan-xiang-rust",
+    content: "2021 年 4 月 7 日，zdnet 发布文章：Android 平台基础支持转向 Rust。2021 年 4 月 6 日，谷歌宣布，Rust 可以在 Android 开源项目内部使用。\r\n\r\n为了减少内存安全漏洞，谷歌宣布开源项目 Android 平台，将支持内置 Rust。\r\n\r\n![rust-yellow](https://blog.budshome.com/static/articles/rust-yellow.jpg)\r\n\r\n虽然 Android 平台上的应用程序可以用 java 和 Kotlin 等受监管的/托管类语言编写，但这些语言没有用于构建 Android 操作系统的低级语言（如 C/C++）的“控制和可预测性”。\r\n\r\n它们的资源较少，而且具有更可预测的性能特征。对于 C/C++，开发人员负责管理内存生命周期。不幸的是，这样做很容易出错，特别是在复杂和多线程的代码库中。\r\n\r\nRust 使用编译时检查，来强制执行对象生命周期/所有权，并通过运行时检查来确保内存访问的有效性，从而提供内存安全保证。这种安全性，是其在提供与 C/C++ 相同性能的同时实现的。\r\n\r\n由于目前在 Android 系统中，如果用 C/C++ 编写的进程处理不可信任的输入，那么它运行在沙箱中。google 说这是昂贵的，并且仍然允许攻击者链接安全漏洞。\r\n\r\n此外，google 发现一半的内存 bug 来自一年内的新代码，因此将 Rust 对准新代码是有意义的，而不是用 Rust 重写操作系统。\r\n\r\n“即使我们重新调整了 Android 团队中每个软件工程师的工作方向，重写数千万行代码也根本不可行的”，Android 团队说。\r\n\r\n“比较罕见的是，老旧的历史 bug，其内存错误可能会让一些人感到惊讶，但我们发现旧代码并不是我们最迫切需要改进的地方。随着时间的推移，软件缺陷会被发现并修复，因此我们预计，正在维护但未积极开发的代码中，其缺陷数量会随着时间的推移而减少。”\r\n\r\nRust 开发的 [gabeldorsche](https://android.googlesource.com/platform/system/bt/+/master/gd/rust/) 项目正在进行，它被誉为蓝牙的继承者。\r\n\r\nAndroid 团队还谈到了试图检测和复制内存缺陷，以修复它们的问题。\r\n\r\n“对于复杂的 C/C++ 代码库，通常只有少数人能够开发和检查修复，即使花费大量的精力去修复 bug，有时修复后也不完全正确。”他们写道。\r\n\r\n“当缺陷相对罕见时，缺陷检测是最有效的，危险的缺陷可以被赋予必要的紧迫性和优先性。我们要想从缺陷检测的改进中获益，就必须优先防止引入新的缺陷。”\r\n\r\n谷歌表示，使用 Rust 的好处之一是语言中固有的附加约束和检查，例如强制初始化变量，这可以防止 Android 中高达 5% 的安全漏洞。\r\n\r\n为 Android 平台添加一种新的语言，是一项艰巨的任务。有需要维护的工具链和依赖项，必须更新的测试基础设施和工具，以及需要培训的开发人员。\r\n\r\n“在过去的 18 个月里，我们一直在为 Android 开源项目添加 Rust 支持。我们有几个采用 Rust 的早期项目，我们将在未来几个月内分享这些项目。”\r\n\r\n今年早些时候，[Rust 从 Mozilla 转移到了自己的 Rust 基金会](https://www.zdnet.com/article/the-rust-programming-language-just-took-a-huge-step-forwards/)。Mozilla 使用了 Rust 来构建其浏览器引擎，目前，**已经使用 85000 行 Rust 代码替换了 160000 行 C/C++ 代码**。\r\n\r\nMozilla 最近在 Firefox 上[运行线程清理器](https://hacks.mozilla.org/2021/04/eliminating-data-races-in-firefox-a-technical-report/)，以清除浏览器代码库中存在的任何数据竞争，这些问题是由 C/C++ 语言开发的。\r\n\r\n总体来说，Rust 似乎正在实现其最初的设计目标之一：允许我们安全地编写更多并发代码。\r\n\r\n谢谢您的阅读！\r\n\r\n原文链接：[Rust support moves into Android underpinnings](https://www.zdnet.com/article/rust-support-moves-into-android-underpinnings/)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-08T03:55:41.799Z"),
+    "updated_at": ISODate("2021-04-08T03:55:41.799Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606e840c0034b56e00ac1eb8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Android 支持 Rust 编程语言，以避免内存缺陷",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "C/C++ 语言中的内存安全漏洞，构成了 Android 平台上高达 70% 的高严重性安全漏洞。google 的想法是切换到 Rust 这样的内存安全语言，以做到首先防止 bug 发生。\r\n\r\n谷歌指出：“Rust 使用编译时检查，来强制执行对象的生命周期/所有权。以及通过运行时检查，来确保内存访问有效，从而提供了内存安全保证。”",
+    slug: "android-zhi-chi-rust-bian-cheng-yu-yan-,yi-bi-mian-nei-cun-que-xian",
+    uri: "/budshome/android-zhi-chi-rust-bian-cheng-yu-yan-,yi-bi-mian-nei-cun-que-xian",
+    content: "> 本文主要摘选自 thehackernews 发表于 thehackernews 网站在 2021 年 4 月 7 日的文章 *Android to Support Rust Programming Language to Prevent Memory Flaws*。\r\n\r\n谷歌周二（2021-04-06）宣布，其开源版本的 Android 操作系统，将增加对 Rust 编程语言的支持，以防止内存安全漏洞。\r\n\r\n为此，在过去的 18 个月里，该公司一直在用 Rust 构建 Android 开源项目（AOSP）的一部分。并且计划扩大这一项目的规模，以覆盖操作系统的更多方面。\r\n\r\n“像 Java 和 Kotlin 这样的受监管的/托管类语言，是 Android App 开发的最佳选择，”谷歌说 Android 操作系统广泛使用 Java，有效地保护了大部分 Android 平台不受内存缺陷的影响。不幸的是，对于操作系统的底层，Java 和 Kotlin 不是一个选项。”\r\n\r\nAndroid 平台中，C/C++ 语言编写的代码，在分析不可靠的输入时需要强大的隔离。谷歌表示，在严格约束和特殊的沙箱技术中，包含此类代码的技术很昂贵，导致延迟问题和额外的内存开销。\r\n\r\n![android-bug](https://blog.budshome.com/static/articles/1617854474.jpg)\r\n\r\nC/C++ 语言中的内存安全漏洞，构成了 [Android 平台上高达 70% 的高严重性安全漏洞](https://security.googleblog.com/2021/01/data-driven-security-hardening-in.html)。google 的想法是切换到 Rust 这样的内存安全语言，以做到首先防止 bug 发生。\r\n\r\n谷歌指出：“Rust 使用编译时检查，来强制执行对象的生命周期/所有权。以及通过运行时检查，来确保内存访问有效，从而提供了内存安全保证。”\r\n\r\n尽管有明显的优势，但谷歌并不打算重写底层 OS，或者替换所有现有的 C/C++ 代码。而是将其安全的语言 Rust，努力集中在新的或最近修改的代码中，这些代码具有更高的内存错误可能性。\r\n\r\n谷歌正在对 Rust 进行一些努力，包括彻底重写 Android 的蓝牙协议栈 [Gabeldorsche](https://android.googlesource.com/platform/system/bt/+/master/gd)，该协议从去年在 Android 11 上开始测试。此外，google 公司还为其[开源 Fuchsia 操作系统](https://fuchsia.dev/)，开发了一个[基于 Rust 的网络堆栈](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/master/src/connectivity/network/netstack3/)。\r\n\r\n谢谢您的阅读！\r\n\r\n原文链接：[Android to Support Rust Programming Language to Prevent Memory Flaws](https://thehackernews.com/2021/04/android-to-support-rust-programming.html)\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-08T04:18:20.836Z"),
+    "updated_at": ISODate("2021-04-08T04:18:20.836Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ebd"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "使用 Rust 做异步数据采集的实践",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "使用 `Rust` 生态中的数据采集相关 `crate` 进行数据采集的实践：异步运行时 `async-std`，HTTP 客户端库 `reqwest`，数据采集库 `scraper`，以及控制台输出文字颜色标记库 `colored`。",
+    slug: "shi-yong-rust-zuo-yi-bu-shu-ju-cai-ji-de-shi-jian",
+    uri: "/budshome/shi-yong-rust-zuo-yi-bu-shu-ju-cai-ji-de-shi-jian",
+    content: "数据采集，生态工具最完整、成熟的，笔者认为莫过于 `Python` 了，特别是其 `Scrapy` 库的强大和成熟，是很多项目和产品的必选。笔者以前在大数据项目中，数据采集部分，也是和团队同事一起使用。不管从工程中的那个视觉来说，笔者认为 `scrapy` 都是完全满足的。\r\n\r\n本文是使用 `Rust` 生态中的数据采集相关 `crate` 进行数据采集的实践，是出于这样的目的：新的项目中，统一为 `Rust` 技术栈；想尝试下 `Rust` 的性能优势，是否在数据采集中也有优势。\r\n\r\n因此，本文更多的仅是关于 `Rust` 生态实践而言，并非是 `Rust` 做数据采集相比 `Python` 有优势。仅就语言而言，Rust 显然具有极大的性能优势。\r\n\r\n好的，我们从头开始进行一次数据采集的完整实践，以站点 `https://this-week-in-rust.org/` 为目标，采集所有的 `Rust 周报`。\r\n\r\n# 创建项目\r\n\r\n我们使用 `cargo`，创建一个新项目。本项目我们要使用 Rust 的异步运行时 `async-std`，HTTP 客户端库 `reqwest`，数据采集库 `scraper`，以及控制台输出文字颜色标记库 `colored`。我们在创建项目后，一并使用 `cargo-edit` crate 将它们加入依赖项：\r\n\r\n> 关于 `cargo-edit` 的安装和使用，请参阅文章《[构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（1）- 起步及 crate 选择](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze)》\r\n\r\n``` bash\r\ncargo new rust-async-crawl-example\r\ncd ./rust-async-crawl-example\r\ncargo add async-std reqwest scraper colored\r\n```\r\n\r\n成功执行后，`Cargo.toml` 文件清单的 `dependencies` 区域将有上述 4 个 crate。但是对于 `async-std`，本次实践中，我们进使用其 `attributes` 特性；对于 `reqwest`,我们则要启用其 `blocking` 特性。我们修改 `Cargo.toml` 文件，最终为如下内容：\r\n\r\n``` toml\r\n[package]\r\nname = \"rust-crawl-week\"\r\nversion = \"0.1.0\"\r\nauthors = [\"zzy <linshi@budshome.com>\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nasync-std = { version = \"1.9.0\", features = [\"attributes\"] }\r\nreqwest = { version = \"0.11.2\", features = [\"blocking\"] }\r\nscraper = \"0.12.0\"\r\ncolored = \"2.0.0\"\r\n```\r\n\r\n# 简要设计\r\n\r\n数据采集，我们必定不会局限于一个站点。所以，我们参考 Python 中的库 `scrapy` 的思路，每个具体的爬虫，对应一个站点。因此，我们组织文件结构为 `main.rs` 是执行入口；`sites.rs` 或者 `sites` 模块，是具体各自站点爬中位置。本例中，我们只是对站点 `https://this-week-in-rust.org/` 进行采集，所以将其编写在 `sites.rs` 文件中。实际的项目产品中，推荐使用 `sites` 模块，里面包含以各自站点命名的具体爬虫。\r\n\r\n对于采集结果，我们要通过输出接口，将其输入到控制台、数据库、文档（文本、excel 等）。这些输出和写入的接口，也需要是在统一的位置，以便于后续扩展。\r\n\r\n本实例中，我们将其打印输出到控制台。并在打印时，对于不同的站点、标题，以及 url 链接进行着色。\r\n\r\n因此，本实践实例中，工程结构最终为：\r\n\r\n![工程结构](https://blog.budshome.com/static/articles/1617940413.png)\r\n\r\n此时，我们还未编译构建，所以没有 `Cargo.lock` 文件和 `target` 目录。您如果跟随本文实践，`cargo build` 后，会产生它们。下文不再说明。\r\n\r\n# `main.rs`\r\n\r\n数据采集入口文件，其代码要尽可能简单和简洁。\r\n\r\n``` rust\r\nmod sites;\r\n\r\n#[async_std::main]\r\nasync fn main() {\r\n\r\n    // this-week-in-rust.org\r\n    match sites::this_week_in_rust_org().await {\r\n        Ok(site) => println!(\"{:#?}\", site),\r\n        Err(_) => eprintln!(\"Error fetching this-week-in-rust.org data.\"),\r\n    }\r\n\r\n    // 其它站点\r\n    // ……\r\n}\r\n```\r\n\r\n对于多个站点，我们逐次增加即可，这样有利于简单的后续扩展。这儿需要再次说明：本例中，我们只是对站点 `https://this-week-in-rust.org/` 进行采集，所以将其编写在 `sites.rs` 文件中。实际的项目产品中，推荐使用 `sites` 模块，里面包含以各自站点命名的具体爬虫。\r\n\r\n> **注意**：`println!(\"{:#?}\", site)`，控制台输出时，我们已经对其采用了 Rust 中默认最美观易读的输出方式。之所以标注此代码，是因为对于第一次不够“人类工程学”的显示方式，我们后面要进行迭代。\r\n\r\n# `sites.rs`\r\n\r\n## 第一次编码，采集数据并输出\r\n\r\n首先，我们要定义两个结构体，分别表示站点信息，以及采集目标数据的信息（本例为标题、url 链接）。\r\n\r\n``` rust\r\n#[derive(Debug)]\r\npub struct Site {\r\n    name: String,\r\n    stories: Vec<Story>,\r\n}\r\n\r\n#[derive(Debug)]\r\nstruct Story {\r\n    title: String,\r\n    link: Option<String>,\r\n}\r\n```\r\n\r\n对于目标数据的采集，我们的思路很简单，三步走：\r\n\r\n1. 获取 HTML 文档；\r\n2. 萃取数据标题；\r\n3. 萃取数据 url 链接。\r\n\r\n我们定义这三个方法，并在具体的站点爬虫 `this_week_in_rust_org` 中，进行调用：\r\n\r\n``` rust\r\nuse reqwest::{blocking, Error};\r\nuse scraper::{ElementRef, Html, Selector};\r\nuse std::result::Result;\r\n\r\npub async fn this_week_in_rust_org() -> Result<Site, Error> {\r\n    let s = Selector::parse(\"div.col-md-12 a\").unwrap();\r\n    let body = get_html(\"https://this-week-in-rust.org/blog/archives/index.html\").await?;\r\n    let stories = body\r\n        .select(&s)\r\n        .map(|element| Story {\r\n            title: parse_title(element),\r\n            link: parse_link(element),\r\n        })\r\n        .collect();\r\n    let site = Site {\r\n        name: \"this-week-in-rust.org\".to_string(),\r\n        stories,\r\n    };\r\n\r\n    Ok(site)\r\n}\r\n\r\nasync fn get_html(uri: &str) -> Result<Html, Error> {\r\n    Ok(Html::parse_document(&blocking::get(uri)?.text()?))\r\n}\r\n\r\nfn parse_link(element: ElementRef) -> Option<String> {\r\n    let mut link: Option<String> = None;\r\n    if let Some(link_str) = element.value().attr(\"href\") {\r\n        let link_str = link_str.to_owned();\r\n        link = Some(link_str);\r\n    }\r\n\r\n    link\r\n}\r\n\r\nfn parse_title(element: ElementRef) -> String {\r\n    element.inner_html()\r\n}\r\n```\r\n\r\n这段代码是很易读的，代码既是最好的文档。注意获取 HTML 文档的函数 `get_html` 和 爬虫调用函数 `this_week_in_rust_org` 是异步的，而萃取链接函数 `parse_link` 和萃取标题函数 `parse_title` 则不是。因为具体的萃取，是在一个数据解析进程中执行的，异步与否笔者认为意义不大。当然，您如果有兴趣，可以改为异步函数，进行性能对比。\r\n\r\n第一次编码完成，我们编译、运行看看部分输出结果：\r\n\r\n> 安装依赖较多，如果时间较长，请[配置 Cargo 国内镜像源](https://rust-guide.budshome.com/4-cargo/4.1-source-replacement.html)。\r\n\r\n![无 display trait](https://blog.budshome.com/static/articles/1617943198.jpg)\r\n\r\n这个输出数据是 json 格式的，并且文字也没有颜色区分。对于其它输入调用接口，非常合适。比如数据库和导出文档等。但是对于人眼阅读来说，则有些不够友好，我们希望输出就是标题和其链接就可以了。\r\n\r\n## 第二次编码，输出数据格式优化\r\n\r\n第一次编码中，我们使用的是 Rust 默认的 `Display` trait。我们要实现自定义输出数据格式，也就是需要对 `Site` 和 `Story` 2 个结构体实现自定义 `Display` trait。\r\n\r\n``` rust\r\nuse colored::Colorize;\r\nuse std::fmt;\r\n\r\nimpl fmt::Display for Site {\r\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\r\n        writeln!(f, \"{}\", self.name.blue().bold())?;\r\n        for story in &self.stories {\r\n            writeln!(f, \"{}\", story)?;\r\n        }\r\n        Ok(())\r\n    }\r\n}\r\n\r\nimpl fmt::Display for Story {\r\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\r\n        match &self.link {\r\n            Some(link) => write!(f, \"\\t{}\\n\\t\\t({})\", self.title.green(), link),\r\n            None => write!(f, \"\\t{}\", self.title),\r\n        }\r\n    }\r\n}\r\n```\r\n\r\n此时，我们 `main.rs` 中的打印，甚至不需要指定 `Display` 方式的：\r\n\r\n``` rust\r\nmod sites;\r\n\r\n#[async_std::main]\r\nasync fn main() {\r\n\r\n    // this-week-in-rust.org\r\n    match sites::this_week_in_rust_org().await {\r\n        Ok(site) => println!(\"{}\", site),\r\n        Err(_) => eprintln!(\"Error fetching this-week-in-rust.org data.\"),\r\n    }\r\n\r\n    // 其它站点\r\n    // ……\r\n}\r\n```\r\n\r\n我们现在看看输出结果：\r\n\r\n![display trait](https://blog.budshome.com/static/articles/1617943311.jpg)\r\n\r\n人眼阅读，这种方式合适一些，并且 url 链接，可以直接点击。\r\n\r\n感兴趣的朋友，可以参阅 [github 完整代码仓库](https://github.com/zzy/rust-async-crawler)。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-09T04:49:57.231Z"),
+    "updated_at": ISODate("2021-04-09T04:49:57.231Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("607119810034b56e00ac1ec1"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 385 期（2021-04-07）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 385期：Rust 核心更新、Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘，以及 Rust 开发者引语等。第 385 期的技术文章偏重于实践，以及开发协同。 ",
+    slug: "rust-guan-fang-zhou-bao-385-qi-(2021-04-07)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-385-qi-(2021-04-07)",
+    content: "大家好，欢迎查阅第 385 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一种系统语言，主要追求三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github 向我们[发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n本周无论文或研究探讨。\r\n\r\n### 官方\r\n\r\n* \\[内部\\] [Rust 核心团队人员变动](https://blog.budshome.com/budshome/-(2021-04-03)--rust-he-xin-tuan-dui-ren-yuan-bian-dong)\r\n* \\[Rust 基金会\\] [成员介绍：侯培新](https://foundation.rust-lang.org/posts/2021-04-08-introducing-peixin-hou/)（译注：董事成员，华为开源软件与系统首席架构师）\r\n* \\[Rust 基金会\\] [成员介绍：Florian Gilcher](https://foundation.rust-lang.org/posts/2021-04-08-introducing-florian-gilcher/)（译注：Rust 核心团队，项目主管）\r\n\r\n### 简讯\r\n\r\n* [Rust OSDev 2021 年 3 月简讯](https://rust-osdev.com/this-month/2021-03/)\r\n* [RiB 简讯 #22](https://www.reddit.com/r/rust/comments/mhmfu9/rib_newsletter_22_a_few_tweaks/)\r\n\r\n### 项目/工具 更新\r\n\r\n* [GCC Rust 月报 #4 2021-03](https://thephilbert.io/2021/04/02/gcc-rust-monthly-report-4-march-2021/)\r\n* [mrustc 升级：支持 rustc 1.39.0](https://www.reddit.com/r/rust/comments/mjxbaz/mrustc_upgrade_rustc_1390/)（译注：1、mrustc 是一个 Rust 编译器的替代实现；2、目前官方 rustc 版本为 1.51.0）\r\n* [rust-analyzer 更新日志 #71](https://rust-analyzer.github.io/thisweek/2021/04/05/changelog-71.html)\r\n* [Rust 中新的左递归 PEG 解析生成器](https://www.mess.org/2021/03/26/Left-Recursive-PEG-Parser-Generator/)\r\n* [Flott（Rust 中的运动控制工具包）月报 - 2021-04](https://flott-motion.org/news/last-month-in-flott-april-2021/)（译注：前景不错的新包，但 github 星星仅 3 个）\r\n* [IntelliJ Rust 更新信息](https://blog.jetbrains.com/rust/2021/04/08/intellij-rust-updates-for-2021-1/)\r\n* [Bevy 0.5](https://bevyengine.org/news/bevy-0-5/)（译注：数据驱动的游戏引擎）\r\n\r\n### 观测/思考\r\n\r\n* [将低层次 actor 模型系统与 Rust async/await 结合（1）](https://uazu.github.io/blog/20210406.html)\r\n* [Rust GC 设计中的安全追踪之旅](https://manishearth.github.io/blog/2021/04/05/a-tour-of-safe-tracing-gc-designs-in-rust/)（译注：此作者用 Rust 设计和实现了 GC 库，被集成在 Servo 浏览器，主要为 JS 层应用）\r\n* [使用 Rust + Lunatic 构建具备 WebAssembly 的 TelNet 聊天服务器](https://www.hackernoon.com/how-i-used-rust-lunatic-to-build-a-telnet-chat-server-with-webassembly-rb3l33cg)\r\n* [Firefox 中消除数据竞争 - 技术报告](https://hacks.mozilla.org/2021/04/eliminating-data-races-in-firefox-a-technical-report/)\r\n* [一级（first-class）IO](https://blog.sunfishcode.online/first-class-io/)（译注：一级（first-class）IO，即执行 I/O 的函数，可作为参数或返回值在程序中传递，如 `File`。或许 first-class 不翻更好理解）\r\n* [当前程序打包发布人的安全噩梦](https://blogs.gentoo.org/mgorny/2021/02/19/the-modern-packagers-security-nightmare/)\r\n* [对请求排序，以加速 I/O](https://pkolaczk.github.io/disk-access-ordering/)\r\n* [关于 Rust 中已检查异常（checked exception）的短文](https://users.rust-lang.org/t/an-essay-of-checked-exceptions-in-rust/57769)\r\n* [离奇的架构设计，从开始就不要支持](https://blog.yossarian.net/2021/02/28/Weird-architectures-werent-supported-to-begin-with)\r\n* \\[视频\\] [7 天内学会 Rust OpenGL](https://youtu.be/KEQIWqSq42k)\r\n\r\n### Rust 演练\r\n\r\n* [以 Rust 为主，构建 Python 客户端](https://www.fluvio.io/blog/2021/03/python-client/)\r\n* [Rust 图形用户界面库 KAS 的简单实例](https://kas-gui.github.io/tutorials/hello.html)（译注：文章特短，推荐对 GUI 开发感兴趣的朋友阅读）\r\n* [如何创建最精简的 Rust Docker 镜像](https://blog.budshome.com/budshome/gou-jian-zui-jing-jian-de-rust-docker-jing-xiang)\r\n* [使用 Rust 自定义（Oxidizing）Kubernetes 算子](https://www.pavel.cool/rust/rust-kubernetes-operators/)\r\n* [从 Node.js 向 Rust 传递元组（tuple）数据，并返回运算结果](https://www.fluvio.io/blog/2021/04/node-bindgen-tuples/)\r\n* [用 Rust 做 Kafka 开发（1）](https://dev.to/abhirockzz/getting-started-with-kafka-and-rust-part-1-4hkb)\r\n* [Rust 初学者的错误处理指南](https://dev.to/seanchen1991/a-beginner-s-guide-to-handling-errors-in-rust-40k2)\r\n* [使用 Seahorn 验证 Rust 程序](https://project-oak.github.io/rust-verification-tools/using-seahorn/)\r\n* [Rust 中的异步数据流（1）——Futures、缓冲处理（buffering），以及难解的编译错误](https://gendignoux.com/blog/2021/04/01/rust-async-streams-futures-part1.html)\r\n* \\[系列\\] [如果 SQLite 是用 Rust 开发的，会是什么样子？（3）](https://medium.com/the-polyglot-programmer/what-would-sqlite-look-like-if-written-in-rust-part-3-edd2eefda473)\r\n* \\[视频\\] [Rust 中的函数返回值](https://www.youtube.com/watch?v=YNSg7g46Hso)\r\n* \\[视频\\] [Rust 中的 Crust：原子计算和内存排序](https://youtu.be/rMGWeSjctlY)（译注：crust 是 Rust 生态中的低层次网络库，用于优化对等连接和数据传输）\r\n* \\[视频\\] [Rust 中的 Async/Await：简介](https://youtu.be/FNcXf-4CLH0)\r\n* \\[视频\\] [OpenVehicleDiag Rust 编码直播](https://youtu.be/zjAe-uvKMJ4)\r\n* \\[视频\\] \\[系列\\] [易学易用 Rust——用简洁的英文进行 Rust 编程](https://youtube.com/playlist?list=PLfllocyHVgsRwLkTAhG0E-2QxCf-ozBkk)\r\n\r\n### 其它\r\n\r\n* [best-of-ml-rust：Rust 机器学习库列表](https://github.com/e-tony/best-of-ml-rust)\r\n* [Rust 在 Android 平台的近况： Android 团队宣布 Android 开源项目（AOSP），已支持 Rust 语言来开发 Android 系统本身](https://blog.budshome.com/budshome/android-tuan-dui-xuan-bu-android-kai-yuan-xiang-mu-(aosp),yi-zhi-chi-rust-yu-yan-lai-kai-fa-android-xi-tong-ben-shen)\r\n* [致谢 David Tolnay](https://www.reddit.com/r/rust/comments/mify2o/david_tolnay_thank_you/)\r\n* [我的“美好未来”](https://smallcultfollowing.com/babysteps/blog/2021/04/02/my-shiny-future/)（译注：即[【2021-04-03】Rust 核心团队人员变动](https://blog.budshome.com/budshome/-(2021-04-03)--rust-he-xin-tuan-dui-ren-yuan-bian-dong)文中所述：Niko Matsakis 正在逐步退出 Rust 核心团队，他将集中精力带领 Rust 语言团队。为此，Niko Matsakis 发表了此篇博文）\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [rs-pbrt](https://crates.io/crates/rs_pbrt)，PBRT 图书（第三版）中 C++ 部分代码的对应 Rust 实现。\r\n\r\n谢谢 [Jan Walter](https://users.rust-lang.org/t/crate-of-the-week/2704/900) 的提议！\r\n\r\n[关于下周最佳 crate，请您提议，并投票!](https://users.rust-lang.org/t/crate-of-the-week/2704)!\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n* [dotenv-linter 有些优先级较高的 issues](https://github.com/dotenv-linter/dotenv-linter/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n# Rust 核心更新\r\n\r\n[313 PR 在上一周被合并](https://github.com/search?q=is%3Apr+org%3Arust-lang+is%3Amerged+merged%3A2021-03-29..2021-04-05)。\r\n\r\n## Rust 编译器性能\r\n\r\n对于[内存使用的改进](https://perf.rust-lang.org/?start=4896450e7e0a522486b4d3a8d360ac4e1d2072a0&end=d32238532138485c80db4f2cd596372bce214e00&absolute=false&stat=max-rss)来说，本周颇为重要。因为默认分配器（allocator，升级到了最新的 jemalloc）的更新，发布构建（cargo build --release）的内存使用率，平均提高了约 20%；而检测构建（cargo check）则大约提升内存使用率为 5%。\r\n\r\n验测工作是由 **@simulacrum** 完成的。修正范围：[4896450e..d32238](https://perf.rust-lang.org/?start=4896450e7e0a522486b4d3a8d360ac4e1d2072a0&end=d32238532138485c80db4f2cd596372bce214e00&absolute=false&stat=instructions%3Au)\r\n\r\n## 已核准的 RFCs\r\n\r\nRust 的改进遵循 [RFC（request for comments）流程](https://github.com/rust-lang/rfcs#rust-rfcs)。如下是本周核准实现的 RFCs：\r\n\r\n* [RFC：声明宏的原变量表达式（Declarative macro metavariable expressions）](https://github.com/rust-lang/rfcs/pull/3086)\r\n\r\n## 新的 RFCs\r\n\r\n* [RFC：预留 2021 版代号（Reserved prefixes in the 2021 edition）](https://github.com/rust-lang/rfcs/pull/3101)（译注：即 `Cargo.toml` 中的设置 `edition = \"2018\"`）\r\n\r\n# 近期活动\r\n\r\n### 线上活动\r\n\r\n* [April 7, Johannesburg, ZA - Monthly Joburg Rust Chat! - Johannesburg Rust Meetup](https://www.meetup.com/Johannesburg-Rust-Meetup/events/277133126/)\r\n* [April 7, Indianapolis, IN, US - Indy.rs - with Social Distancing - Indy Rust](https://www.meetup.com/indyrs/events/jhfstryccgbkb/)\r\n* [April 12, Denver, CO, US - Building Delightful CLI Tools in Rust by Chuck Pierce - Rust Denver](https://www.meetup.com/Rust-Boulder-Denver/events/276801410/)\r\n* [April 13, Seattle, WA, US - Monthly Meetup - Seattle Rust Meetup](https://www.meetup.com/Seattle-Rust-Meetup/events/gskksryccgbrb/)\r\n* [April 13, Saarbrücken, Saarland, DE - ](https://www.meetup.com/de-DE/Rust-Saar/events/276873622/)**[Rust Saar](https://www.meetup.com/de-DE/Rust-Saar/events/276873622/)**[ 10u16](https://www.meetup.com/de-DE/Rust-Saar/events/276873622/)\r\n* [April 20, Washington, DC, US - The Rust Borrow Checker—A Deep Dive - Rust DC](https://www.meetup.com/RustDC/events/ntvrgsyccgblb)\r\n\r\n### 北美\r\n\r\n* [April 8, Columbus, OH, US - Monthly Meetup - Columbus Rust Society](https://www.meetup.com/columbus-rs/events/dpkhgryccgblb/)\r\n* [April 14, Atlanta, GA, US - Grab a beer with fellow Rustaceans - Rust Atlanta](https://www.meetup.com/Rust-ATL/events/qxqdgryccgbsb/)\r\n\r\n### 亚太\r\n\r\n* [April 19, Wellington, NZ - IGNITION: What is Rust and why should I care? Rust at work & at play - Rust Wellington](https://www.meetup.com/Rust-Wellington/events/277270667)\r\n\r\n# Rust 招聘信息\r\n\r\n**IOTA Foundation**\r\n\r\n* [IOTA Identity Software Engineer - Rust (Remote)](https://iota.bamboohr.com/jobs/view.php?id=143&source=other)\r\n\r\n**Parity Technologies**\r\n\r\n* [Blockchain Developer - Cross Chain Messaging (Remote)](https://grnh.se/9aec49883us)\r\n* [Numerous other Rust engineering openings](https://www.parity.io/jobs/)\r\n\r\n**Microsoft**\r\n\r\n* [Azure IoT Senior Software Engineer (remote possible within U.S.)](https://careers.microsoft.com/us/en/job/960784/Senior-Software-Engineer)\r\n  * Junior developers should also apply but relocation to Redmond is necessary in that case.\r\n\r\n**Wallaroo**\r\n\r\n* [Software Engineer (Remote)](https://wallaroo.breezy.hr/p/30939dc4e5c7-software-engineer)\r\n\r\n*Tweet us at [@ThisWeekInRust](https://twitter.com/ThisWeekInRust) to get your job offers listed here!*\r\n\r\n# 本周引语\r\n\r\n很遗憾，本周没有“引语”提议。\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman).*\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-10T03:20:33.644Z"),
+    "updated_at": ISODate("2021-04-10T03:20:33.644Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ed0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "构建最精简的 Rust Docker 镜像",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "构建最精简的 Docker 映像，以用来部署 Rust，将会带来很多益处：不仅有利于安全（减少攻击面），而且还可以缩短部署时间、降低成本（减少带宽和存储），并降低依赖项冲突的风险。",
+    slug: "gou-jian-zui-jing-jian-de-rust-docker-jing-xiang",
+    uri: "/budshome/gou-jian-zui-jing-jian-de-rust-docker-jing-xiang",
+    content: "> 本文摘选自 Sylvain Kerkour（Bloom.sh 站点的创建者和《黑帽 Rust（Black Hat Rust）》一书作者）的文章 [How to create small Docker images for Rust](https://kerkour.com/blog/rust-small-docker-image/)。\r\n\r\n构建最精简的 Docker 映像，以用来部署 Rust，将会带来很多益处：不仅有利于安全（减少攻击面），而且还可以缩短部署时间、降低成本（减少带宽和存储），并降低依赖项冲突的风险。\r\n\r\n# Rust 代码\r\n\r\n我们的“应用”相当简单：将构建一个简单的命令行实用程序，用来调用 https://api.myip.com，并打印响应结果。\r\n\r\n进行 HTTPS 调用很有趣，因为它需要一个库来与 TLS（通常使用 `openssl`）交互。但是，为了构建尽可能精简的 Docker 映像，我们需要对我们的程序做静态链接，而 `openssl` 的静态链接并不是那么容易实现。所以，本文我们将避免使用 `openssl`，而改用 Rust 生态库 `rustls`。\r\n\r\n让我们暂时忽略 `Jemalloc`。\r\n\r\n``` bash\r\ncargo new myip\r\n```\r\n\r\n## Cargo.toml\r\n\r\n``` toml\r\n[package]\r\nname = \"myip\"\r\nversion = \"0.1.0\"\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nserde = { version = \"1\", features = [\"derive\"] }\r\nreqwest = { version = \"0.11\", default-features = false, features = [\"json\", \"rustls-tls\", \"blocking\"] }\r\n\r\n\r\n[target.'cfg(all(target_env = \"musl\", target_pointer_width = \"64\"))'.dependencies.jemallocator]\r\nversion = \"0.3\"\r\n```\r\n\r\n## main.rs\r\n\r\n``` rust\r\nuse serde::Deserialize;\r\nuse std::error::Error;\r\n\r\n// Use Jemalloc only for musl-64 bits platforms\r\n#[cfg(all(target_env = \"musl\", target_pointer_width = \"64\"))]\r\n#[global_allocator]\r\nstatic ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;\r\n\r\n#[derive(Deserialize, Debug)]\r\nstruct ApiRes {\r\n    ip: String,\r\n}\r\n\r\nfn main() -> Result<(), Box<dyn Error>> {\r\n    let res = reqwest::blocking::get(\"https://api.myip.com\")?.json::<ApiRes>()?;\r\n\r\n    println!(\"{}\", res.ip);\r\n\r\n    Ok(())\r\n}\r\n```\r\n\r\n我们执行 `cargo run`，看看是否正常运行：\r\n\r\n``` bash\r\ncargo run\r\n     Running `target/debug/myip`\r\n127.0.0.1\r\n```\r\n\r\n# 使用空镜像 scratch\r\n\r\n大小：15.9 MB\r\n\r\n为了将 docker 空镜像 `scratch` 作为基础镜像，我们必须静态地将程序链接到 `musl libc`，因为 `glibc` 在 `scratch` 中不可用。链接 `musl libc`，可以通过增加编译目标 `x86_64-unknown-linux-musl` 来实现。\r\n\r\n这样做有一个问题，`musl` 的内存分配器没有进行速度优化，可能会[降低应用程序的性能](https://www.linkedin.com/pulse/testing-alternative-c-memory-allocators-pt-2-musl-mystery-gomes)，尤其是在处理高吞吐量的应用程序时。\r\n\r\n这就是为什么我们要使用 [`jemalloc`](https://github.com/jemalloc/jemalloc)，一个为高并发应用程序设计的内存分配器。\r\n\r\n请注意，[在使用 `jemalloc` 时可能会产生错误](https://andygrove.io/2020/05/why-musl-extremely-slow/)，因此请注意查看日志 ;)\r\n\r\n作为一个数据节点，我已经使用它为数百万个 HTTP 请求提供了服务，没有任何问题。\r\n\r\n## Dockerfile.scratch\r\n\r\n``` docker\r\n####################################################################################################\r\n## Builder\r\n####################################################################################################\r\nFROM rust:latest AS builder\r\n\r\nRUN rustup target add x86_64-unknown-linux-musl\r\nRUN apt update && apt install -y musl-tools musl-dev\r\nRUN update-ca-certificates\r\n\r\n# Create appuser\r\nENV USER=myip\r\nENV UID=10001\r\n\r\nRUN adduser \\\r\n    --disabled-password \\\r\n    --gecos \"\" \\\r\n    --home \"/nonexistent\" \\\r\n    --shell \"/sbin/nologin\" \\\r\n    --no-create-home \\\r\n    --uid \"${UID}\" \\\r\n    \"${USER}\"\r\n\r\n\r\nWORKDIR /myip\r\n\r\nCOPY ./ .\r\n\r\nRUN cargo build --target x86_64-unknown-linux-musl --release\r\n\r\n####################################################################################################\r\n## Final image\r\n####################################################################################################\r\nFROM scratch\r\n\r\n# Import from builder.\r\nCOPY --from=builder /etc/passwd /etc/passwd\r\nCOPY --from=builder /etc/group /etc/group\r\n\r\nWORKDIR /myip\r\n\r\n# Copy our build\r\nCOPY --from=builder /myip/target/x86_64-unknown-linux-musl/release/myip ./\r\n\r\n# Use an unprivileged user.\r\nUSER myip:myip\r\n\r\nCMD [\"/myip/myip\"]\r\n```\r\n\r\n让我们构建，以及运行镜像：\r\n\r\n``` bash\r\ndocker build -t myip:scratch -f Dockerfile.scratch .\r\n# 省略构建时输出\r\n# ……\r\n\r\ndocker run -ti --rm myip:scratch\r\n127.0.0.1\r\n```\r\n\r\n# 使用基础镜像 alpine\r\n\r\n大小：21.6MB\r\n\r\n[Alpine Linux](https://alpinelinux.org/) *是以安全为理念的轻量级 Linux 发行版，基于 `musl libc` 和 `busybox`*。\r\n\r\n如果使用 `scratch` 空镜像不满足需求，并且需要包管理器来安装依赖项，如 `chromium` 或者 `ssh`，那么应当使用 `alpine` 基础镜像。\r\n\r\n由于基础镜像 `alpine` 基于 `musl libc`，因此它的约束条件与空镜像 `scratch` 相同，我们需要使用编译目标 `x86_64-unknown-linux-musl`，以静态链接我们的 Rust 程序。\r\n\r\n## Dockerfile.alpine\r\n\r\n``` docker\r\n####################################################################################################\r\n## Builder\r\n####################################################################################################\r\nFROM rust:latest AS builder\r\n\r\nRUN rustup target add x86_64-unknown-linux-musl\r\nRUN apt update && apt install -y musl-tools musl-dev\r\nRUN update-ca-certificates\r\n\r\n# Create appuser\r\nENV USER=myip\r\nENV UID=10001\r\n\r\nRUN adduser \\\r\n    --disabled-password \\\r\n    --gecos \"\" \\\r\n    --home \"/nonexistent\" \\\r\n    --shell \"/sbin/nologin\" \\\r\n    --no-create-home \\\r\n    --uid \"${UID}\" \\\r\n    \"${USER}\"\r\n\r\n\r\nWORKDIR /myip\r\n\r\nCOPY ./ .\r\n\r\nRUN cargo build --target x86_64-unknown-linux-musl --release\r\n\r\n####################################################################################################\r\n## Final image\r\n####################################################################################################\r\nFROM alpine\r\n\r\n# Import from builder.\r\nCOPY --from=builder /etc/passwd /etc/passwd\r\nCOPY --from=builder /etc/group /etc/group\r\n\r\nWORKDIR /myip\r\n\r\n# Copy our build\r\nCOPY --from=builder /myip/target/x86_64-unknown-linux-musl/release/myip ./\r\n\r\n# Use an unprivileged user.\r\nUSER myip:myip\r\n\r\nCMD [\"/myip/myip\"]\r\n```\r\n\r\n让我们构建，以及运行镜像：\r\n\r\n``` bash\r\ndocker build -t myip:alpine -f Dockerfile.alpine .\r\n# 省略构建时输出\r\n# ……\r\n\r\ndocker run -ti --rm myip:alpine\r\n127.0.0.1\r\n```\r\n\r\n# 使用基础镜像 buster-slim\r\n\r\n大小：79.4MB\r\n\r\n最后一个例子，我们将使用基础镜像 `debian:buster-slim` 作为基本。由于 Debian 基于 `glibc`，我们不再需要使用编译目标 `x86_64-unknown-linux-musl`。\r\n\r\n## Dockerfile.debian\r\n\r\n``` docker\r\n####################################################################################################\r\n## Builder\r\n####################################################################################################\r\nFROM rust:latest AS builder\r\n\r\nRUN update-ca-certificates\r\n\r\n# Create appuser\r\nENV USER=myip\r\nENV UID=10001\r\n\r\nRUN adduser \\\r\n    --disabled-password \\\r\n    --gecos \"\" \\\r\n    --home \"/nonexistent\" \\\r\n    --shell \"/sbin/nologin\" \\\r\n    --no-create-home \\\r\n    --uid \"${UID}\" \\\r\n    \"${USER}\"\r\n\r\n\r\nWORKDIR /myip\r\n\r\nCOPY ./ .\r\n\r\n# We no longer need to use the x86_64-unknown-linux-musl target\r\nRUN cargo build --release\r\n\r\n####################################################################################################\r\n## Final image\r\n####################################################################################################\r\nFROM debian:buster-slim\r\n\r\n# Import from builder.\r\nCOPY --from=builder /etc/passwd /etc/passwd\r\nCOPY --from=builder /etc/group /etc/group\r\n\r\nWORKDIR /myip\r\n\r\n# Copy our build\r\nCOPY --from=builder /myip/target/release/myip ./\r\n\r\n# Use an unprivileged user.\r\nUSER myip:myip\r\n\r\nCMD [\"/myip/myip\"]\r\n```\r\n\r\n让我们构建，以及运行镜像：\r\n\r\n``` bash\r\ndocker build -t myip:debian -f Dockerfile.debian .\r\n# 省略构建时输出\r\n# ……\r\n\r\ndocker run -ti --rm myip:debian\r\n127.0.0.1\r\n```\r\n\r\n# 结论\r\n\r\n``` bash\r\ndocker images\r\nREPOSITORY    TAG           IMAGE ID       CREATED          SIZE\r\nmyip          scratch       795604e74501   9 minutes ago    15.9MB\r\nmyip          alpine        9a26400587a2   2 minutes ago    21.6MB\r\nmyip          debian        c388547b9486   12 seconds ago   79.4MB\r\n```\r\n\r\n虽然本文我们聚焦于 Docker，但是如果镜像对您来说仍然太大，并且您知道自己在做什么，那么请[参阅这篇文章](https://github.com/johnthagen/min-size-rust%E4%BB%A5%E5%8F%8Ahttps://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html)，还有一些技巧可以将 Rust 可执行文件的大小进一步精简。\r\n\r\n例如，在 `Cargo.toml` 文件中：\r\n\r\n``` toml\r\n[profile.release]\r\nlto = true\r\ncodegen-units = 1\r\n```\r\n\r\n然后，在执行 `cargo build` 命令后，在 `Dockerfile` 文件中增加：\r\n\r\n``` docker\r\nRUN strip -s /myip/target/release/myip\r\n```\r\n\r\n现在，大小如下：\r\n\r\n``` bash\r\ndocker images\r\nREPOSITORY    TAG           IMAGE ID       CREATED          SIZE\r\nmyip          scratch       de26b0460262   17 minutes ago   4.2MB\r\nmyip          alpine        4188ccc82662   6 minutes ago    9.81MB\r\nmyip          debian        0eefb58278a8   4 seconds ago    72.8MB\r\n```\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-10T12:12:15.172Z"),
+    "updated_at": ISODate("2021-04-10T12:12:15.172Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 用在生产环境的 42 家公司",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 已经被广泛用于生产环境，从个人、小团队，到世界上最大和最具影响力的公司，都已经将 Rust 用于生产环境。每天服务数十亿笔交易，无论是可靠性、生产率、性能优势，或是安全性，Rust 都是当今的首选语言。",
+    slug: "rust-yong-zai-sheng-chan-huan-jing-de-42-jia-gong-si",
+    uri: "/budshome/rust-yong-zai-sheng-chan-huan-jing-de-42-jia-gong-si",
+    content: "> 本文摘选自 Sylvain Kerkour（Bloom.sh 站点的创建者和《黑帽 Rust（Black Hat Rust）》一书作者）的文章 [42 Companies using Rust in production](https://kerkour.com/blog/rust-in-production-2021/)。\r\n\r\n[很多人都想学习 Rust 语言](https://insights.stackoverflow.com/survey/2020#technology-most-loved-dreaded-and-wanted-languages)，但担忧 Rust 语言或其生态系统还没有做好在生产环境使用的准备，或者他们可能找不到 Rust 开发相关的工作。\r\n\r\n**实际上，大可不必**。Rust 已经被广泛用于生产环境，从个人、小团队，到世界上最大和最具影响力的公司，都已经将 Rust 用于生产环境。每天服务数十亿笔交易，无论是可靠性、生产率、性能优势，或是安全性，Rust 都是当今的首选语言。\r\n\r\n下面的列表**并不详尽**，我从我所关注的公司中，挑选了 42 个家简要介绍，以及它们在生产环境中使用 Rust 的信息。\r\n\r\n**[1Password](https://serokell.io/blog/rust-in-production-1password)**：*“我们在 1Password 的生产环境中，使用 Rust 已有几年了。我们的 Windows 团队是这项工作的领跑者，Windows 中所用的  1Password 7，大约 70% 都是用 Rust 开发的。在 2019 年底，我们还将 1Password Brain（驱动浏览器填充逻辑的引擎）从 Go 移植到了 Rust。这样，我们就可以在浏览器扩展中，发挥将 Rust 程序部署到 WebAssembly 应用的性能优势。”*\r\n\r\n**[Android](https://security.googleblog.com/2021/04/rust-in-android-platform.html)**：*“在过去的 18 个月里，我们一直在为 Android 开源项目添加对 Rust 的支持。我们有几个早期采用 Rust 开发的项目，我们将在未来几个月内分享。将 Rust 扩展到更多操作系统，是我们的一个多年项目。”*\r\n\r\n**[Astropad](https://blog.astropad.com/why-rust/)**：*“有了 Rust，我们将拥有一个高性能、可移植的平台，可以轻松地在 Mac、iOS、Linux、Android，以及 Windows 上运行。这不仅极大地扩大了我们潜在的市场规模，而且还看到了我们的 `LIQUID` 技术的许多有趣的新用途。我们有信心用以强大的代码、更好的产品和对 Astropad 未来的乐观展望，以完成我们的 Rust 之旅。”*\r\n\r\n**[AWS](https://aws.amazon.com/blogs/opensource/why-aws-loves-rust-and-how-wed-like-to-help/)**：*“在 AWS，我们喜欢 Rust，因为它帮助 AWS 编写高性能、安全的基础设施级网络和其他系统软件。我们使用 Rust 提供的服务产品有很多，比如 Amazon 简单存储服务（Amazon S3）、Amazon 弹性计算云（Amazon EC2）、Amazon CloudFront、Amazon Route 53 等等。最近我们推出了 Bottlerocket，这是一个基于 Linux 的容器操作系统，也是用 Rust 开发的。”*\r\n\r\n**[Bloom](https://github.com/skerkour/bloom)**（译注：本文作者自己创建的）：*“作为一个独立和繁荣的企业，我需要 Bloom 尽可能可靠，这样我就可以享受我的夜晚和假期。Rust 是一个完美的选择，因为它出色的编译器，在编译时捕获了大多数 bug。”*\r\n\r\n**[Cloudflare](https://blog.cloudflare.com/tag/rust/)**：*“随着我们 Rust 开发经验的增长，Rust 语言在另外两个方面显示出了优势：作为一种具有强大内存安全性语言，它是边缘计算的一个绝好选择；作为一种具有极大热情的语言，它成为一种流行于组件重新开发（de novo）的语言。”*\r\n\r\n**[Coursera](https://medium.com/coursera-engineering/rust-docker-in-production-coursera-f7841d88e6ed)**：*“我们在增强的 Docker 容器中，高效、可靠、安全地为提交的作业评分。虽然我们将集群调度到 Amazon EC2 容器服务（ECS）上，但许多程序之间协同工作，是用 Rust 开发的。”*\r\n\r\n**[Cultivate](https://cultivatehq.com/posts/how-we-built-a-visual-studio-code-extension-for-iot-prototyping/)**：*“Rust 语言，使经验丰富的开发者灵活、高效，且错误较少。并且，允许那些探索系统发展的开发者，第一次脱离 C/C++ 的‘陷阱（gotchas）’，以自信心、好奇心和受保护的方式前进。”*\r\n\r\n**[Crisp](https://github.com/valeriansaliou/vigil)**：*“Vigil 是开源的、自托管的状态页面，也是监控和警报系统。它使用 Rust 开发，这使得它可靠、轻量、无崩溃（crash-free），至少在理论上是这样。”*\r\n\r\n**[Discor](https://blog.discord.com/why-discord-is-switching-from-go-to-rust-a190bbca2b1f?gi=e5dd22290878)**：*“当开始一个新的项目或组件时，我们首先考虑使用 Rust。当然，我们只在适合的地方使用。除了性能之外，Rust 对工程团队也有很多优势。例如，它的类型安全性和借用/引用检查器，使重构代码变得非常容易。此外，Rust 的生态系统和工具都非常出色，背后有着巨大的动力。”*\r\n\r\n**[Ditto](https://www.ditto.live/blog/posts/introducing-safer-ffi)**：*“当我们开始构建 Ditto 作为跨平台 SDK 时，Rust 为我们带来了许多功能，例如易于阅读、性能优良，包括一个现代化的构建系统和包管理器。”*\r\n\r\n**[Dropbox](https://dropbox.tech/infrastructure/rewriting-the-heart-of-our-sync-engine)**：*“我们用 Rust 开发了 `Nucleus`！Rust 帮助我们团队力量倍增，选择 Rust 是我们做出的最好决定之一。Rust 的人机工程学和正确原则，不仅有助于我们驯服 `sync` 的复杂性。而且，我们可以在类型系统中，对系统进行复杂的不变量编码，并让编译器为我们检查它们。”*\r\n\r\n**[Everlane](https://precompile.com/2016/06/23/shipping-forgettable-microservices-with-rust.html)**：*“Rust 给予我们锻造性。这项服务已经在生产环境运行 4 个月了，它平均每秒处理 40 个请求，响应时间为 10ms。它的内存使用量很少超过 100MB。”*\r\n\r\n**[Facebook](https://www.reddit.com/r/rust/comments/jfkmxo/facebook_is_hiring_a_team_to_work_on_the_rust/)**：*“Facebook 正在雇佣一个团队，计划开发 Rust 编译器和库。”*\r\n\r\n**[Faraday](https://github.com/faradayio?q=&type=&language=rust&sort=)**（译注：不是法拉第未来哦）\r\n\r\n**[Figma](https://www.figma.com/blog/rust-in-production-at-figma/)**：*“虽然我们有一些挫折，但我想强调的是，我们在 Rust 方面的经验，总体上是非常积极的。这是一个非常有前途的项目，我们拥有坚实的核心和健康的社区。”*\r\n\r\n**[Fly.io](https://fly.io/docs/reference/architecture/#proxy)**：*“我们基础设施中的每台服务器，都在运行一个名为 `fly-proxy` 的基于信任的代理。此代理负责接受客户端连接、将其与客户应用程序匹配、应用处理程序（例如：TLS终止）以及服务器之间的回程处理。”*\r\n\r\n**[fullstory](https://bionic.fullstory.com/rust-at-fullstory-part-1/)**：*“经过仔细考虑，Rust 出现在我们选择标准的最前面。虽然我们承认，我们中的一些人希望这将是最终的结果，但这不是一个定局！我们有相当多的工程师对 Go 和 TypeScript 有很深的了解，我们利用他们的经验确保这些语言不会受到冷遇。但最终，大家一致认为，Rust 实际上是最正确的选择。”*\r\n\r\n**[IBM](https://developer.ibm.com/technologies/web-development/articles/why-webassembly-and-rust-together-improve-nodejs-performance/)**：*“IBM 的一个团队使用 WebAssembly 和 Rust，实现了难以置信的性能改进。”*\r\n\r\n**[华为](https://trusted-programming.github.io/2021/02/07/our-rust-mission-at-huawei.html)**：*“可信编程的愿景之旅，才刚刚开始。我们希望与 Rust 社区，以及即将成立的 Rust 基金会合作，为电信软件行业带来一场平稳的革命。”*\r\n\r\n**[KISIO Digital](https://github.com/CanalTP/mimirsbrunn)**\r\n\r\n**[Komodo Platform](https://github.com/KomodoPlatform?q=&type=&language=rust&sort=)**\r\n\r\n**[Linkerd](https://linkerd.io/2020/07/23/under-the-hood-of-linkerds-state-of-the-art-rust-proxy-linkerd2-proxy/)**：*“使用 Rust 的决定，可归结为三个因素。首先，`mesh` 服务代理有一些非常严格的要求：因为它是基于 `per-pod` 基础部署的，所以它必须具有尽可能小的内存和 CPU 占用。其次，因为应用程序的大部分或所有网络流量都通过代理，所以它需要最小的延迟开销，尤其是最坏情况下的尾部延迟。最后，也许是最重要的：因为代理处理的应用程序数据，可能包括极其敏感的数据，如金融交易或个人健康，所以它必须是安全的。”*\r\n\r\n**[微软](https://www.youtube.com/watch?v=NQBVUjdkLAA)**\r\n\r\n**[Mozilla](https://hacks.mozilla.org/2016/07/shipping-rust-in-firefox/)**：*“firefox v48，是 Mozilla 发布的第一个使用 Rust 开发的产品。当然，还有更多的使用 Rust 开发的产品要发布！”*\r\n\r\n**[npm](https://www.rust-lang.org/static/pdfs/Rust-npm-Whitepaper.pdf)**：*“npm 的第一个 Rust 程序，在一年半的生产环境中，没有发生任何警报。‘我对 Rust 最大的赞美，是它很无聊’，Dickinson说，‘这是一个令人惊奇的赞美’。部署新的 Rust 服务的过程是直接的，很快，他们就能够忘记这项 Rust 服务，因为它只引起很少的操作问题。”*\r\n\r\n**[OneSignal](https://onesignal.com/blog/tag/rust/)**：*“就在这个月，我们突破了每天发送 70亿 条通知的门槛，并创下了每秒 175 万条的记录。”*\r\n\r\n**[Qovery](https://www.qovery.com/blog/why-rust-has-a-bright-future-in-the-cloud)**：*“随着公司意识到云计算的好处，Rust 的势头就越来越强劲。Dropbox 使用 Rust 重写了它的一些核心系统，而 Mozilla 使用 Rust 构建了 Firefox 浏览器引擎，展示了 Rust 强大的优势。在 Qovery，我们相信 Rust 能够云构建的未来。”*\r\n\r\n**[Rapid7](https://blog.rapid7.com/2017/06/01/trusting-agents-with-rust/)**：*“我们在 Rust 部署中，看到的主要加速点是，不同平台上的部署工具，能够很容易地适应该语言。代理开发人员，能够很快地学习该语言，并开发与托管运行时的集成。”*\r\n\r\n**[三星](https://community.smartthings.com/t/hub-firmware-release-notes-17-12-17-13-17-14/83722/376)**：*“我们想向 Rust 语言的 5 个核心团队、Mozilla，以及 Rust 语言生态系统中众多软件包的贡献者们公开道谢：我们正在利用 Rust 开发新的更新客户端和服务器，以及其他一些软件的主干，并希望随着时间的推移，继续扩大我们对该语言的使用。”*\r\n\r\n**[Sentry](https://blog.sentry.io/2016/10/19/fixing-python-performance-with-rust)**：*“这个项目非常成功。它花了我们很少的时间来实现，它降低了用户的处理时间，而且它还将帮助我们横向扩展。Rust 一直是这个工作的完美工具，因为它允许我们把昂贵的操作转移到本地库中，而不必使用 C 或 C++，这将不太适合这种复杂的任务。”*\r\n\r\n**[Signal](https://github.com/signalapp/ringrtc)**\r\n\r\n**[Snips](https://github.com/snipsco?q=&type=&language=rust&sort=)**\r\n\r\n**[System76](https://blog.system76.com/post/187072707563/one-of-the-remaining-issues-with-firmware)**：*“像我们今天的所有项目一样，它是用 Rust 编写的，并且遵循当前的最佳实践。该项目被配置为一个工作区，核心 crate 提供了一个通用库，用于从多个固件服务中发现和管理固件。支持 `fwupd` 和 `system76-firmware`。”*\r\n\r\n**[Threema](https://github.com/threema-ch/push-relay)**\r\n\r\n**[Tonari](https://blog.tonari.no/why-we-love-rust)**：*“到目前为止，没有出现与软件相关的停机，这既是一个惊喜，也是 Rust 保证所提供服务的安全性的证明。Rust 还使得编写高性能代码，和高效的资源利用变得很容易——我们的 CPU 和内存使用都是可预测的和一致的。没有垃圾回收器，我们可以保证一致的延迟和帧速率。”*\r\n\r\n**[Veloren](https://veloren.net/)**\r\n\r\n**[VS Code](https://github.com/microsoft/vscode-ripgrep)**：有没有注意到 VS Code 的搜索速度有多快？原因是 VS Code 正在使用 [`ripgrep`](https://github.com/BurntSushi/ripgrep) 来[增强它的搜索能力](https://code.visualstudio.com/updates/v1_11#_text-search-improvements)。\r\n\r\n**[Wire](https://github.com/wireapp/proteus)**\r\n\r\n**[Zenly](https://www.rustjobs.dev/job/zenly-senior-back-end-engineer-rust)**\r\n\r\n**[yeslogic](https://github.com/yeslogic?q=&type=&language=rust&sort=)**\r\n\r\n**[Clever Cloud](https://www.clever-cloud.com/blog/tag/rust/)**：*“对我们来说，这些好处有力地证明了 Rust 是生产平台的可靠构建块。这是一段我们不必担心的代码，它将使其它服务能够安全地运行。”*\r\n\r\n还有很多公司，如 [Scaleway](https://careers.scaleway.com/job/backend-developer-api,-golang,-rust-network-products)、[Oxide](https://github.com/oxidecomputer?q=&type=&language=rust&sort=)、[Fuchsia](https://fuchsia.dev/fuchsia-src/contribute/contributing_to_netstack3)、[MeiliSearch](https://github.com/meilisearch/MeiliSearch)、[Vector](https://github.com/timberio/vector)、[embark](https://medium.com/embarkstudios/inside-rust-at-embark-b82c06d1d9f4)、[Chef](https://github.com/habitat-sh/habitat)、[BBC](https://twitter.com/tdp_org/status/1380205061775712257)、……\r\n\r\nRust 官方网站上，你也可以找到一个[专有的介绍页面](https://www.rust-lang.org/production/users)。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-11T03:27:44.661Z"),
+    "updated_at": ISODate("2021-04-11T03:27:44.661Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1edc"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 2021 版本特性预览，以及工作计划",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 的下一代版本，Rust 2021，将定于今年（2021）晚些时候发布。包括：`prelude` 的变更、新的闭包捕获规则、统一 std 和 core 中的 panic，以及将一些 lint 从警告升级为错误。目标里程碑的时间表：\r\n\r\n4 月 1 日：所有相关 RFC 合并，或处于良好状态（即，所有达成的重大决策和合并，将在接下来的几周内进行）。\r\n5 月 1 日：Rust 2021 中包含的所有特性，将包含在 nightly 版本中。\r\n6 月 1 日：所有 lints 将包含在 nightly 版本中。\r\n9 月 1 日：Rust 2021 在 nightly 版本中稳定。\r\n10 月 21 日：Rust 2021 版本稳定。",
+    slug: "rust-2021-ban-ben-te-xing-yu-lan-,yi-ji-gong-zuo-ji-hua",
+    uri: "/budshome/rust-2021-ban-ben-te-xing-yu-lan-,yi-ji-gong-zuo-ji-hua",
+    content: "2021 年 3 月 4 日，由 Ryan Levick 代表 [Rust 2021 版本工作组](https://www.rust-lang.org/governance/teams/core#project-edition-2021)发布博文：[Planning the Rust 2021 Edition](https://blog.rust-lang.org/inside-rust/2021/03/04/planning-rust-2021.html)。\r\n\r\n> 译注：此为版本 `edition`，非 `version`。如 `Rust 2018 edition`，对应的 `version` 为 `Rust 1.31.0`，其最重要的特性是 `Non-lexical lifetimes（NLL）`。笔者估计，`Rust 2021 edition`，会对应 Rust 1.51.0，语法演变不多。主要是关于 `Cargo` 的新特性方面，如 `resolver`（详细请参阅 [Rust 1.51.0 已正式发布，及其新特性详述](https://blog.budshome.com/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu)）。\r\n\r\nRust 2021 版本工作组很高兴地宣布：Rust 的下一代版本，Rust 2021，将定于今年（2021）晚些时候发布。虽然关于 Rust 2021 版本的 [RFC](https://github.com/rust-lang/rfcs/pull/3085) 介绍，在形式上仍然是开放的，但我们预计，RFC 将很快会被合并。计划和准备已经开始，我们正在按计划进行！\r\n\r\n如果你关注 Rust 2021 版本会引入什么特性，或者了解稳定版发布的时间线，请继续阅读！\r\n\r\n## Rust 2021 包含什么？\r\n\r\nRust 2021 的最终特性列表，仍在审定中。总的来说，相比 Rust 2018，Rust 2021 特性的发布目标要小得多。有以下几个原因：\r\n\r\n- 为版本发布确立一个有规律的节奏。在版本级别，采用 Rust “train（译注：比喻改进的一系列节奏感）” 的发布模型，会有许多好处。\r\n- Rust 2018，需要直接解决 Rust 的“低应力（low stress）”问题（Rust 2018 worked directly against the Rust model of \"low stress\" releases）。\r\n- Rust 语言演变方面，突破性变化较少。\r\n\r\n您可以[在 RFC 中](https://github.com/rust-lang/rfcs/pull/3085)，阅读到更多关于版本演变的信息。\r\n\r\n特性是否会包含在 Rust 2021 中，是 RFC 审定过程的一部分。因此，从当前到发布的这段时间内，特性列表仍然可能会改变。也就是说，以下特性，**可能会**包含在 Rust 2021 版本中：\r\n\r\n### `prelude` 的变更\r\n\r\n尽管类型和自由函数（译注：非成员函数），可以不受版本约束而添加到 `prelude` 中。但对于 trait 来说，情况并非如此。向 `prelude` 添加 trait 可能会导致兼容性问题：新进入作用域的 trait，其包含的方法可能会有重名，从而导致对方法的调用会变得模棱两可。\r\n\r\n目前，建议将以下 trait 纳入到 Rust 2021 版本：\r\n\r\n* `TryFrom`/`TryInto`\r\n* `FromIterator`\r\n\r\n此变更的 RFC 可通过[此链接](https://github.com/rust-lang/rfcs/pull/3090)查阅。请注意，RFC 尚未合并，`prelude` 的新内容仍在积极讨论中。\r\n\r\n### 新的闭包捕获规则\r\n\r\n[RFC 2229](https://github.com/rust-lang/rfcs/pull/2229) 建议：在可能的情况下，闭包捕获单个字段，而非整个结构体。此 RFC 已被接受。在某些情况下，此变更将导致析构函数与当前版本的运行不同。因此，必须将此变更关联到新版本。后续，将会提供代码迁移的 lint 工具，以避免更改现有代码的语义。\r\n\r\n### Cargo 新特性 `resolver`\r\n\r\n在 Rust 1.51 中，Cargo 将有一个稳定的[新特性 `resolver`](https://github.com/rust-lang/cargo/issues/8088)（详细请参阅 [Rust 1.51.0 已正式发布，及其新特性详述](https://blog.budshome.com/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu)），`resolver` 允许 crate 的依赖项在不同的上下文中使用不同的特性。例如，`#[no_std]` crate 可能希望：将特定的依赖项用作构建（build）依赖项，启用 `std`；而常规依赖项，则禁用 `std`。目前，因为特性属于全局命名空间，所以会导致在这两种情况下都将启用 `std`。\r\n\r\n在 Rust 2021 版本中，这个新的 `resolver` 将成为默认的。但是 Rust 2018 版本中，仍然可以对新的 `resolver` 选择使用。\r\n\r\n> **译注**：Rust 2018 版本中，可以通过在 `Cargo.toml` 中加入一行设定，来启用Cargo 新特性 `resolver`。笔者项目中已经尝鲜，**建议启用**：\r\n>\r\n> > ``` toml\r\n> > [package]\r\n> > resolver = \"2\"\r\n> > # 或者，你使用 workspace\r\n> > [workspace]\r\n> > resolver = \"2\"\r\n> > ```\r\n\r\n### 其它\r\n\r\n其它提议的变更包括：[统一 `std` 和 `core` 中的 `panic`](https://github.com/rust-lang/rust/issues/80162)，以及将一些 `lint` 从[警告升级为错误](https://github.com/rust-lang/rust/issues/80165)。\r\n\r\n正在考虑中的完整特性列表，请参阅[此链接](https://docs.google.com/spreadsheets/d/1chZ2SL9T444nvU9al1kQ7TJMwC3IVQQV2xIv1HWGQ_k/edit?usp=sharing)。\r\n\r\n如果您关注于一个特性，其已经在讨论，并被包含在 Rust 的下一个版本中，但却没有在`完整特性列表中`列出，请[告知我们](https://rust-lang.zulipchat.com/#narrow/stream/268952-edition-2021)。虽然，对于更多还没有被讨论的特性，我们会很高兴听到。但是，可能直到 Rust 2021 版本准备发布，我们也不太可能有精力来讨论所有特性。\r\n\r\n## 时间线粗估\r\n\r\n以下是目标里程碑的时间表：\r\n\r\n- 4 月 1 日：所有相关 RFC 合并，或处于良好状态（即，所有达成的重大决策和合并，将在接下来的几周内进行）。\r\n- 5 月 1 日：Rust 2021 中包含的所有特性，将包含在 `nightly` 版本中。\r\n- 6 月 1 日：所有 `lints` 将包含在 `nightly` 版本中。\r\n- 9 月 1 日：Rust 2021 在 `nightly` 版本中稳定。\r\n- 10 月 21 日：Rust 2021 版本稳定。\r\n\r\n当接近最后期限时，我们将缩小那些已经取得积极进展的项目，并拟议变更清单。\r\n\r\n## 参与邀请\r\n\r\n如果您有兴趣对 Rust 2021 版本的发布提供帮助，请[联系我们](https://rust-lang.zulipchat.com/#narrow/stream/268952-edition-2021)。除了特性专项工作和版本管理规划之外，还有很多工作要做。版本发布需要执行的一些附加工作项包括：\r\n\r\n- 所有相关特性的 `rustfix` 迁移\r\n- 测试所有特性及其迁移路径\r\n- 博客文章和其它宣传材料\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-12T07:51:49.734Z"),
+    "updated_at": ISODate("2021-04-12T07:51:49.734Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务 - 起步及 crate 选择",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "本系列博客中，我们基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务。 本文为起步教程，主要包括： 工程的创建、工具类 crate 安装、添加依赖 crate，以及依赖项支持特性（features）的设定。",
+    slug: "ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu---qi-bu-ji-crate-xuan-ze",
+    uri: "/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu---qi-bu-ji-crate-xuan-ze",
+    content: "前段时间，笔者写了一个构建 Rust 异步 GraphQL 服务的系列博文，[构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze)，采用的 Rust web 框架是 [Tide](https://tide.budshome.com/)。\r\n\r\n感兴趣的朋友阅读以后，对 actix-web 更感兴趣。有几十位朋友建议笔者写个 actix-web + async-graphql 构建 GraphQL 服务的系列。看样子 Rust 的国内社区，虽然使用 Rust 的公司可能很少，但至少感兴趣的程序员基本面不小了。\r\n\r\n因此，本系列文章，笔者以 actix-web + async-graphql + rbatis + postgresql / mysql 技术栈为骨架，简单进行 GraphQL 服务构建的实践。actix-web 是极为优秀的 Rust web 框架，笔者在 2018-2019 年间，GraphQL 服务后端，也一直使用的是 actix-web + juniper + postgresql 的组合。\r\n\r\n同时，目前国内工作场景，还是 mysql 居多，所以本系列实践，我们采用 mysql 数据库。但这次实践采用了 orm 框架 rbatis，所以对于 postgresql 的支持，会很方便。在系列文章最后，我们增加很少量的代码，即可支持 postgresql。并且，我们将一并实现 GraphQL 服务的**多数据源**支持。\r\n\r\n和 [tide + async-graphql + mongodb](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze) 系列类似，我们需要做到前后端分离。\r\n\r\n1. **后端**：主要提供 GraphQL 服务，使用到的 crate 包括：[actix-web](https://actix-web.budshome.com/)、[async-graphql](https://async-graphql.budshome.com/)、jsonwebtoken、rbatis、serde、ring、base64 等。\r\n2. **前端（handlebars-rust）**：主要提供 WEB 应用服务，使用到 crate 包括：[actix-web](https://actix-web.budshome.com/)、[rhai](https://rhai.budshome.com/)、surf、graphql_client、[handlebars-rust](https://handlebars.budshome.com/guide/)、cookie 等。\r\n3. **前端（WebAssembly ）**：主要提供 WEB 应用服务，笔者实际项目中，和伙伴们还处于尝试初期。后面写到这部分时，我们再确定使用的技术栈。如果您对于 wasm 的使用已经熟悉，欢迎您的指导。\r\n\r\nRust 环境的配置，cargo 工具的使用，以及 Rust 程序设计语言和 GraphQL 的介绍和优势，在此不再赘述。您可以参阅如下资料学习 Rust 程序设计语言，以及 Rust 生态中的 GraphQL 实现。\r\n\r\n- 请参阅 [Windows、Linux，以及 MacOS 下安装和配置 Rust 环境](https://rust-guide.budshome.com/3-env.html)，以及配置 Rust 工具链的国内源、配置 Cargo 国内镜像源。\r\n- [actix-web](https://actix-web.budshome.com/)，Rust 社区中最活跃、成熟的 WEB 框架。\r\n- [通过例子学 Rust](https://rust-by-example.budshome.com/)，推荐。\r\n- [Rust Cookbook 中文版](https://rust-cookbook.budshome.com)，推荐。\r\n- [Cargo 中文文档](https://cargo.budshome.com/)，推荐。\r\n- [async-graphql 中文文档](https://async-graphql.budshome.com/)\r\n- [Rust 程序设计语言](https://rust-lang.budshome.com/)\r\n\r\n以下建议了解，技术选型很丰富，我们不必拘泥。\r\n\r\n- [Tide](https://tide.budshome.com/)，Rust 官方团队开发的 HTTP 服务器框架。推荐作为了解，本系列文章中我们选择 actix-web。\r\n- [Juniper 中文文档](https://juniper.budshome.com/)，推荐作为了解，本系列文章中我们选择 async-graphql。\r\n\r\n其它概念性、对比类的内容，请您自行搜索。\r\n\r\n# 工程的创建\r\n\r\n文章的开始提到，我们要做到前后端分离。因此，前、后端需要各自创建一个工程。同时，我们要使用 cargo 对工程进行管理和组织。\r\n\r\n- 首先，创新本次工程根目录和 cargo 清单文件\r\n\r\n``` Bash\r\nmkdir actix-web-async-graphql\r\ncd ./actix-web-async-graphql\r\n\r\ntouch Cargo.toml \r\n```\r\n\r\n在 `Cargo.toml` 文件中，填入以下内容：\r\n\r\n``` Toml\r\n[workspace]\r\nmembers = [\r\n  \"./backend\",\r\n  \"./frontend-handlebars\",\r\n  \"./frontend-wasm\",\r\n]\r\n\r\nresolver = \"2\"\r\n\r\n[profile.dev]\r\nsplit-debuginfo = \"unpacked\"\r\n```\r\n\r\n> **注1**：`resolver = \"2\"` 是 Rust 1.51.0 中 cargo 工具新支持的设定项，主要用于解决依赖项管理的难题。目前，Cargo 的默认行为是：在依赖关系图中，当单个包被多次引用时，合并该包的特性。而启用 `resolver` 后，则可避免合并包，启用所有特性。但这种新的解析特性，可能会导致一些 crate 编译不止一次。具体参阅 [Rust 1.51.0 已正式发布，及其新特性详述](https://blog.budshome.com/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu)，或者 [Rust 2021 版本特性预览，以及工作计划](https://blog.budshome.com/budshome/rust-2021-ban-ben-te-xing-yu-lan-,yi-ji-gong-zuo-ji-hua) 中的 `Cargo resolver` 小节。\r\n\r\n> **注2**：`[profile.dev]` 是 Rust 1.51.0 中的关于“拆分调试信息”的设定，这个主要是 macOS 上的改进。\r\n\r\n文件中，`workspace` 是 cargo 中的工作区。cargo 中，工作区共享公共依赖项解析（即具有共享 Cargo.lock），输出目录和各种设置，如配置文件等的一个或多个包的集合。\r\n\r\n虚拟工作区是 `Cargo.toml` 清单中，根目录的工作空间，不需要定义包，只列出工作区成员即可。\r\n\r\n上述配置中，包含 3 个成员 `backend`、`frontend-handlebars`，以及 `frontend-wasm` 即我们需要创建 3 个工程（请注意您处于 actix-web-async-graphql 目录中）：前端和后端 —— 均为二进制程序，所以传递 `--bin` 参数，或省略参数。\r\n\r\n``` Bash\r\ncargo new backend --bin\r\ncargo new frontend-handlebars --bin\r\ncargo new frontend-wasm --bin\r\n```\r\n\r\n> **注3**：如果你不想要产生 git 信息，或者你有自己的 git 配置，请在 cargo 命令后再加上 `--vcs none` 参数。\r\n\r\n创建后，工程结构如下图所示——\r\n\r\n![工程结构](https://blog.budshome.com/static/articles/1618326764.png)\r\n\r\n我们可以看到，因为还未编译，没有 `Cargo.lock` 文件；`main.rs` 文件也是 Cargo 产生的默认代码。\r\n\r\n现在，这个全新的工程，已经创建完成了。\r\n\r\n# 工具类 crate 安装\r\n\r\n工程创建完成后，我们即可以进入开发环节了。开发中，一些工具类 crate 可以起到“善其事”的作用，我们需要先进行安装。\r\n\r\n- cargo-edit，包含 `cargo add`、`cargo rm`，以及 `cargo upgrade`，可以让我们方便地管理 crate。\r\n- cargo-watch，监视项目的源代码，以了解其更改，并在源代码发生更改时，运行 Cargo 命令。\r\n\r\n好的，我们安装这 2 个 crate。\r\n\r\n``` Bash\r\ncargo install cargo-edit\r\ncargo install cargo-watch\r\n```\r\n\r\n> 安装依赖较多，如果时间较长，请[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)。\r\n\r\n# 添加依赖 crate\r\n\r\n接着，我们需要添加开发所需依赖项。依赖项的添加，我们不用一次性全部添加，我们根据开发需要，一步步添加。首先，从后端工程开始。\r\n\r\n后端工程中，我们提供 GraphQL 服务，需要依赖的基本 crate 有 actix-web、async-graphql、rbatis。我们使用 `cargo add` 命令来安装，其将安装最新版本。\r\n\r\n``` Bash\r\ncd backend\r\ncargo add actix-web async-graphql rbatis\r\n```\r\n\r\n> 安装依赖较多，如果时间较长，请[配置 Cargo 国内镜像源](https://rust-guide.budshome.com/4-cargo/4.1-source-replacement.html)。\r\n\r\n执行上述命令后，`actix-web-async-graphql/backend/Cargo.toml` 内容如下所示——\r\n\r\n``` Toml\r\n...\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\n\r\nasync-graphql = \"2.8.2\"\r\nrbatis = \"1.8.83\"\r\n...\r\n```\r\n\r\nRust 生态和社区中，发展是非常迅猛的。虽然 Rust 的稳定性、安全性非常高，但活跃的社区导致 crate 的迭代版本很快。所以我们使用的都是最新版本的 crate，跟上 Rust 生态的最新潮流。\r\n\r\n# 依赖项支持特性（features）\r\n\r\n本文开始，我们已经提到：本系列，我们将以 mysql、postgresql 作为数据库进行实践。`rbatis` 默认为特性为 `all-database`，支持包括 sqlite、sqlserver 等，我们不需要，所以限定特性为 mysql、postgresql 即可。\r\n\r\n另外，async-graphql 从 2.6.3 开始，默认不激活所有特性，所以我们本次实践，也需要做一些设定。\r\n\r\n最终，`actix-web-async-graphql/backend/Cargo.toml` 内容如下所示——\r\n\r\n``` Toml\r\n...\r\n[dependencies]\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\n\r\nasync-graphql = { version = \"2.8.2\", features = [\"chrono\"] }\r\nrbatis = { version = \"1.8.83\", default-features = false, features = [\"mysql\", \"postgres\"] }\r\n...\r\n```\r\n\r\n至此，我们构建基于 Rust 技术栈的 Graphql 服务的后端基础工程已经搭建完成。下一篇文章中，我们开始构建一个最基本的 GraphQL 服务器。\r\n\r\n此[实例源码仓库在 github](https://github.com/zzy/actix-web-async-graphql)，欢迎您共同完善。\r\n\r\n如果您发现**任何错误/错别字**，请给予指导（微信号 **yupen-com**，或者页底邮箱）。\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-13T15:48:29.416Z"),
+    "updated_at": ISODate("2021-04-13T15:48:29.416Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eeb"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（2） - 查询服务",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "本文中，我们将开启基于 actix-web 和 async-graphql 构建异步 Rust GraphQL 服务的历程。本章主要是 GraphQL 查询服务，包括如下内容：\r\n\r\n1、构建 GraphQL Schema；\r\n\r\n2、整合 actix-web 和 async-graphql；\r\n\r\n3、验证 query 服务；\r\n\r\n4、连接 mysql；\r\n\r\n5、提供 query 服务。",
+    slug: "ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(2)---cha-xun-fu-wu",
+    uri: "/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(2)---cha-xun-fu-wu",
+    content: "上一篇文章中，我们对后端基础工程进行了初始化，未有进行任何代码编写。本文中，我们将不再进行技术选型和优劣对比，直接基于 actix-web 和 async-graphql 构建异步 Rust GraphQL 服务的历程。本章主要是 GraphQL 查询服务，包括如下内容：\r\n\r\n1、构建 GraphQL Schema；\r\n\r\n2、整合 actix-web 和 async-graphql；\r\n\r\n3、验证 query 服务；\r\n\r\n4、连接 mysql；\r\n\r\n5、提供 query 服务。\r\n\r\n# 构建 GraphQL Schema\r\n\r\n首先，让我们将 GraphQL 服务相关的代码都放到一个模块中。为了避免下文啰嗦，我称其为 GraphQL 总线。\r\n\r\n``` Bash\r\ncd ./actix-web-async-graphql/backend/src\r\nmkdir gql\r\ncd ./gql\r\ntouch mod.rs queries.rs mutations.rs\r\n```\r\n\r\n## 构建一个查询示例\r\n\r\n- 首先，我们构建一个不连接数据库的查询示例：通过一个函数进行求合运算，将其返回给 graphql 查询服务。此实例改编自 [async-graphql 文档](https://async-graphql.budshome.com/quickstart.html)，仅用于验证环境配置，实际环境没有意义。\r\n\r\n> 下面代码中，注意变更 EmptyMutation 和订阅 EmptySubscription 都是空的，甚至 `mutations.rs` 文件都是空白，未有任何代码，仅为验证服务器正确配置。\r\n\r\n下面，我们需要编写代码。思路如下：\r\n\r\n### 编写求和实例，作为 query 服务\r\n\r\n在 `queries.rs` 文件中，写入以下代码：\r\n\r\n``` Rust\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    async fn add(&self, a: i32, b: i32) -> i32 {\r\n        a + b\r\n    }\r\n}\r\n```\r\n\r\n### `mod.rs` 中：构建 Schema，并编写请求处理（handler）函数\r\n\r\n- 通过 `async-graphql SchemaBuilder`，构建要在 `actix-web` 中使用的 `GraphQL Schema`，并接入我们自己的查询、变更，以及订阅服务。\r\n- 目前，我们首先要进行 `actix-web` 和 `async-graphql` 的集成验证，所以仅有`求和`作为查询服务，变更和订阅服务都是空的。\r\n- 同时，我们要进行 `actix-web` 中的请求处理（handler）函数的编写。\r\n\r\nactix-web 的请求处理函数中，请求为 `HttpRequest` 类型，响应类型则是 `HttpResponse`。而 async-graphql 在执行 GraphQL 服务时，请求类型和返回类型与 actix-web 的并不同，需要进行封装处理。\r\n\r\nasync-graphql 官方提供了 actix-web 与 async-graphql 的集成 crate `async-graphql-actix-web`，功能很全。我们直接使用，通过 `cargo add async-graphql-actix-web` 命令添加到依赖项。然后，填入具体代码如下：\r\n\r\n``` Rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse actix_web::{web, HttpResponse, Result};\r\nuse async_graphql::http::{playground_source, GraphQLPlaygroundConfig};\r\nuse async_graphql::{EmptyMutation, EmptySubscription, Schema};\r\nuse async_graphql_actix_web::{Request, Response};\r\n\r\nuse crate::gql::queries::QueryRoot;\r\n\r\n// `ActixSchema` 类型定义，项目中可以统一放置在一个共用文件中。\r\n// 但和 `actix-web` 和 `tide` 框架不同，无需放入应用程序`状态（State）`\r\n// 所以此 `Schema` 类型仅是为了代码清晰易读，使用位置并不多，我们直接和构建函数一起定义。\r\n// 或者，不做此类型定义，直接作为构建函数的返回类型。\r\ntype ActixSchema = Schema<\r\n    queries::QueryRoot,\r\n    async_graphql::EmptyMutation,\r\n    async_graphql::EmptySubscription,\r\n>;\r\n\r\npub async fn build_schema() -> ActixSchema {\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global sql datasource  in the schema object.\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription).finish()\r\n}\r\n\r\npub async fn graphql(schema: web::Data<ActixSchema>, req: Request) -> Response {\r\n    schema.execute(req.into_inner()).await.into()\r\n}\r\n\r\npub async fn graphiql() -> Result<HttpResponse> {\r\n    Ok(HttpResponse::Ok().content_type(\"text/html; charset=utf-8\").body(\r\n        playground_source(\r\n            GraphQLPlaygroundConfig::new(\"/graphql\").subscription_endpoint(\"/graphql\"),\r\n        ),\r\n    ))\r\n}\r\n```\r\n\r\n上面的示例代码中，函数 `graphql` 和 `graphiql` 作为 actix-web 服务器的请求处理程序，因此必须返回 `actix_web::HttpResponse`。\r\n\r\n> actix-web 开发本文不是重点，请参阅 [actix-web 中文文档](https://actix-web.budshome.com/)，很短时间即可掌握。\r\n\r\n# 整合 actix-web 和 async-graphql\r\n\r\n接下来，我们要进行 actix-web 服务器主程序开发和启动。进入 `./backend/src` 目录，迭代 `main.rs` 文件：\r\n\r\n``` Rust\r\nmod gql;\r\n\r\nuse actix_web::{guard, web, App, HttpServer};\r\n\r\nuse crate::gql::{build_schema, graphql, graphiql};\r\n\r\n#[actix_rt::main]\r\nasync fn main() -> std::io::Result<()> {\r\n    let schema = build_schema().await;\r\n\r\n    println!(\"GraphQL UI: http://127.0.0.1:8080\");\r\n\r\n    HttpServer::new(move || {\r\n        App::new()\r\n            .data(schema.clone())\r\n            .service(web::resource(\"/graphql\").guard(guard::Post()).to(graphql))\r\n            .service(web::resource(\"/graphiql\").guard(guard::Get()).to(graphiql))\r\n    })\r\n    .bind(\"127.0.0.1:8080\")?\r\n    .run()\r\n    .await\r\n}\r\n```\r\n\r\n本段代码中，我们直接在 `App` 构建器中加入 `schema`，以及对于 `graphql` 和 `graphiql` 这两个请求处理函数，我们也是在 `App` 构建器中逐次注册。这种方式虽然没有问题，但对于一个应用的主程序 `main.rs` 来讲，精简一些更易于阅读和维护。所以我们下一篇文章中对此迭代，通过 `ServiceConfig` 进行注册。\r\n\r\n# 验证 query 服务\r\n\r\n## 启动 actix-web 服务\r\n\r\n以上，一个基础的基于 Rust 技术栈的 GraphQL 服务器已经开发成功了。我们验证以下是否正常，请执行——\r\n\r\n``` Bash\r\ncargo run\r\n```\r\n\r\n更推荐您使用我们前一篇文章中安装的 `cargo watch` 来启动服务器，这样后续代码的修改，可以自动部署，无需您反复对服务器进行停止和启动操作。\r\n\r\n``` Bash\r\ncargo watch -x \"run\"\r\n```\r\n\r\n但遗憾的是——此时，你会发现服务器无法启动，因为上面的代码中，我们使用了 `#[actix_rt::main]` 此类的 Rust 属性标记。编译器会提示如下错误信息：\r\n\r\n``` bash\r\nerror[E0433]: failed to resolve: use of undeclared crate or module `actix_rt`\r\n --> backend\\src\\main.rs:7:3\r\n  |\r\n7 | #[actix_rt::main]\r\n  |   ^^^^^^^^ use of undeclared crate or module `actix_rt`\r\n……\r\n……\r\nerror[E0752]: `main` function is not allowed to be `async`\r\n --> backend\\src\\main.rs:8:1\r\n  |\r\n8 | async fn main() -> std::io::Result<()> {\r\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `main` function is not allowed to be `async`\r\n\r\nerror: aborting due to 3 previous errors\r\n\r\nSome errors have detailed explanations: E0277, E0433, E0752.\r\nFor more information about an error, try `rustc --explain E0277`.\r\nerror: could not compile `backend`\r\n```\r\n\r\n根据编译器提示，我们执行 `cargo add actix-rt`，然后重新运行。但很遗憾，仍然会报错：\r\n\r\n``` bash\r\nthread 'main' panicked at 'System is not running', ……\\actix-rt-1.1.1\\src\\system.rs:78:21\r\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\r\n```\r\n\r\n并且，我们查看 `backend/Cargo.toml` 文件时会发现，我们通过 `cargo add` 添加的依赖项是最新版，`actix-rt = \"2.2.0\"`，但此处错误信息却是 `actix-rt-1.1.1\\src\\system.rs:78:21`。这是因为 actix-web 3.3.2，可以一起正常工作的 actix-rt 最高版本是 1.1.1。如果你想使用 `actix-rt = \"2.2.0\"`，需要使用 actix-web 的测试版本，如下面配置：\r\n\r\n``` toml\r\n……\r\nactix = \"0.11.0-beta.2\"\r\nactix-web = \"4.0.0-beta.3\"\r\nactix-rt = \"2.0.2\"\r\n……\r\n```\r\n\r\n我们的实践是为了生产环境使用，不尝鲜了。最终，我们更改 `backend/Cargo.toml` 文件如下：\r\n\r\n``` toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"zzy <linshi@budshome.com>\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\nactix-rt = \"1.1.1\"\r\n\r\nasync-graphql = { version = \"2.8.2\", features = [\"chrono\"] }\r\nasync-graphql-actix-web = \"2.8.2\"\r\nrbatis = { version = \"1.8.83\", default-features = false, features = [\"mysql\", \"postgres\"] }\r\n```\r\n\r\n> 请注意，不是根目录 `actix-web-async-graphql/Cargo.toml` 文件。\r\n\r\n再次执行 `cargo run` 命令，您会发现服务器已经启动成功。\r\n\r\n## 执行 GraphQL 查询\r\n\r\n请打开您的浏览器，输入 `http://127.0.0.1:8080/graphiql`，您会看到如下界面（点击右侧卡片 docs 和 schema 查看详细）：\r\n\r\n![graphiql](https://blog.budshome.com/static/articles/161688998877.jpg)\r\n\r\n如图中示例，在左侧输入：\r\n\r\n```\r\nquery {\r\n  add(a: 110, b: 11)\r\n}\r\n```\r\n\r\n右侧的返回结果为：\r\n\r\n```\r\n{\r\n  \"data\": {\r\n    \"add\": 121\r\n  }\r\n}\r\n```\r\n\r\n基础的 GraphQL 查询服务成功！\r\n\r\n# 连接 MySql\r\n\r\n## 创建 MySql 数据池\r\n\r\n为了做到代码仓库风格的统一，以及扩展性。目前即使只需要连接 MySql 数据库，我们也将其放到一个模块中。\r\n\r\n``` Bash\r\ncd ./actix-web-async-graphql/backend/src\r\nmkdir dbs\r\ntouch ./dbs/mod.rs ./dbs/mysql.rs\r\n```\r\n\r\n在 `mysql.rs` 中，编写如下代码：\r\n\r\n``` Rust\r\nuse rbatis::core::db::DBPoolOptions;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\n// 对于常量，应当统一放置\r\n// 下一篇重构中，我们再讨论不同的方式\r\npub const MYSQL_URL: &'static str =\r\n    \"mysql://root:mysql@localhost:3306/budshome\";\r\n\r\npub async fn my_pool() -> Rbatis {\r\n    let rb = Rbatis::new();\r\n\r\n    let mut opts = DBPoolOptions::new();\r\n    opts.max_connections = 100;\r\n\r\n    rb.link_opt(MYSQL_URL, &opts).await.unwrap();\r\n\r\n    rb\r\n}\r\n```\r\n\r\n在 `mod.rs` 中，编写如下代码：\r\n\r\n``` Rust\r\n// pub mod postgres;\r\npub mod mysql;\r\n```\r\n\r\n## 创建数据表及数据\r\n\r\n在 mysql 中，创建 `user` 表，并构造几条数据，示例数据如下：\r\n\r\n``` sql\r\nSET NAMES utf8mb4;\r\nSET FOREIGN_KEY_CHECKS = 0;\r\n\r\n-- ----------------------------\r\n-- Table structure for user\r\n-- ----------------------------\r\nDROP TABLE IF EXISTS `user`;\r\nCREATE TABLE `user`  (\r\n  `id` int(0) UNSIGNED NOT NULL AUTO_INCREMENT,\r\n  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,\r\n  `username` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,\r\n  `cred` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,\r\n  PRIMARY KEY (`id`) USING BTREE\r\n) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;\r\n\r\n-- ----------------------------\r\n-- Records of user\r\n-- ----------------------------\r\nINSERT INTO `user` VALUES (1, 'ok@budshome.com', '我谁24ok32', '5ff82b2c0076cc8b00e5cddb');\r\nINSERT INTO `user` VALUES (2, 'oka@budshome.com', '我s谁24ok32', '5ff83f4b00e8fda000e5cddc');\r\nINSERT INTO `user` VALUES (3, 'oka2@budshome.com', '我2s谁24ok32', '5ffd710400b6b84e000349f8');\r\n\r\nSET FOREIGN_KEY_CHECKS = 1;\r\n```\r\n\r\n- `id` 是由 mysql 自动产生的，且递增；\r\n- `cred` 是使用 PBKDF2 对用户密码进行加密（salt）和散列（hash）运算后产生的密码，后面会有详述。此处，请您随意。\r\n\r\n# 提供 query 服务\r\n\r\n## Schema 中添加 MySql 数据池\r\n\r\n前文小节我们创建了 MySql 数据池，欲在 async-graphql 中是获取和使用 MySql 数据池，有如下方法——\r\n\r\n1. 作为 async-graphql 的全局数据；\r\n2. 作为 actix-web 的应用程序数据，优势是可以进行原子操作；\r\n3. 使用 `lazy-static`，优势是获取方便，简单易用。\r\n\r\n如果不作前后端分离，为了方便前端的数据库操作，那么 2 和 3 是比较推荐的，特别是使用 crate lazy-static，存取方便，简单易用。rbatis 的官方实例，以及笔者看到其它开源 rust-web 项目，都采用 lazy-static。因为 rbatis 实现了 `Send + Sync`，是线程安全的，无需担心线程竞争。\r\n\r\n虽然 2 和 3 方便、简单，以及易用。但是本应用中，我们仅需要 actix-web 作为一个服务器提供 http 服务，MySql 数据池也仅是为 async-graphql 使用。因此，我采用作为 async-graphql 的全局数据，将其构建到 Schema 中。\r\n\r\n> 笔者仅是简单使用，如果您有深入的见解，欢迎您指导（微信号 yupen-com，或者页底邮箱）。\r\n\r\n基于上述思路，我们迭代 `backend/src/gql/mod.rs` 文件：\r\n\r\n``` Rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse actix_web::{web, HttpResponse, Result};\r\nuse async_graphql::http::{playground_source, GraphQLPlaygroundConfig};\r\nuse async_graphql::{EmptyMutation, EmptySubscription, Schema};\r\nuse async_graphql_actix_web::{Request, Response};\r\n\r\nuse crate::dbs::mysql::my_pool;\r\nuse crate::gql::queries::QueryRoot;\r\n\r\ntype ActixSchema = Schema<\r\n    queries::QueryRoot,\r\n    async_graphql::EmptyMutation,\r\n    async_graphql::EmptySubscription,\r\n>;\r\n\r\npub async fn build_schema() -> ActixSchema {\r\n    // 获取 MySql 数据池后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 actix-web 的应用程序数据，优势是可以进行原子操作；\r\n    // 3. 使用 lazy-static.rs\r\n    let my_pool = my_pool().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mysql pool  in the schema object.\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)\r\n        .data(my_pool)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(schema: web::Data<ActixSchema>, req: Request) -> Response {\r\n    schema.execute(req.into_inner()).await.into()\r\n}\r\n\r\npub async fn graphiql() -> Result<HttpResponse> {\r\n    Ok(HttpResponse::Ok().content_type(\"text/html; charset=utf-8\").body(\r\n        playground_source(\r\n            GraphQLPlaygroundConfig::new(\"/graphql\")\r\n                .subscription_endpoint(\"/graphql\"),\r\n        ),\r\n    ))\r\n}\r\n```\r\n\r\n## 实现查询服务，自 MySql `user` 表查询所有用户\r\n\r\n### 增加 users 模块，及分层阐述\r\n\r\n一个完整的 GraphQL 查询服务，在本应用项目——注意，非 actix-web 或者 GraphQL 技术分层——我们可以简单将其分为三层：\r\n\r\n- actix-web handler：发起一次 GraphQL 请求，通知 GraphQL 总线执行 GraphQL service 调用，以及接收和处理响应；\r\n- GraphQL 总线：分发 GraphQL service 调用；\r\n- services：负责执行具体的查询服务，从 MySql 数据表获取数据，并封装到 model 中；\r\n\r\n基于上述思路，我们想要开发一个查询所有用户的 GraphQL 服务，需要增加 users 模块，并创建如下文件：\r\n\r\n``` Bash\r\ncd ./backend/src\r\nmkdir users\r\ncd users\r\ntouch mod.rs models.rs services.rs\r\n```\r\n\r\n至此，本篇文章的所有文件已经创建，先让我们查看一下总体的 backend 工程结构，如下图所示：\r\n\r\n![backend 完成文件结构](https://blog.budshome.com/static/articles/1618408795.jpg)\r\n\r\n其中 `users/mod.rs` 文件内容为：\r\n\r\n``` Rust\r\npub mod models;\r\npub mod services;\r\n```\r\n\r\n我们也需要将 `users 模块`添加到 `main.rs` 中：\r\n\r\n``` Rust\r\nmod gql;\r\nmod dbs;\r\nmod users;\r\n\r\nuse actix_web::{guard, web, App, HttpServer};\r\n\r\nuse crate::gql::{build_schema, graphql, graphiql};\r\n\r\n#[actix_rt::main]\r\nasync fn main() -> std::io::Result<()> {\r\n    let schema = build_schema().await;\r\n\r\n    println!(\"GraphQL UI: http://127.0.0.1:8080\");\r\n\r\n    HttpServer::new(move || {\r\n        App::new()\r\n            .data(schema.clone())\r\n            .service(web::resource(\"/graphql\").guard(guard::Post()).to(graphql))\r\n            .service(\r\n                web::resource(\"/graphiql\").guard(guard::Get()).to(graphiql),\r\n            )\r\n    })\r\n    .bind(\"127.0.0.1:8080\")?\r\n    .run()\r\n    .await\r\n}\r\n```\r\n\r\n### 编写 `User` 模型\r\n\r\n在 `users/models.rs` 文件中添加：\r\n\r\n``` Rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[rbatis::crud_enable]\r\n#[derive(Serialize, Deserialize, Clone, Debug)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::Object]\r\nimpl User {\r\n    pub async fn id(&self) -> i32 {\r\n        self.id\r\n    }\r\n\r\n    pub async fn email(&self) -> &str {\r\n        self.email.as_str()\r\n    }\r\n\r\n    pub async fn username(&self) -> &str {\r\n        self.username.as_str()\r\n    }\r\n}\r\n```\r\n\r\n上述代码中，`User` 结构体中定义的字段类型为 `String`，但结构体实现中返回为 `&str`，这是因为 Rust 中 `String` 未有默认实现 `copy trait`。如果您希望结构体实现中返回 `String`，可以通过 `clone()` 方法实现：\r\n\r\n``` Rust\r\n    pub async fn email(&self) -> String {\r\n        self.email.clone()\r\n    }\r\n```\r\n\r\n> 您使用的 IDE 比较智能，或许会有报错，先不要管，我们后面一并处理。\r\n\r\n### 编写 service\r\n\r\n在 `users/services.rs` 文件中添加代码，这次比 MongoDB 少了很多代码。如下：\r\n\r\n``` Rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse rbatis::rbatis::Rbatis;\r\nuse rbatis::crud::CRUD;\r\n\r\nuse crate::users::models::User;\r\n\r\npub async fn all_users(\r\n    my_pool: &Rbatis,\r\n) -> std::result::Result<Vec<User>, async_graphql::Error> {\r\n    let users = my_pool.fetch_list::<User>(\"\").await.unwrap();\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"1-all-users\")\r\n            .extend_with(|_, e| e.set(\"details\", \"No records\")))\r\n    }\r\n}\r\n```\r\n\r\n> 您使用的 IDE 比较智能，或许会有报错，先不要管，我们后面一并处理。\r\n\r\n### 在 GraphQL 总线中调用 service\r\n\r\n迭代 `gql/queries.rs` 文件，最终为：\r\n\r\n``` Rust\r\nuse async_graphql::Context;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\nuse crate::users::{self, models::User};\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // Get all Users,\r\n    async fn all_users(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n    ) -> std::result::Result<Vec<User>, async_graphql::Error> {\r\n        let my_pool = ctx.data_unchecked::<Rbatis>();\r\n        users::services::all_users(my_pool).await\r\n    }\r\n}\r\n```\r\n\r\nOkay，如果您使用的 IDE 比较智能，可以看到现在已经是满屏的红、黄相配了。代码是没有问题的，我们只是缺少几个使用到的 crate。\r\n\r\n- 首先，执行命令：\r\n\r\n``` Bash\r\ncargo add serde\r\n```\r\n\r\n- 其次，因为我们使用到了 serde crate 的 `derive` trait，因此需要迭代 `backend/Cargo.toml` 文件，最终版本为：\r\n\r\n``` Toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"zzy <linshi@budshome.com>\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\nactix-rt = \"1.1.1\"\r\n\r\nasync-graphql = { version = \"2.8.2\", features = [\"chrono\"] }\r\nasync-graphql-actix-web = \"2.8.2\"\r\nrbatis = { version = \"1.8.83\", default-features = false, features = [\"mysql\", \"postgres\"] }\r\n\r\nserde = { version = \"1.0\", features = [\"derive\"] }\r\n```\r\n\r\n现在，重新运行 `cargo build`，可以发现红、黄错误已经消失殆尽了。执行 `cargo watch -x \"run\"` 命令会发现启动成功。\r\n\r\n最后，我们来执行 GraphQL 查询，看看是否取出了 MySql 中 user 表的所有数据。\r\n\r\n左侧输入：\r\n\r\n```\r\n# Write your query or mutation here\r\nquery {\r\n  allUsers {\r\n    id\r\n    email\r\n    username\r\n  }\r\n}\r\n```\r\n\r\n右侧返回结果依赖于您在数据表中添加了多少条数据，如我的查询结果为：\r\n\r\n```\r\n{\r\n  \"data\": {\r\n    \"allUsers\": [\r\n      {\r\n        \"email\": \"ok@budshome.com\",\r\n        \"id\": 1,\r\n        \"username\": \"我谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"oka@budshome.com\",\r\n        \"id\": 2,\r\n        \"username\": \"我s谁24ok32\"\r\n      },\r\n      {\r\n        \"email\": \"oka2@budshome.com\",\r\n        \"id\": 3,\r\n        \"username\": \"我2s谁24ok32\"\r\n      }\r\n      ……\r\n      ……\r\n    ]\r\n  }\r\n}\r\n```\r\n\r\n好的，以上就是一个完成的 GraphQL 查询服务。\r\n\r\n此[实例源码仓库在 github](https://github.com/zzy/actix-web-async-graphql)，欢迎您共同完善。\r\n\r\n# 下篇摘要\r\n\r\n目前我们成功开发了一个基于 Rust 技术栈的 GraphQL 查询服务，但本例代码是不够满意的，如冗长的返回类型 `std::result::Result<Vec<User>, async_graphql::Error>`，如太多的魔术代码。\r\n\r\n下篇中，我们先不进行 GraphQL mutation 的开发。我将对代码进行重构——\r\n\r\n- 应用配置文件；\r\n- 代码抽象。\r\n\r\n谢谢您的阅读，欢迎交流（微信号 yupen-com，或者页底邮箱）。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-14T14:22:17.524Z"),
+    "updated_at": ISODate("2021-04-14T14:22:17.524Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef5"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "头脑风暴进行中：Async Rust 的未来熠熠生辉",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "在倡议书《为 Async Rust 构建共享的愿景文档—— Rust 社区的讲“故事”，可获奖》之后，Async Rust 的愿景文档进程，已经进展到了头脑风暴阶段。这次头脑风暴会持续六周，直到四月底。前两周（直到 2021-04-02），只收集“现状”故事。之后，将收受“现状”和“光明未来”的故事，直到头脑风暴期结束。最后，为了结束头脑风暴阶段，将评选出“最幽默的故事”或“必须支持的贡献者”等奖项，以及获奖者。所以现在还可以提交“现状故事”。",
+    slug: "tou-nao-feng-bao-jin-xing-zhong-:async-rust-de-wei-lai-yi-yi-sheng-hui",
+    uri: "/budshome/tou-nao-feng-bao-jin-xing-zhong-:async-rust-de-wei-lai-yi-yi-sheng-hui",
+    content: "Niko Matsakis 代表 [Async 基金会工作组](https://rust-lang.github.io/wg-async-foundations/)，于 2021 年 4 月 14 日发布文章 [Brainstorming Async Rust's Shiny Future](https://blog.rust-lang.org/2021/04/14/async-vision-doc-shiny-future.html)\r\n\r\n3 月 18 日，我们宣布开始[为 Async Rust 构建共享的愿景文档](https://blog.budshome.com/budshome/wei-async-rust-gou-jian-gong-xiang-de-yuan-jing-wen-dang------rust-she-qu-de-jiang-gu-shi-,ke-huo-jiang)（请参阅博文《[为 Async Rust 构建共享的愿景文档—— Rust 社区的讲“故事”，可获奖》](https://blog.budshome.com/budshome/wei-async-rust-gou-jian-gong-xiang-de-yuan-jing-wen-dang------rust-she-qu-de-jiang-gu-shi-,ke-huo-jiang)）的过程。从那时起，我们已经接收到了 [24 个“现状”故事](https://rust-lang.github.io/wg-async-foundations/vision/status_quo.html)。在[开启状态的 PR（open PRs）中，还有 4 个故事](https://github.com/rust-lang/wg-async-foundations/pulls)；在过去的几周里，[Ryan Levick](https://twitter.com/ryan_levick/) 和我还主持了 10 多个协作写作会议。本周，我们还安排了[更多的会议](https://smallcultfollowing.com/babysteps/blog/2021/04/12/async-vision-doc-writing-sessions-v/)。\r\n\r\n> **译注**：“现状故事”还在征集中，此次愿景文档安排如下：编写愿景文档的过程中，鼓励积极协作，以及“正和博弈”思维。开始于一个集思广益的阶段，在此期间，目标是收集尽可能多的“现状”和“光明未来”的故事。这次**头脑风暴会持续六周，直到四月底**。前两周（直到 2021-04-02），只收集“现状”故事。之后，将收受“现状”和“光明未来”的故事，直到头脑风暴期结束。最后，为了结束头脑风暴阶段，将评选出“最幽默的故事”或“必须支持的贡献者”等奖项，以及获奖者。所以现在还可以提交“现状故事”，具体请参阅[为 Async Rust 构建共享的愿景文档—— Rust 社区的讲“故事”，可获奖 ](https://blog.budshome.com/budshome/wei-async-rust-gou-jian-gong-xiang-de-yuan-jing-wen-dang------rust-she-qu-de-jiang-gu-shi-,ke-huo-jiang)。\r\n\r\n既然我们有了很棒的“现状”故事作为基础，让我们开始想象[✨ “熠熠生辉的未来”✨](https://rust-lang.github.io/wg-async-foundations/vision/shiny_future.html)吧。在此，**我们需要您的帮助**！如果您对 Async Rus 有很棒的想法——不用谦虚，请尽管说，那么请[查看模板并打开 PR](https://rust-lang.github.io/wg-async-foundations/vision/shiny_future/template.html)！或者，如果你对某个故事有想法，但想在写作之前先讨论，你可以[打开一个“光明未来”的 issue](https://github.com/rust-lang/wg-async-foundations/issues/new/choose)。此外，我们仍然希望得到更多的“现状”故事，所以希望您继续分享。\r\n\r\n在撰写“光明未来”的故事时，我们的首要目标是聚焦于 Rust 用户的**体验**，而不是具体的技术细节。事实上，你甚至不必确切地知道这种体验是如何实现的。毕竟，我们还有几年的时间来解决这个问题。🚀\r\n\r\n每一个“光明未来”的故事，都是一个或多个“现状”故事的“复述”。我们的想法是重演同样的历史场景，但希望有更快乐的结局作为改进结果。如果你看到的“现状”故事，没有讲述到你的经历或想法，没问题，把你的故事写下来。我们仍然需要“现状”和“光明未来”的故事，会一直写到最后阶段。\r\n\r\n如果你想看看“光明未来”的故事是什么样子的，我们整合了一个例子：《[奔波儿灞的愿望](https://rust-lang.github.io/wg-async-foundations/vision/shiny_future/barbara_makes_a_wish.html)》。这个故事描述了奔波儿灞使用一个漂亮的新工具的经历，这个工具给了她很多关于异步执行器状态的信息。这个“复述”的“现状”的故事中，[奔波儿灞对 Async 有了更深的洞察和见解](https://rust-lang.github.io/wg-async-foundations/vision/status_quo/barbara_wants_async_insights.html)。\r\n\r\n> **译注**：奔波儿灞是《西游记》中祭赛国的鲶鱼怪。因为这个“现状故事”是虚拟的模板文，所以笔者调皮下，原文是 Barbara ;-)\r\n\r\n#### async 愿景文档是什么？如何工作？\r\n\r\n简而言之，是这样的想法：\r\n\r\n> 我们正在发起一项协作工作，为 Async Rust 构建一个共享的[愿景文档](https://rust-lang.github.io/wg-async-foundations/vision.html#-the-vision)。**我们的目标是让整个社区参与到一个集体的愿景活动中**：我们如何才能让使用 Async I/O 的体验不仅成为一个实用的选择，而且是一个 _愉悦_ 的选择？\r\n\r\n正如在[最初的公告](https://blog.rust-lang.org/2021/03/18/async-vision-doc.html)中所描述的，[愿景文档](https://rust-lang.github.io/wg-async-foundations/vision.html#-the-vision)的结构是一系列“现状”和“光明未来”的故事。每个故事都描述了[ 4 个角色](https://rust-lang.github.io/wg-async-foundations/vision/characters.html)中的一个或多个在使用 Async Rust 实现目标时的经历。\r\n\r\n“现状”故事中，描述了用户今天的体验。正如通过访谈、博客和 tweets 向我们报告的那样，“现状”故事是人们使用 Async Rust 真实体验的融合。这些故事的目的是帮助我们理解和衡量问题，以及这些问题对用户的累积影响。\r\n\r\n“光明未来”故事中，则展望未来几年，描述一些角色需要实现的目标。“光明未来”故事旨在说明我们的目标，为我们希望进行的变革提供总体背景。\r\n\r\n### 头脑风暴阶段和后续内容\r\n\r\n我们目前正处于集思广益的[头脑风暴阶段](https://rust-lang.github.io/wg-async-foundations/vision/how_to_vision.html#brainstorming)。这意味着，我们正在尽可能多地收集关于“现状”和“光明未来”的故事，且头脑风暴会持续到 4 月底。之后，[工作组负责日](https://rust-lang.github.io/wg-async-foundations/#leads)将合并其余的故事，并着手起草一份综合的愿景文档，其中包括已提交的各种故事要素。\r\n\r\n后续，我们计划定期重温愿景文档。我们打心底里希望：我们写的“光明未来”故事，在某些方面会是不正确的，有时甚至是非常错误的。我们将定期回顾愿景文档，检查进展情况，并适当调整我们的改进路线。\r\n\r\n### 听起来挺酷，我怎么参与？\r\n\r\n如果你愿意帮忙，我们将很乐意！如果您对一个故事有想法，那么可以根据以下模板之一，为 Async 基金会工作组的存储库创建一个 PR：\r\n\r\n* [“现状”故事模板](https://rust-lang.github.io/wg-async-foundations/vision/status_quo/template.html)\r\n* [“光明未来”故事模板](https://rust-lang.github.io/wg-async-foundations/vision/shiny_future/template.html)\r\n\r\n如果你想得到更多的灵感，那么你可以参加 [Ryan Levick](https://twitter.com/ryan_levick/) 和[我 Niko Matsakis](https://twitter.com/nikomatsakis/) 组织的愿景文档研讨会。[本周，我们安排了很多的会议](https://smallcultfollowing.com/babysteps/blog/2021/04/12/async-vision-doc-writing-sessions-v/)，您可以在 twitter 上查看我们的公告，或者查看 [rust-lang Zulip](https://rust-lang.zulipchat.com/) 上的视频 `#wg-async-foundations`。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-15T05:45:17.74Z"),
+    "updated_at": ISODate("2021-04-15T05:45:17.74Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f02"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（3） - 重构",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "前 2 篇文章中，我们初始化搭建了工程结构，选择了必须的 crate，并成功构建了 GraphQL 查询服务：从 MySql 中获取了数据，并通过 GraphQL 查询，输出 json 数据。本篇文章，本应当进行 GraphQL 变更（mutation）服务的开发。但是，虽然代码成功运行，却存在一些问题，如：对于 MySql 数据库的连接信息，应当采取配置文件存储；通用公用的代码，应当组织和抽象；诸如此类以便于后续扩展，生产部署等问题。所以，本篇文章中我们暂不进行变更的开发，而是进行第一次简单的重构。以免后续代码扩大，重构工作量繁重。",
+    slug: "ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(3)---zhong-gou",
+    uri: "/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(3)---zhong-gou",
+    content: "> 本文 GraphQL 开发部分，受到了 **async-graphql 作者孙老师**的指导；actix-web 部分，受到了**庞老师**的指导，非常感谢！\r\n\r\n首先，我们通过 shell 命令 `cd ./actix-web-async-graphql-rbatis/backend` 进入后端工程目录（下文中，将默认在此目录执行操作）。\r\n\r\n> 有朋友提议示例项目的名字中，用的库名也多列一些，方便 github 搜索。虽然关系不大，但还是更名为 `actix-web-async-graphql-rbatis`。如果您是从 github 检出，或者和我一样命名，注意修改哈。\r\n\r\n# 重构1：配置信息的存储和获取\r\n\r\n让我们设想正式生产环境的应用场景：\r\n\r\n- 服务器地址和端口的变更可能；\r\n- 服务功能升级，对用户暴露 API 地址的变更可能。如 rest api，graphql api，以及版本升级；\r\n- 服务站点密钥定时调整的可能；\r\n- 服务站点安全调整，jwt、session/cookie 过期时间的变更可能。\r\n\r\n显然易见，我们应当避免每次变更调整时，都去重新编译一次源码——并且，大工程中，Rust 的**编译速度**让开发者注目。更优的方法是，将这些写入到配置文件中。或许上述第 4 点无需写入，但是文件存储到加密保护的物理地址，安全方面也有提升。\r\n\r\n当然，实际的应用场景或许有更合适有优的解决方法，但我们先基于此思路来设计。Rust 中，`dotenv` crate 用来读取环境变量。取得环境变量后，我们将其作为静态或者惰性值来使用，静态或者惰性值相关的 crate 有 `lazy_static` 和 `once_cell` 等，都很简单易用。此示例中，我们使用 `lazy_static`。\r\n\r\n## 创建 `.env`，添加读取相关 crate\r\n\r\n增加这 2 个 crate，并且在 `backend` 目录创建 `.env` 文件。\r\n\r\n``` Bash\r\ncargo add dotenv lazy_static\r\ntouch .env\r\n```\r\n\r\n在 `.env` 文件中，写入如下内容：\r\n\r\n```\r\n# 服务器信息\r\nADDRESS=127.0.0.1\r\nPORT=8080\r\n\r\n# API 服务信息，“gql” 也可以单独提出来定义\r\nGQL_VER=v1\r\nGIQL_VER=v1i\r\n\r\n# 数据库配置\r\nMYSQL_URI=mysql://root:mysql@localhost:3306/budshome\r\n```\r\n\r\n`Cargo.toml` 文件：\r\n\r\n``` Toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"zzy <linshi@budshome.com>\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\nactix-rt = \"1.1.1\"\r\n\r\ndotenv = \"0.15.0\"\r\nlazy_static = \"1.4.0\"\r\n\r\n\r\nasync-graphql = { version = \"2.8.2\", features = [\"chrono\"] }\r\nasync-graphql-actix-web = \"2.8.2\"\r\nrbatis = { version = \"1.8.83\", default-features = false, features = [\"mysql\", \"postgres\"] }\r\n\r\nserde = { version = \"1.0\", features = [\"derive\"] }\r\n```\r\n\r\n## 读取配置文件并使用配置信息\r\n\r\n对于配置信息的读取和使用，显然属于公用功能，我们将其归到单独的模块中。所以，需要创建 2 个文件：一个是模块标识文件，一个是将抽象出来共用的常量子模块。\r\n\r\n``` Bash\r\ncd ./src\r\nmkdir util\r\ntouch ./util/mod.rs ./util/constant.rs\r\n```\r\n\r\n至此，本篇文章的所有文件都已经创建，我们确认一下工程结构。\r\n\r\n![backend 工程结构](https://blog.budshome.com/static/articles/1616216469.png)\r\n\r\n- 在 `util/mod.rs`，编写如下代码：\r\n\r\n``` Rust\r\npub mod constant;\r\n```\r\n\r\n- 读取配置信息\r\n\r\n在 `util/constant.rs` 中，编写如下代码：\r\n\r\n``` rust\r\nuse dotenv::dotenv;\r\nuse lazy_static::lazy_static;\r\nuse std::collections::HashMap;\r\n\r\nlazy_static! {\r\n    // CFG variables defined in .env file\r\n    pub static ref CFG: HashMap<&'static str, String> = {\r\n        dotenv().ok();\r\n\r\n        let mut map = HashMap::new();\r\n\r\n        map.insert(\r\n            \"ADDRESS\",\r\n            dotenv::var(\"ADDRESS\").expect(\"Expected ADDRESS to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"PORT\",\r\n            dotenv::var(\"PORT\").expect(\"Expected PORT to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"GQL_PATH\",\r\n            dotenv::var(\"GQL_PATH\").expect(\"Expected GQL_PATH to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"GQL_VER\",\r\n            dotenv::var(\"GQL_VER\").expect(\"Expected GQL_VER to be set in env!\"),\r\n        );\r\n        map.insert(\r\n            \"GIQL_VER\",\r\n            dotenv::var(\"GIQL_VER\").expect(\"Expected GIQL_VER to be set in env!\"),\r\n        );\r\n\r\n        map.insert(\r\n            \"MYSQL_URI\",\r\n            dotenv::var(\"MYSQL_URI\").expect(\"Expected MYSQL_URI to be set in env!\"),\r\n        );\r\n\r\n        map\r\n    };\r\n}\r\n```\r\n\r\n- 重构代码，使用配置信息，正确提供 GraphQL 服务\r\n\r\n首先，`src/main.rs` 文件中引入 `util` 模块。并用 `use` 引入 `constant` 子模块。并重构 `HttpServer` 的绑定 IP 地址和端口信息，读取其惰性配置值。\r\n\r\n``` Rust\r\nmod util;\r\nmod gql;\r\nmod dbs;\r\nmod users;\r\n\r\nuse actix_web::{guard, web, App, HttpServer};\r\n\r\nuse crate::util::constant::CFG;\r\nuse crate::gql::{build_schema, graphql, graphiql};\r\n\r\n#[actix_rt::main]\r\nasync fn main() -> std::io::Result<()> {\r\n    let schema = build_schema().await;\r\n\r\n    println!(\r\n        \"GraphQL UI: http://{}:{}\",\r\n        CFG.get(\"ADDRESS\").unwrap(),\r\n        CFG.get(\"PORT\").unwrap()\r\n    );\r\n\r\n    HttpServer::new(move || {\r\n        App::new()\r\n            .data(schema.clone())\r\n            .service(\r\n                web::resource(CFG.get(\"GQL_VER\").unwrap())\r\n                    .guard(guard::Post())\r\n                    .to(graphql),\r\n            )\r\n            .service(\r\n                web::resource(CFG.get(\"GIQL_VER\").unwrap())\r\n                    .guard(guard::Get())\r\n                    .to(graphiql),\r\n            )\r\n    })\r\n    .bind(format!(\r\n        \"{}:{}\",\r\n        CFG.get(\"ADDRESS\").unwrap(),\r\n        CFG.get(\"PORT\").unwrap()\r\n    ))?\r\n    .run()\r\n    .await\r\n}\r\n```\r\n\r\n其次，`src/gql/mod.rs` 文件中，用 `use` 引入 `constant` 子模块，读取其惰性配置值。\r\n\r\n``` Rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse actix_web::{web, HttpResponse, Result};\r\nuse async_graphql::http::{playground_source, GraphQLPlaygroundConfig};\r\nuse async_graphql::{EmptyMutation, EmptySubscription, Schema};\r\nuse async_graphql_actix_web::{Request, Response};\r\n\r\nuse crate::util::constant::CFG;\r\nuse crate::dbs::mysql::my_pool;\r\nuse crate::gql::queries::QueryRoot;\r\n\r\ntype ActixSchema = Schema<\r\n    queries::QueryRoot,\r\n    async_graphql::EmptyMutation,\r\n    async_graphql::EmptySubscription,\r\n>;\r\n\r\npub async fn build_schema() -> ActixSchema {\r\n    // 获取 mysql 数据池后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 actix-web 的应用程序数据，优势是可以进行原子操作；\r\n    // 3. 使用 lazy-static.rs\r\n    let my_pool = my_pool().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mysql pool in the schema object.\r\n    Schema::build(QueryRoot, EmptyMutation, EmptySubscription)\r\n        .data(my_pool)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(schema: web::Data<ActixSchema>, req: Request) -> Response {\r\n    schema.execute(req.into_inner()).await.into()\r\n}\r\n\r\npub async fn graphiql() -> Result<HttpResponse> {\r\n    Ok(HttpResponse::Ok().content_type(\"text/html; charset=utf-8\").body(\r\n        playground_source(\r\n            GraphQLPlaygroundConfig::new(CFG.get(\"GQL_VER\").unwrap())\r\n                .subscription_endpoint(CFG.get(\"GQL_VER\").unwrap()),\r\n        ),\r\n    ))\r\n}\r\n```\r\n\r\n最后，不要忘了 `src/dbs/mysql.rs` 文件中，用 `use` 引入 `constant` 子模块，读取其惰性配置值。\r\n\r\n``` rust\r\nuse rbatis::core::db::DBPoolOptions;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\nuse crate::util::constant::CFG;\r\n\r\npub async fn my_pool() -> Rbatis {\r\n    let rb = Rbatis::new();\r\n\r\n    let mut opts = DBPoolOptions::new();\r\n    opts.max_connections = 100;\r\n\r\n    rb.link_opt(CFG.get(\"MYSQL_URI\").unwrap(), &opts).await.unwrap();\r\n\r\n    rb\r\n}\r\n```\r\n\r\n配置文件读取已经完成，我们测试看看。这次，我们浏览器中要打开的链接为 `http://127.0.0.1:8080/v1i`。\r\n\r\n![graphiql ui](https://blog.budshome.com/static/articles/1616217670.jpg)\r\n\r\n执行查询，一切正常。\r\n\r\n![graphql query](https://blog.budshome.com/static/articles/1616217840.jpg)\r\n\r\n# 重构2：async-graphql 代码简洁性重构\r\n\r\n## 定义公用类型\r\n\r\n在上一篇[基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（2） - 查询服务](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(2)---cha-xun-fu-wu)文章中，`gql/queries.rs` 和 `users/services.rs` 代码中，`all_users` 函数/方法的返回值为冗长的 `std::result::Result<Vec<User>, async_graphql::Error>`。显然，这样代码不够易读和简洁。我们简单重构下：定义一个公用的 `GqlResult` 类型即可。\r\n\r\n- 首先，迭代 `util/constant.rs` 文件，增加一行：定义 `GqlResult` 类型别名：\r\n\r\n``` Rust\r\nuse dotenv::dotenv;\r\nuse lazy_static::lazy_static;\r\nuse std::collections::HashMap;\r\n\r\npub type GqlResult<T> = std::result::Result<T, async_graphql::Error>;\r\n\r\nlazy_static! {\r\n    // CFG variables defined in .env file\r\n    pub static ref CFG: HashMap<&'static str, String> = {\r\n        dotenv().ok();\r\n\r\n        let mut map = HashMap::new();\r\n\r\n        map.insert(\r\n            \\\"ADDRESS\\\",\r\n            dotenv::var(\\\"ADDRESS\\\").expect(\\\"Expected ADDRESS to be set in env!\\\"),\r\n        );\r\n ……\r\n ……\r\n ……\r\n```\r\n\r\n- 其次，迭代 `gql/queries.rs` 和 `users/services.rs` 文件，引入并让函数/方法返回 `GqlResult` 类型。\r\n\r\n`gql/queries.rs`\r\n\r\n``` rust\r\nuse async_graphql::Context;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\nuse crate::util::constant::GqlResult;\r\nuse crate::users::{self, models::User};\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // Get all Users\r\n    async fn all_users(&self, ctx: &Context<'_>) -> GqlResult<Vec<User>> {\r\n        let my_pool = ctx.data_unchecked::<Rbatis>();\r\n        users::services::all_users(my_pool).await\r\n    }\r\n}\r\n```\r\n\r\n`users/services.rs`\r\n\r\n``` rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse rbatis::rbatis::Rbatis;\r\nuse rbatis::crud::CRUD;\r\n\r\nuse crate::util::constant::GqlResult;\r\nuse crate::users::models::User;\r\n\r\npub async fn all_users(my_pool: &Rbatis) -> GqlResult<Vec<User>> {\r\n    let users = my_pool.fetch_list::<User>(\"\").await.unwrap();\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"1-all-users\")\r\n            .extend_with(|_, e| e.set(\"details\", \"No records\")))\r\n    }\r\n}\r\n```\r\n\r\n执行查询，一切正常。\r\n\r\n## async-graphql 对象类型重构\r\n\r\n> 此重构受到了 **async-graphql 作者孙老师**的指导，非常感谢！孙老师的 [async-graphql 项目仓库在 github](https://github.com/async-graphql/async-graphql)，是 Rust 生态中最优秀的 GraphQL 服务端库，**希望朋友们去 `star` 和 `fork`**。\r\n\r\n目前代码是可以运行的，但是总是感觉太冗余。比如 `impl User` 中大量的 `getter` 方法，这是**老派的** Java 风格了。在 async-graphql 中，已经对此有了解决方案 `SimpleObject`，大家直接删去 `impl User` 即可。如下 `user/models.rs` 代码，是可以正常运行的：\r\n\r\n### async-graphql 简单对象类型\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n\r\n#[rbatis::crud_enable]\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n// 下段代码直接不要，删除或注释\r\n// #[async_graphql::Object]\r\n// impl User {\r\n//     pub async fn id(&self) -> i32 {\r\n//         self.id\r\n//     }\r\n// \r\n//     pub async fn email(&self) -> &str {\r\n//         self.email.as_str()\r\n//     }\r\n// \r\n//     pub async fn username(&self) -> &str {\r\n//         self.username.as_str()\r\n//     }\r\n// }\r\n```\r\n\r\n这个 `user/models.rs`文件时完整的，请您删掉或者注释后，运行测试一次是否正常。\r\n\r\n这个派生属性，在 async-graphql 中称之为简单对象，主要是省去满篇的 `getter`、`setter`。\r\n\r\n### async-graphql 复杂对象类型\r\n\r\n但有时，除了自定义结构体中的字段外，我们还需要返回一些计算后的数据。比如，我们要在邮箱应用中，显示发件人信息，一般是 `username<email>` 这样的格式。对此实现有两种方式：\r\n\r\n#### 第 1 种方式：`async-graphql::Object` 类型\r\n\r\n使用 `async-graphql::Object` 类型。完善昨天的代码为（注意省略的部分不变）：\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[rbatis::crud_enable]\r\n#[derive(Serialize, Deserialize, Clone, Debug)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::Object]\r\nimpl User {\r\n    pub async fn id(&self) -> i32 {\r\n        self.id\r\n    }\r\n\r\n    pub async fn email(&self) -> &str {\r\n        ……\r\n        ……\r\n        ……\r\n\r\n    // 补充如下方法\r\n    pub async fn from(&self) -> String {\r\n        let mut from =  String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n```\r\n\r\n#### 第 2 种方式，`async_graphql::ComplexObject` 类型\r\n\r\nasync-graphql 的新版本中，可以将复杂对象类型和简单对象类型整合使用。这样，既可以省去省去满篇的 `getter`、`setter`，还可以自定义对结构体字段计算后的返回数据。如下 `users/models.rs` 文件，是完整的代码：\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[rbatis::crud_enable]\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\n#[graphql(complex)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::ComplexObject]\r\nimpl User {\r\n    pub async fn from(&self) -> String {\r\n        let mut from =  String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n```\r\n\r\n我们可以看到，GraphQL 的文档中，已经多了一个类型定义：\r\n\r\n![复杂对象类型](https://blog.budshome.com/static/articles/1618479793.jpg)\r\n\r\n执行查询，我们看看返回结果：\r\n\r\n``` json\r\n{\r\n  \"data\": {\r\n    \"allUsers\": [\r\n      {\r\n        \"cred\": \"5ff82b2c0076cc8b00e5cddb\",\r\n        \"email\": \"ok@budshome.com\",\r\n        \"from\": \"我谁24ok32<ok@budshome.com>\",\r\n        \"id\": 1,\r\n        \"username\": \"我谁24ok32\"\r\n      },\r\n      {\r\n        \"cred\": \"5ff83f4b00e8fda000e5cddc\",\r\n        \"email\": \"oka@budshome.com\",\r\n        \"from\": \"我s谁24ok32<oka@budshome.com>\",\r\n        \"id\": 2,\r\n        \"username\": \"我s谁24ok32\"\r\n      },\r\n      {\r\n        \"cred\": \"5ffd710400b6b84e000349f8\",\r\n        \"email\": \"oka2@budshome.com\",\r\n        \"from\": \"我2s谁24ok32<oka2@budshome.com>\",\r\n        \"id\": 3,\r\n        \"username\": \"我2s谁24ok32\"\r\n      }\r\n    ]\r\n  }\r\n}\r\n```\r\n\r\n# 重构3：actix-web 代码整理\r\n\r\n## 依赖项整理\r\n\r\n> 此重构受到了**庞老师的指点**，非常感谢！\r\n\r\n上一篇文章，服务器启动主程序时，我们可以使用 `#[actix_web::main]` 替代 `#[actix_rt::main]`。这种情况下，`backend/Cargo.toml` 文件中的依赖项 `actix-rt` 也可以直接删除。\r\n\r\n## 路由组织\r\n\r\n目前，GraphQL `Schema` 和路由，我们都直接在 `main.rs` 文件中注册到了 actix-web `HttpServer` 对象。笔者个人喜欢 `main.rs` 代码尽可能简单清晰——不是代码量越少越好，比如，GraphQL `Schema` 和路由，完全可以放在 `gql` 模块中，以后多了一个 `rest` 模块之类，各自模块中定义路由。\r\n\r\n对此也应当重构，但实例简单，我们在此后端开发中仅作提及。在未来的前端开发中（使用 `actix-web + surf + graphql-client + rhai + handlebars-rust` 技术栈），因为需要复杂的路由，我们再做处理。\r\n\r\n第一次重构，我们就到这个程度。下一篇，我们将进行 GraphQL 变更（mutation）的开发。\r\n\r\n此[实例源码仓库在 github](https://github.com/zzy/actix-web-async-graphql-rbatis)，欢迎您共同完善。\r\n\r\n---\r\n\r\n欢迎交流（指正、错别字等均可）。我的联系方式为页底邮箱，或者微信号 yupen-com。\r\n\r\n![yupen-com](https://blog.budshome.com/static/users/yupen-com.jpg)\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-15T11:02:51.743Z"),
+    "updated_at": ISODate("2021-04-15T11:02:51.743Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f0c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 编译器（Compiler）团队 4 月份计划 - Rust Compiler April Steering Cycle",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 编译器（Compiler）团队 4 月份计划，关于编译器方向周期（Steering Cycle）的会议安排。",
+    slug: "rust-bian-yi-qi-(compiler)tuan-dui-4-yue-fen-ji-hua---rust-compiler-april-steering-cycle",
+    uri: "/budshome/rust-bian-yi-qi-(compiler)tuan-dui-4-yue-fen-ji-hua---rust-compiler-april-steering-cycle",
+    content: "> 感觉这个标题很难做中文的直译，希望得到您的指导。[Rust 官方博客仓库为 github.com/zzy/blog.rust-lang.org-zh-cn](https://github.com/zzy/blog.rust-lang.org-zh-cn)，您可以直接在 github 进行完善。\r\n\r\n2021 年 4 月 15 日， Felix Klock on 代表 [Rust 编译器团队](https://www.rust-lang.org/governance/teams/compiler)发表了博文 [Rust Compiler April Steering Cycle](https://blog.rust-lang.org/inside-rust/2021/04/15/compiler-team-april-steering-cycle.html)，对于 Rust 编译器的 4 月份研讨会议，进行日程安排。\r\n\r\n*以下是原文内容——*\r\n\r\n2021 年 [4 月 9 日，4 月第 2 个星期五](https://zulip-archive.rust-lang.org/238009tcompilermeetings/96901planningmeeting20210409.html)，Rust 编译器团队召开了关于编译器方向周期（steering cycle）的 4 月份计划会议。\r\n\r\n每到第 4 个星期五，Rust 编译器团队就将决定：在未来的三个星期五，如何使用预定的指导和设计会议时间。\r\n\r\n2021 年 4 月 23 日，星期五，我们将举行一次会议，讨论的主题是：为编译器贡献者提出一套[指导原则](https://github.com/rust-lang/compiler-team/issues/424)。\r\n\r\n2021 年 4 月 30 日，星期五，我们将召开一次会议，讨论每周的编译器[性能分类](https://github.com/rust-lang/compiler-team/issues/400)过程。\r\n\r\n此两个会议，将在格林尼治标准时间下午 2-3 点举行，直播地址为 [T-compiler/meetings zulip stream](https://rust-lang.zulipchat.com/#narrow/stream/238009-t-compiler.2Fmeetings)。\r\n\r\n> **备注**：3 月份的方向周期（steering cycle）会议，我们忽略了公告的发布。3 月份，我们召开了两次会议：第一次是[回顾 3 月份第 1 周，关于智能指针（memshrink）](https://github.com/rust-lang/compiler-team/issues/412)的快速开发；第二次是[讨论 `musl libc`](https://github.com/rust-lang/compiler-team/issues/416) 的静态、动态链接默认值。\r\n\r\n> 希望得到您的指导。Rust 官方博客仓库为 github.com/zzy/blog.rust-lang.org-zh-cn，您可以直接在 github 进行完善。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-15T23:30:42.898Z"),
+    "updated_at": ISODate("2021-04-15T23:30:42.898Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("607919450034b56e00ac1f12"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 386 期（2021-04-14）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 386 期：Rust 核心更新、Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘，以及 Rust 开发者引语等。第 386 期的技术文章中，用 Rust 开发游戏引擎实践不少；另外，对于开发工具和 IDE 方面，介绍也颇多。 ",
+    slug: "rust-guan-fang-zhou-bao-386-qi-(2021-04-14)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-386-qi-(2021-04-14)",
+    content: "> [Rust 官方周报（中文版）仓库为 github.com/zzy/this-week-in-rust-zh-cn](https://github.com/zzy/this-week-in-rust-zh-cn)，欢迎您的参与，一起丰富中文网络的 Rust 资源。\r\n\r\n大家好，欢迎查阅第 386 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一种系统语言，主要追求三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github 向我们[发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n本周无论文或研究探讨。\r\n\r\n### 官方\r\n\r\n* [头脑风暴进行中：Async Rust 的未来熠熠生辉 ](https://blog.budshome.com/budshome/tou-nao-feng-bao-jin-xing-zhong-:async-rust-de-wei-lai-yi-yi-sheng-hui)\r\n* \\[Rust 基金会\\] [成员介绍：Florian Gilcher](https://foundation.rust-lang.org/posts/2021-04-08-introducing-florian-gilcher/)（译注：Rust 核心团队，项目主管）\r\n* \\[Rust 基金会\\] [成员介绍：侯培新](https://foundation.rust-lang.org/posts/2021-04-08-introducing-peixin-hou/)（译注：董事成员，华为开源软件与系统首席架构师）\r\n\r\n### 简讯\r\n\r\n* [Rust 游戏开发月报 #20 - 2021 年 3 月](https://gamedev.rs/news/020/)（译注：游戏很棒，推荐大家去看看，如下笔者随意取了一张图）\r\n\r\n![Rust veloren game](https://blog.budshome.com/static/articles/1618536523.jpg)\r\n\r\n### 项目/工具 更新\r\n\r\n* [基于 Cranelift 的 rustc 代码生成后端（rustc_codegen_cranelift）进展报告（2021 年 4 月）](https://bjorn3.github.io/2021/04/13/progress-report-april-2021.html)\r\n* [IntelliJ Rust：2021.1 更新版发布](https://blog.jetbrains.com/rust/2021/04/08/intellij-rust-updates-for-2021-1/)\r\n* [IntelliJ Rust 更新日志 #145](https://intellij-rust.github.io/2021/04/12/changelog-145.html)\r\n* [rust-analyzer 更新日志 #72](https://rust-analyzer.github.io/thisweek/2021/04/12/changelog-72.html)\r\n* [Ballista 项目已被捐赠给了 Apache Arrow 项目组](https://www.reddit.com/r/rust/comments/mo63t3/ballista_has_been_donated_to_the_apache_arrow/)（译注：Ballista 项目是 Rust 开发的类似 Spark 的分布式计算平台，笔者已经在使用中。其还支持  Python、C++，以及 Java 等语言，且不用为序列化付出额外开销代价）\r\n\r\n### 观测/思考\r\n\r\n* [Rust 用于生产环境：MeiliSearch](https://serokell.io/blog/rust-in-production-meilisearch)\r\n* [Rust 是为专业人士准备的](https://gregoryszorc.com/blog/2021/04/13/rust-is-for-professionals/)\r\n* [Rust 语言中，让异步函数和同步函数匹配，不是什么大问题](https://morestina.net/blog/1686/rust-async-is-colored)（译注：原标题使用了 `Rust async is colored`，这个 `colored` 源自 JavaScript，比喻 JavaScript 和其它语言中，同步函数和异步函数那些令人痛苦的不匹配难题）\r\n* [使用 Rust 进行科学计算：从经验中学习总结](https://blog.esciencecenter.nl/using-rust-for-scientific-numerical-applications-learning-from-past-experiences-798665d9f9f0)\r\n* [PlaintDB - 新的里程碑](https://dev.to/ecton/plaintdb-serves-another-milestone-reached-kl3)（译注：作者很有信心，计划用 PlaintDB 取代 PostgreSQL 和 Redis）\r\n* [为什么应将 Rust 用于机器人平台？](https://blog.budshome.com/budshome/wei-shi-yao-ying-jiang-rust-yin-ru-ji-qi-ren-ping-tai-yi-ji-ji-qi-ren-ping-tai-de-rust-zi-yuan-tui-jian)\r\n* [nalgebra 0.26 中整合常量泛型（const-generics）的实践](https://www.dimforge.com/blog/2021/04/12/integrating-const-generics-to-nalgebra/)（译注：nalgebra 是 Rust 实现的线性代数库）\r\n* \\[播客\\] [使用 Rust 进行构建：Tim McNamara 讲解《Rust in Action》](https://anchor.fm/building-with-rust/episodes/Building-with-Rust-Tim-McNamara-on-Rust-in-Action-eugoal/a-a1ptlh) [\\[文字实录\\]](https://github.com/seanchen1991/building-with-rust/blob/main/transcripts/002.md)\r\n\r\n### Rust 演练\r\n\r\n* [使用 `Ockam` crate，逐步构建端对端（End-to-End）的加密信息传输应用](https://github.com/ockam-network/ockam/tree/develop/documentation/guides/rust/get-started#readme)（译注：`Ockam` 是一个主要用于物联网设备间通信的库，端到端加密、相互认证通信等）\r\n* [`easy-cast` 库介绍](https://kas-gui.github.io/blog/easy-cast.html)（译注：`easy-cast` 是一个类型转换方面的辅助库，可以用来替代 `as i32`，`u32::` 这类写法。笔者体验了，挺方便）\r\n* [为什么 Rust 中的字符串（strings）使用体验不好（hard）](https://www.brandons.me/blog/why-rust-strings-seem-hard)\r\n* [Rust 技巧：返回多态性类型](https://loige.co/rust-shenanigans-return-type-polymorphism/)（译注：即返回泛化类型，泛型）\r\n* [使用 Rust 开发 Neovim 编辑器插件（plugins)](https://blog.usejournal.com/a-detailed-guide-to-writing-your-first-neovim-plugin-in-rust-a81604c606b1)\r\n* [Rust 中的零开销（zero-overhead）链表](https://aloso.github.io/2021/04/12/linked-list.html)（译注：推荐阅读）\r\n* [将 Rust 整合到 Python 中](https://www.vortexa.com/insight/integrating-rust-into-python)（译注：是上次使用 300 行左右 Rust 代码极致提升 Python 性能的公司，请参阅《[使用 Rust 极致提升 Python 性能：图表和绘图提升 24 倍，数据计算提升 10 倍](https://blog.budshome.com/budshome/shi-yong-rust-ji-zhi-ti-sheng-python-xing-neng-:tu-biao-he-hui-tu-ti-sheng-24-bei-,shu-ju-ji-suan-ti-sheng-10-bei)》）\r\n* [使用 `Tonic` 建立 `gRPC Protobuf` 服务器](https://dev.to/transienterror/setting-up-a-grpc-protobuf-server-with-tonic-218e)（译注：`Tonic` 是基于 `HTTP/2` 的 gRPC 服务实现，关注高性能、互操作性和灵活性。笔者正打算项目中选择一个 gRPC 服务实现库，也看了这个项目，此项目几年没发新版本了……）\r\n* [用 Rust 做 Kafka 开发（2）](https://dev.to/abhirockzz/getting-started-with-kafka-and-rust-part-2-354f)\r\n* [Rust lib 错误管理，多枚举方式](http://www.tglman.com/posts/rust_lib_error_management.html)\r\n* [Rust 中的异步数据流（2）——撤销过期请求](https://gendignoux.com/blog/2021/04/08/rust-async-streams-futures-part2.html)\r\n* \\[系列\\] [可爱的 Warp：使用 Rust 开发 REST API](https://dev.to/rogertorres/series/12179)\r\n* \\[中文\\] \\[系列\\] [基于 Async Rust 构建 GraphQL 服务，使用 tide + async-graphql + mongodb（1）](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(1)--qi-bu-ji-crate-xuan-ze)（注：笔者的博文，官方周报同意收录，不是翻译中夹带私货哈）\r\n* \\[视频\\] [使用 Rust 开发 Flocking Boids 游戏的实践和比较：Piston vs Tetra vs Amethyst vs Bevy](https://youtu.be/e0n9v565HR4)（译注：后面比较的都是游戏引擎，所以推断 Flocking Boids 应该是个游戏名字，如果不对请你指导）\r\n\r\n### 其它\r\n\r\n* [Rust，并非 Firefox，而是 Mozilla 对业界的最伟大奉献](https://www.techrepublic.com/article/rust-not-firefox-is-mozillas-greatest-industry-contribution/)\r\n* [来自 AWS 的人员 Shane Miller将领导新的 Rust 基金会](https://www.zdnet.com/article/awss-shane-miller-to-head-the-newly-created-rust-foundation/)\r\n* [\\[RFC\\] 将 Rust 引入 Linux 内核的讨论](https://lkml.org/lkml/2021/4/14/1023)（译注：实际是一个邮件记录，如果有朋友有兴趣翻译，希望可以也发我一份，在公众号发布）\r\n* [LLVM 窥探 - `clamp` 实现的比较分析](https://secret.club/2021/04/09/std-clamp.html)\r\n* [`Tokio-uring` 设计方案](https://www.reddit.com/r/rust/comments/mmz1sg/tokiouring_design_proposal/)\r\n* [Google 使用 Rust 开发 Android 底层（low-level Android）](https://arstechnica.com/gadgets/2021/04/google-is-now-writing-low-level-android-code-in-rust/)\r\n* [Linux 内核中的 Rust](https://security.googleblog.com/2021/04/rust-in-linux-kernel.html)\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [dipa](https://docs.rs/dipa)，Rust 数据结构中用于派生（derive）差分/增量编码（delta-encoding）的 crate。\r\n\r\n即使缺少提名，但 llogiq（译注：周报编辑人员之一）对自己的选择非常满意。\r\n\r\n[关于下周最佳 crate，请您提议，并投票!](https://users.rust-lang.org/t/crate-of-the-week/2704)!\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n# Rust 核心更新\r\n\r\n[329 PR 在上一周被合并](https://github.com/search?q=is%3Apr+org%3Arust-lang+is%3Amerged+merged%3A2021-04-05..2021-04-12)。\r\n\r\n## Rust 编译器性能\r\n\r\n本周稍显安静。\r\n\r\n验测工作是由 **@simulacrum** 完成的。修正范围：[d322385..5258a74](https://perf.rust-lang.org/?start=d32238532138485c80db4f2cd596372bce214e00&end=5258a74c887f8ae14717e1f98b652b470877ce4e&absolute=false&stat=instructions%3Au)\r\n\r\n## 已核准的 RFCs\r\n\r\nRust 的改进遵循 [RFC（request for comments）流程](https://github.com/rust-lang/rfcs#rust-rfcs)。如下是本周核准实现的 RFCs：\r\n\r\n* [RFC: -C export-executable-symbols](https://github.com/rust-lang/rfcs/pull/2841)\r\n\r\n## 新的 RFCs\r\n\r\n* [枚举上的 `#[derive(Default)]` 具有 `#[default]` 属性（attribute） #3107](https://github.com/rust-lang/rfcs/pull/3107)\r\n* [新增：值的宏捕获标识符（value macro capture designator）](https://github.com/rust-lang/rfcs/pull/3106)\r\n\r\n# 近期活动\r\n\r\n### 线上活动\r\n\r\n* [April 20, Washington, DC, US - 深入探讨 Rust 的接用检查器 - Rust DC](https://www.meetup.com/RustDC/events/ntvrgsyccgblb)\r\n* [April 21, Vancouver, BC, CA - Rust 的研讨/Hack/闲逛 之夜 - Vancouver Rust](https://www.meetup.com/Vancouver-Rust/events/npqfbsyccgbcc/)\r\n* [April 27, Dallas, TX, US - Last Tuesday - Dallas Rust](https://www.meetup.com/Dallas-Rust/events/jqxqwryccgbkc/)\r\n\r\n### 北美\r\n\r\n* [April 14, Atlanta, GA, US - 和 Rustaceans 一起畅饮啤酒 - Rust Atlanta](https://www.meetup.com/Rust-ATL/events/qxqdgryccgbsb/)\r\n\r\n### 亚太\r\n\r\n* [April 19, Wellington, NZ - IGNITION: 什么是 Rust，以及我为什么要关注它？工作和游戏中的 Rust - Rust Wellington](https://www.meetup.com/Rust-Wellington/events/277270667)\r\n\r\n### 欧洲\r\n\r\n* [April 21, Moscow, RU -月度会议 - Rust Moscow](https://www.meetup.com/ru-RU/Rust-%D0%B2-%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B5/events/277259838/)\r\n\r\n如果你正在运作一次 Rust 活动，请将其[添加到日历](https://www.google.com/calendar/embed?src=apd9vmbc22egenmtu5l6c5jbfc%40group.calendar.google.com)中，以便在此处提及。请向 [Rust 社区团队](mailto:community-team@rust-lang.org)发送电子邮件，以获取访问日历权限。\r\n\r\n# Rust 招聘信息\r\n\r\n**Slight**\r\n\r\n* **[远程](https://www.slight.co/jobs/software-engineer-core)**[ Rust 软件工程师 - 核心团队](https://www.slight.co/jobs/software-engineer-core)\r\n\r\n**Kraken**\r\n\r\n* [若干](https://jobs.lever.co/kraken?team=Engineering)**[远程](https://jobs.lever.co/kraken?team=Engineering)**[ Rust 工程师岗位](https://jobs.lever.co/kraken?team=Engineering)\r\n\r\n*通过 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，tweet 信息给我们，以便于我们在此处列出你的招聘信息！*\r\n\r\n# 本周引语\r\n\r\n> 每天，我在 \\[rust is\\] 中真正看重的是：我可以放心调用其他人的代码，而不产生令人不快的“惊喜”。\r\n>\r\n> ```\r\n> async fn verify_signature(token: &Jwt) -> Result<Claims, VerificationError>\r\n> ```\r\n>\r\n> 代码段中：\r\n>\r\n> * 我知道我的 JWT 令牌（token）不会被更改，仅能被访问（`&`）；\r\n> * 我晓得函数可以异步 I/O（`async`）；\r\n> * 我明白函数失败原因（`Result`）；\r\n> * 我了解它的故障模式（`VerificationError`）。\r\n\r\n– [Luca Palmieri 发表于 Twitter](https://twitter.com/algo_luca/status/1380928103019597827)（译注：*Zero to Production in Rust* 一书的作者）\r\n\r\n谢谢 [Nixon Enraght-Moony](https://users.rust-lang.org/t/twir-quote-of-the-week/328/1031) 的提议！\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman)。*\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-16T04:57:41.465Z"),
+    "updated_at": ISODate("2021-04-16T04:57:41.465Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f19"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "rust-lang.org、crates.io，以及 docs.rs 的管理，已由 Mozilla 转移到 Rust 基金会",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 2 月 8 日，由 5 家公司：华为、亚马逊、谷歌、微软，以及 Mozilla 作为创始成员，成立了 Rust 基金会。Rust 基金会的部分任务既是管理和支持 Rust 开发者（Rustaceans）所依赖的服务，包括 rust-lang.org、crates.io，以及 docs.rs。以前，这些服务的管理和支持由 Mozilla 负责，Rust 基金会成立后，Rust 社区赋权 Rust 基金会代表其管理上述服务。",
+    slug: "rust-lang.org,-crates.io,yi-ji-docs.rs-de-guan-li-,yi-you-mozilla-zhuan-yi-dao-rust-ji-jin-hui",
+    uri: "/budshome/rust-lang.org,-crates.io,yi-ji-docs.rs-de-guan-li-,yi-you-mozilla-zhuan-yi-dao-rust-ji-jin-hui",
+    content: "昨天（4 月 17 日），Rust 基金会向其邮件订阅用户，或者 crates.io 的注册用户，发送了一封邮件，内容是关于 rust-lang.org、crates.io，以及 docs.rs 的管理组织发生转移的说明，以及新的隐私政策的详细说明。\r\n\r\n[2021 年 2 月 8 日，由 5 家公司：华为、亚马逊、谷歌、微软，以及 Mozilla 作为创始成员，成立了 Rust 基金会](https://foundation.rust-lang.org/posts/2021-02-08-hello-world/)。Rust 基金会的董事会由创始成员公司的 5 名董事以及项目领导层的 5 名董事组成，其中 2 名代表核心团队。关于 Rust 基金会董事会成员的相关信息，在[每期的 Rust 官方周报（链接为上周的 386 期）](https://blog.budshome.com/budshome/rust-guan-fang-zhou-bao-386-qi-(2021-04-14))中有介绍。\r\n\r\nRust 基金会的部分任务既是管理和支持 Rust 开发者（Rustaceans）所依赖的服务，包括 rust-lang.org、crates.io，以及 docs.rs。以前，这些服务的管理和支持由 Mozilla 负责，Rust 基金会成立后，Rust 社区赋权 Rust 基金会代表其管理上述服务。\r\n\r\n基于此次变更，上述服务的隐私声明，管理内容等都发生了变化，详细信息见 Rust 基金会[管理政策](https://foundation.rust-lang.org/policies/privacy-policy/)。概要说来，主要是如下所述：\r\n\r\n# rust-lang.org\r\n\r\nrust-lang.org 由 Rust 核心团队和社区团队管理。\r\n\r\n- 访客记录：当你访问 rust-lang.org 及相关网站时，作为标准服务日志的一部分，你的 IP 地址会被记录，并存储 1 年。\r\n\r\n# crates.io\r\n\r\ncrates.io 由 Rust 核心团队和 crates.io 团队管理。\r\n\r\n- github 账户登录：crates.io 需要用户有一个 github 帐户，以便登录和使用服务。在你登录时，crates.io 将收到你的 github 用户名、头像。如果你在 github 公开信息中，有设置共享的显示名称或电子邮件地址，crates.io 也会收到该信息。\r\n- 电子邮件：在 crates.io 有经过验证的电子邮件，才能发布 crate。crates.io 会将此邮件作为 github 账户的公开电子邮件，自动与 github 账户做匹配。当然，也支持仅操作 crates.io 相关活动的电子邮件。\r\n- 访客记录：当你访问 crates.io 及相关网站时，作为标准服务日志的一部分，你的 IP 地址会被记录，并存储 1 年。\r\n- 上传到 crates.io 的信息：由于 crates.io 的公共性质，如果你在 crate 中包含任何私人信息，则该信息可能会被搜索引擎编入索引，或由第三方使用。因此，敏感信息不应包含在 crate 文件中。\r\n- 错误监控：主要是作为错误报告的一部分，你的 IP 地址等可能会被披露。不过，目前已经有保护性的删除措施。\r\n\r\n# docs.rs\r\n\r\ndocs.rs 由 Rust 核心团队和开发工具 docs.rs 子团队管理。\r\n\r\n- 访客记录：当你访问 docs.rs 及相关网站时，作为标准服务日志的一部分，你的 IP 地址会被记录，并存储 1 年。\r\n\r\n另外，还有论坛、资料来源，以及第三方服务等隐私声明，不过主要是基于操作者个人的主观操控，所以笔者就不整理了。\r\n\r\n欢迎交流（指正、错别字等均可）。我的联系方式为页底邮箱，或者微信号 yupen-com。\r\n\r\n![yupen-com](https://blog.budshome.com/static/users/yupen-com.jpg)\r\n\r\n谢谢您的阅读。\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-18T01:17:01.562Z"),
+    "updated_at": ISODate("2021-04-18T01:17:01.562Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f20"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "为什么应将 Rust 引入机器人平台？以及机器人平台的 Rust 资源推荐",
+    "category_id": ObjectId("608789231430000011000d12"),
+    summary: "因 C++ 的特性，使得机器人平台面临着潜在的巨大危害。C++ 的测试、体系结构，以及内存管理，均存在使用依赖性上的不一致问题；然而，这些依赖关系可能会捕获和操纵基本的底层资源。这意味着在不经意间，就会非常容易地构建导致关键问题的 bug，并且你不会意识到……Rust 具有和 C++ 同等的“与金属融合（close to the metal）”的特性。这使得 Rust 成为一种高效、极其安全的语言。Rust 还允许底层访问，这非常适合资源约束和代码安全至关重要的机器人世界。使用 Rust 构建机器人平台的最大好处是内存安全和管理。在 Rust 中，内存管理的方法是使用堆栈跟踪程序，然后使用指针引用来指向包含较大数据结构的堆。对于机器人平台来说，Rust 是一个明智的选择，但是向用 Rust 编写的机器人平台过渡，则需要时间。",
+    slug: "wei-shi-yao-ying-jiang-rust-yin-ru-ji-qi-ren-ping-tai-yi-ji-ji-qi-ren-ping-tai-de-rust-zi-yuan-tui-jian",
+    uri: "/budshome/wei-shi-yao-ying-jiang-rust-yin-ru-ji-qi-ren-ping-tai-yi-ji-ji-qi-ren-ping-tai-de-rust-zi-yuan-tui-jian",
+    content: "> 摘译自 Adam Rodnitzky 于 2021-03-30 发表在 tangramvision.com 的文章 [Why Rust for Robots?](https://www.tangramvision.com/blog/why-rust-for-robots)\r\n\r\n目前，机器人平台主要使用的程序设计语言为 C++。而 Tangram Vision 团队则认为，机器人平台应当选择更好和更合适的程序设计语言，Rust。\r\n\r\n![rust robots](https://blog.budshome.com/static/articles/1619487413.jpg)\r\n图像作者为 Davide Baraldi，来自于 Unsplash\r\n\r\n# C++ 在机器人平台的应用\r\n\r\n对于机器人平台而言，其最终目标是商业化及其规模上的部署。C++ 在过去几十年的使用中，已经逐渐成为标准，这是由多种原因合力造就的。首先，C++ 无处不在的应用规模已经形成一个自我强化的机制；其次，C++ 有丰富的类库、工具，以及工程师的生态系统。比如说，[ROS（译注：RobotOS，目前最流行的机器人平台客户端库之一）](https://en.wikipedia.org/wiki/Robot_Operating_System)主要是用 C++ 实现的；流行的 [OpenCV](https://www.opencv.org/) 计算机视觉库也主要是用 C++ 编写，并用 C++ 进行调用。\r\n\r\n然而，工具和工程师的普遍性存在，并不能完全解释 C++ 在机器人平台的流行。还有一个更根本的原因是：在已知的资源限制下，大多数机器人平台**必须满足可接受的性能阈值**。C++ 非常适合这些嵌入式应用程序，因为高性能的语言才适合“与金属融合（close to the metal）”。\r\n\r\n> 译注：\"close to the metal\" 是美剧《奔腾年代（Halt and Catch Fire）》第一季第四集剧名，大概剧情：戈登等人突破了多赫蒂阈值，这意味着他们的个人电脑组装后，将成为最快的电脑……清洁工打扫时制造了电涌，导致代码都不见了……原来乔是故意将卡梅伦骗出工作间制造了电涌……\r\n\r\n因其 C++ 的特性，这种“与金属融合（close to the metal）”的优势，使得机器人平台面临着潜在的巨大危害。C++ 的测试、体系结构，以及内存管理，均存在使用依赖性上的不一致问题；然而，这些依赖关系可能会捕获和操纵基本的底层资源。这意味着在不经意间，就会非常容易地构建导致关键问题的 bug，并且你不会意识到……也就是说，直到你完全投入生产环境。在产品部署到生产环境之前，这个大问题的 bug，是不会被发现的。在生产环境中，一个绕过 QA 的边缘案例场景，会触发内存泄漏，或者系统崩溃，等等。\r\n\r\n![c++ robots](https://blog.budshome.com/static/articles/1619484754.jpg)\r\n\r\n除非你如上述韦恩图所示，在狭小的交集范围内思考。否则，将会因为 C++ 自身的问题，而导致你的机器人平台代码库有诸多麻烦。\r\n\r\n基于上述原因，Rust 语言则显得非常有积极意义。\r\n\r\n# 将 Rust 引入机器人平台\r\n\r\nRust 是相对较新的机器人语言，但是有大量快速增长的项目和库，以及为机器人技术的发展提供了关键框架。\r\n\r\n但是，为什么要改变呢？\r\n\r\n首先，使用 Rust 构建机器人平台的最大好处是内存安全和管理。在 Rust 中，您必须非常地*努力*，才能“创造”内存泄漏或争用条件，比如：常见的内存陷阱、空指针，或数据争用。在 Rust 中，内存管理的方法是使用堆栈跟踪程序，然后使用指针引用来指向包含较大数据结构的堆。\r\n\r\n为了访问数据结构，必须建立所有权，从而防止多个变量同时访问或修改数据结构。效率高？对。安全吗？对。最好的部分是：Rust 具有和 C++ 同等的“与金属融合（close to the metal）”的特性。这使得 Rust 成为一种高效、极其安全的语言。Rust 还允许底层访问，这非常适合资源约束和代码安全至关重要的机器人世界。\r\n\r\n对于机器人平台来说，Rust 是一个明智的选择，但是向用 Rust 编写的机器人平台过渡，则需要时间。Rust 发布不足十年（译注：2014 年 10 月，Rust 编译器和工具有了第一个发布：0.12 版），而 C++ 已经存在了四个十年了。因此，C++ 仍然具有非常大的惯性，但 Rust 社区正在快速发展中。\r\n\r\n# 机器人平台的 Rust 资源\r\n\r\n在将 Rust 用于机器人平台的开发方面，有一个小型的，但正在不断增长的公司和开发人员社区（包括 Tangram Vision）。他们正在将一些机器人平台最常用的库和工具与 Rust 相融合，并且也在开发新的工具，以简化创建 `Rust-编程（Rust-programmed）`机器人的开发路径。\r\n\r\n下面是我们最喜欢的几个机器人平台的 Rust 资源，涵盖了机器人技术发展的一些关键领域。在我们的选择中，较看重积极维护的资源（一年内）。\r\n\r\n## 框架\r\n\r\n- [OpenRR](https://github.com/openrr/openrr)：开源的 Rust 机器人平台\r\n\r\n## ROS\r\n\r\n- [rosrust](https://github.com/adnanademovic/rosrust)：完全由 Rust 实现的 ROS 客户端库\r\n- [ros2-rust](https://github.com/ros2-rust/ros2_rust)：ROS2 的 Rust 绑定、代码生成器，以及示例代码\r\n- [rustros_tf](https://github.com/arjo129/rustros_tf)：ROS tf 库的 Rust 端口，用于追踪三维变换\r\n- [Optimization Engine](https://github.com/alphaville/optimization-engine)：用于机器人和自主系统的嵌入式优化\r\n\r\n## 计算机视觉\r\n\r\n- [realsense-rust](https://docs.rs/crate/realsense-rust/0.5.1)：用于 Intel RealSense 深度摄像机的高级绑定（Tangram Vision 维护）\r\n- [opencv-ros-camera](https://lib.rs/crates/opencv-ros-camera): 一种兼容 OpenCV 的相机几何模型\r\n- [adskalman](https://lib.rs/crates/adskalman): 卡尔曼（Kalman）电子滤波器\r\n- [cam-geom](https://lib.rs/crates/cam-geom): 相机几何模型\r\n- [bayes_estimate](https://lib.rs/crates/bayes_estimate): 一种贝叶斯（Bayesian）评估库\r\n\r\n## 碰撞侦测\r\n\r\n- [openrr-planner](https://lib.rs/crates/openrr-planner): 规避性的路径规划\r\n\r\n## 控制器\r\n\r\n- [stepper](https://lib.rs/crates/stepper): Rust 的通用步进电机驱动器和控制器接口\r\n\r\n## 模拟器\r\n\r\n- [nphysics](https://github.com/dimforge/nphysics): 可用于机器人仿真的 2D 和 3D 物理引擎\r\n\r\n## 数学计算\r\n\r\n- [Nalgebra](https://www.nalgebra.org/): Rust 的线性代数计算库\r\n- [petgraph](https://github.com/petgraph/petgraph): 图数据结构库，兼容 Rust\r\n\r\n# 你应该用 Rust 开发机器人吗？\r\n\r\n随着 Rust 和机器人世界的发展，我们认为答案将越来越是肯定的。Rust 语言的基本优点，已经使其非常适合机器人专家，以及机器人平台的需要。越来越多的库和资源，使我们比以往任何时候都更容易开始基础工作。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-27T03:56:54.454Z"),
+    "updated_at": ISODate("2021-04-27T03:56:54.454Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60879b130034b56e00ac1f27"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Jacob Hoffman-Andrews 加入 Rustdoc 团队",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Jacob Hoffman-Andrews 加入 Rustdoc 团队，Jacob Hoffman-Andrews joins the Rustdoc team",
+    slug: "jacob-hoffman-andrews-jia-ru-rustdoc-tuan-dui",
+    uri: "/budshome/jacob-hoffman-andrews-jia-ru-rustdoc-tuan-dui",
+    content: "2021 年 4 月 20 日，Guillaume Gomez 代表 rustdoc 团队公告 [Jacob Hoffman-Andrews joins the Rustdoc team](https://blog.rust-lang.org/inside-rust/2021/04/20/jsha-rustdoc-member.html)\r\n\r\n*以下为公告原文——*\r\n\r\n大家好，请欢迎 [Jacob Hoffman-Andrews](https://github.com/jsha) 来到 rustdoc 团队。\r\n\r\nJacob Hoffman-Andrews（[@jsha](https://github.com/jsha)）为 rustdoc 的前端工作做出了很大贡献。在他的帮助下，rustdoc 页面的加载速度提高了得多。以下是他最近所完成的工作（非详尽清单）：\r\n\r\n* 超大的搜索索引加载优化。现在，[仅在需要时才加载](https://github.com/rust-lang/rust/pull/82310)。\r\n* 大量的[页面负载优化](https://github.com/rust-lang/rust/pull/82315)。\r\n* Rustdoc 的切换按钮 show/hide [被改写为纯 HTML 实现](https://github.com/rust-lang/rust/issues/83332)，降低了复杂性，并提高了页面加载性能。\r\n\r\n上述说明仅是简要概述！\r\n\r\n我们真的很高兴 Jacob 加入我们，非常感谢你的工作。\r\n\r\n祝贺你！\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-27T05:03:15.386Z"),
+    "updated_at": ISODate("2021-04-27T05:03:15.386Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60879bc00034b56e00ac1f2b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 编译器团队对成员 Aaron Hill 的祝贺",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 编译器团队对成员 Aaron Hill 的祝贺，Aaron Hill 已成为 Rust 编译器团队的正式成员。Congrats to compiler team member Aaron Hill。",
+    slug: "rust-bian-yi-qi-tuan-dui-dui-cheng-yuan-aaron-hill-de-zhu-he",
+    uri: "/budshome/rust-bian-yi-qi-tuan-dui-dui-cheng-yuan-aaron-hill-de-zhu-he",
+    content: "2021 年 4 月 26 日，Wesley Wiser 代表 [Rust 编译器团队](https://www.rust-lang.org/governance/teams/compiler)发布祝贺 [Congrats to compiler team member Aaron Hill](https://blog.rust-lang.org/inside-rust/2021/04/26/aaron-hill-compiler-team.html)\r\n\r\n*以下为祝贺原文——*\r\n\r\n我很荣幸地宣布，[Aaron Hill](https://github.com/aaron1011) 已成为 [Rust 编译器团队](https://www.rust-lang.org/governance/teams/compiler)的正式成员。\r\n\r\n自 2017 年始，Aaron Hill（[@Aaron1011](https://github.com/aaron1011)）为 Rust 编译器的许多不同部分做出了贡献。最近，Aaron 一直致力于发现和修复增量系统中的错误和纠正问题，清理和改进宏扩展，以及各种错误修复。除了编译器之外，Aaron 还对下述工作实现了支持：\r\n\r\n- [Miri 中的解旋（unwinding）](https://github.com/rust-lang/rust/pull/60026)；\r\n- [`auto-traits` 的文档生成](https://github.com/rust-lang/rust/pull/47833)；\r\n- [Cargo 中的 future 不兼容报告](https://github.com/rust-lang/cargo/pull/8825)。\r\n\r\n恭喜 Aaron，感谢你对这个项目的所有贡献！\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-27T05:06:08.221Z"),
+    "updated_at": ISODate("2021-04-27T05:06:08.221Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f31"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "basedrop：Rust 生态中，适用于实时音频的垃圾收集器",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "在实时音频中，截止时间至关重要。您的代码仅有几毫秒的时间来填充一个缓冲区，其中的样本将被发送到 DAC。但是，这几毫秒，也可能要与许多其他音频处理程序共享。如果您的代码花费太长时间来生成这些样本，那么就没有第二次机会；音频根本不会被播放，用户会听到一个令人讨厌的小故障，或者被口吃的声音代替。\r\n为了防止这种情况，实时音频代码必须避免执行任何操作，这些操作可能会在无限或不可预测的时间内阻塞音频线程。如何在受上述限制的情况下，以可管理和高效的方式完成这一任务？Basedrop 是我试图为这个问题提供的一个解决方案。",
+    slug: "basedrop:rust-sheng-tai-zhong-,gua-yong-yu-shi-shi-yin-pin-de-la-ji-shou-ji-qi",
+    uri: "/budshome/basedrop:rust-sheng-tai-zhong-,gua-yong-yu-shi-shi-yin-pin-de-la-ji-shou-ji-qi",
+    content: "> 首先对关心笔者的朋友表示感谢。上周是因事外出，所以未有更新。\r\n\r\n因个人开发需要音频处理，笔者在搜索相关工具时，发现了一个很新的实时音频 crate：`basedrop`，目前 github 星星数 20 左右。在对 basedrop 浅显实践后，感觉此 crate 非常棒，因此分享。\r\n\r\n> 示例代码为笔者实践而仓促编写，参考了 docs.rs 站点的 basedrop 文档；后来发现作者有介绍的文章，所以文字内容摘译自 glowcoil 于 2021-04-26 发表的文章 [basedrop: a garbage collector for real-time audio in rust ](https://glowcoil.com/posts/basedrop/)。\r\n\r\n在实时音频中，截止时间至关重要。您的代码仅有几毫秒的时间来填充一个缓冲区，其中的样本将被发送到 `DAC`（译注：数字模拟转换器，Digital to analog converter，是将输入的数字信号转换成具有模拟位准的信号）。但是，这几毫秒，也可能要与许多其他音频处理程序共享。如果您的代码花费太长时间来生成这些样本，那么就没有第二次机会；音频根本不会被播放，用户会听到一个令人讨厌的小故障，或者被口吃的声音代替。\r\n\r\n为了防止这种情况，实时音频代码必须避免执行任何操作，这些操作可能会在无限或不可预测的时间内阻塞音频线程。这些操作包括：文件和网络 I/O、内存分配和释放，以及使用锁与非音频线程同步等，因为这些操作的“实时安全”性不被认可。相反，像 I/O 和内存分配这样的操作应该在其它线程上执行。而线程的同步操作，应该使用对音频线程没有等待的原语来执行。Ross Bencina 的经典博客文章《[时间不等人（Time Waits for Nothing）](http://www.rossbencina.com/code/real-time-audio-programming-101-time-waits-for-nothing)》中，更全面地概述了这一主题。\r\n\r\n考虑到音频软件通常需要分配内存，并从音频线程中使用内存。那么问题就来了：如何在受上述限制的情况下，以可管理和高效的方式完成这一任务？[Basedrop](https://github.com/glowcoil/basedrop) 是我试图为这个问题提供的一个解决方案。\r\n\r\n# 延迟回收\r\n\r\n考虑一个简单的场景：我们有一个存储在 `Vec<f32>` 中的样本缓冲区，可能是从磁盘合成或加载的，我们希望在音频线程使用它。作为解决方案的初始草图，我们可以使用无等待（wait-free）且有界容量（bounded-capacity）的 `SPSC` 通道（译注：高性能无锁队列，比如 [rtrb crate](https://crates.io/crates/rtrb)），以将缓冲区发送到音频线程。然后，当我们使用完它并希望回收内存时，我们可以通过另一个 `SPSC` 通道将其发送回非实时线程，以进行释放。\r\n\r\n在较简单的情况下，此解决方案效果良好。但是，随着应用程序复杂性的增加，它也有缺点。例如，如果在音频线程之间传输大量分配，则用于返回分配的固定容量通道，则可能会被填满。由于在这种情况下阻止音频线程是不可接受的，因此应用程序需要确保信道的轮询频率足以适配，并且信道总是可满足最坏情况时需要的容量（使用更复杂的动态分配设计）。或者，如果当前无法返回分配，音频线程可以继续播放，但不出错。此外，这个解决方案依赖于程序员的纪律性，以确保分配总是被释放。而 Rust 的 [RAII](https://rust-lang.budshome.com/ch04-01-what-is-ownership.html?highlight=raii#%E5%86%85%E5%AD%98%E4%B8%8E%E5%88%86%E9%85%8D)（译注：资源获取即初始化，详细请参阅 [Rust 所有权的内存与分配](https://rust-lang.budshome.com/ch04-01-what-is-ownership.html?highlight=raii#%E5%86%85%E5%AD%98%E4%B8%8E%E5%88%86%E9%85%8D)）设计，对于这方面的错误，在很大程度上是不可见的。[assert_no_alloc](https://crates.io/crates/assert_no_alloc) 等诊断工具 crate，可以在很大程度上检测此类错误，在编译时有一个保证是很好的。\r\n\r\nBasedrop 的解决方案是使用 [MPSC](http://www.1024cores.net/home/lock-free-algorithms/queues) 链表队列，替换用于返回分配的固定容量的环形缓冲区。在分配时，为任何要与音频线程共享的内存块创建 MPSC 链表队列节点，并内联存储。当音频线程准备释放一段内存以进行回收时，可以通过无分配、无等待的操作将相应的节点推送到队列中。此模式由一对智能指针封装：`Owned<T>` 和 `Shared<T>`，类似于 `Box<T>` 和 `Arc<T>`，它们将内容推送到队列中，进行延迟回收，而不是直接丢弃。然后可以使用 basedrop 的 `Collector` 类型，在另一个线程上定期处理队列。\r\n\r\n此系统的优点是回收通道不可能变满，缺少完全打开的 OOM（译注：OutOfMemory）。也不可能忘记将要收集的东西返回，只要它最初是用 `Owned<T>` 或者 `Shared<T>` 封装的。特别是 `Shared<T>`，其为在音频和非音频线程之间共享不可变和持久的数据结构，提供了令人兴奋的可能性。这种方式对于手动的消息传递方法来说，是很麻烦或不可能的。\r\n\r\n## `Collector` 的使用\r\n\r\n### 丢弃队列中的所有垃圾\r\n\r\n``` rust\r\nuse basedrop::{Collector, Handle, Owned};\r\nuse core::mem::drop;\r\n\r\nlet mut collector = Collector::new();\r\nlet handle = collector.handle();\r\nlet x = Owned::new(&handle, 1);\r\nlet y = Owned::new(&handle, 2);\r\nlet z = Owned::new(&handle, 3);\r\n\r\nassert_eq!(collector.alloc_count(), 3);\r\n\r\ndrop(x);\r\ndrop(y);\r\ndrop(z);\r\ncollector.collect();\r\n\r\nassert_eq!(collector.alloc_count(), 0);\r\n```\r\n\r\n### 尝试删除队列中的**第一个**分配\r\n\r\n如果成功，返回 `true`；否则，返回 `false`。\r\n\r\n``` rust\r\nuse basedrop::{Collector, Handle, Owned};\r\nuse core::mem::drop;\r\n\r\nlet mut collector = Collector::new();\r\nlet handle = collector.handle();\r\nlet x = Owned::new(&handle, 1);\r\nlet y = Owned::new(&handle, 2);\r\nlet z = Owned::new(&handle, 3);\r\n\r\nassert_eq!(collector.alloc_count(), 3);\r\n\r\ndrop(x);\r\ndrop(y);\r\ndrop(z);\r\n\r\nassert!(collector.collect_one());\r\nassert!(collector.collect_one());\r\nassert!(collector.collect_one());\r\n\r\nassert!(!collector.collect_one());\r\nassert_eq!(collector.alloc_count(), 0);\r\n```\r\n\r\n# SharedCell\r\n\r\nBasedrop 还提供了另一个与音频线程共享内存的原语，称为 `SharedCell<T>`。`SharedCell<T>` 充当一个线程安全的可变内存位置，用于存储 `Shared<T>` 指针，提供 `get`、`set` 和 `replace` 方法（与 `Cell` 非常类似），用来获取和更新内容。我的设想，这将被用作一种非实时线程，以原子方式发布数据的方法。然后，实时音频线程可以不可变地观察到这些数据。\r\n\r\n以无锁方式实现此模式，其主要困难在于获取引用计数指针的副本。实际上包括两个步骤：首先，获取实际指针；然后，增加引用计数。在这两个步骤之间，决不能允许写入器用新值替换指针，将前一个值的引用计数减为零，然后释放其引用，因为这将导致读取器在释放后使用。对于这个问题有各种可能的解决方案，有不同的权衡。\r\n\r\n`SharedCell<T>` 采用的方法是在存储的指针旁边，保留一个读取器计数。读取器在获取指针时，递增此计数，只有在成功递增指针的引用计数后，才能递减。反过来，在替换存储的指针之后，写入程序会循环，直到观察到计数为零，然后才允许它们移动（Rust 中的 `move`），并可能减少引用计数。此方案可被设计成低成本、无阻塞的读取器，而写入器的开销要高一些。我认为这是实时音频的适当折衷，读取器（音频线程）的延迟期限要短得多，执行频率也要比写入器高得多。\r\n\r\n## `SharedCell` 的使用\r\n\r\n### 替换包含的 `Shared<T>`，减少进程中的引用计数\r\n\r\n``` rust\r\nuse basedrop::{Collector, Shared, SharedCell};\r\n\r\nlet collector = Collector::new();\r\nlet x = Shared::new(&collector.handle(), 3);\r\nlet cell = SharedCell::new(x);\r\n\r\nlet y = Shared::new(&collector.handle(), 4);\r\ncell.set(y);\r\n```\r\n\r\n### 替换包含的 `Shared<T>` 并返回\r\n\r\n``` rust\r\nuse basedrop::{Collector, Shared, SharedCell};\r\n\r\nlet collector = Collector::new();\r\nlet x = Shared::new(&collector.handle(), 3);\r\nlet cell = SharedCell::new(x);\r\n\r\nlet y = Shared::new(&collector.handle(), 4);\r\nlet x = cell.replace(y);\r\n```\r\n\r\n### 释放 `SharedCell`，并返回包含的 `Shared<T>`\r\n\r\n这样做是安全的，因为我们保证是 `SharedCell` 的唯一持有者。\r\n\r\n``` rust\r\nuse basedrop::{Collector, Shared, SharedCell};\r\n\r\nlet collector = Collector::new();\r\nlet x = Shared::new(&collector.handle(), 3);\r\nlet cell = SharedCell::new(x);\r\n\r\nlet x = cell.into_inner();\r\n```\r\n\r\n# 未来展望\r\n\r\nBaseTrop 当前不支持动态类型，如 `Owned<[T]>` 或者 `Owned<dyn Trait>`。等待 Rust 的 [`CoerceUnsized`](https://doc.rust-lang.org/nightly/core/ops/trait.CoerceUnsized.html) 或者 `equivalent` 稳定时，这一点应该可以实现。目前，动态类型可以通过将 `DST` 封装到另一层分配中来解决，没有太多问题。\r\n\r\n此外，`Shared<T>` 当前不支持循环数据结构的弱引用，如 `Arc<T>` 所做的那样。这会使引用计数逻辑复杂化（参见 [`Arc` 源代码](https://github.com/rust-lang/rust/blob/5702cfa2551a56172a4e392aab4b494562242f35/library/alloc/src/sync.rs)），我想从一些简单的东西开始。\r\n\r\n我还想探索比引用计数开销更小的内存回收策略，例如 Linux 内核中的 [RCU 模式](https://www.kernel.org/doc/html/latest/RCU/whatisRCU.html)、[基于代（epoch-based）的回收](https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.html)，以及[基于静态（quiescent state-based）的回收](https://preshing.com/20160726/using-quiescent-states-to-reclaim-memory/)。我还没有想到这样一种设计，既符合 Rust 的所有权，又满足实时音频（和音频插件）的限制，但我认为这是有希望的方向。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-27T09:19:48.183Z"),
+    "updated_at": ISODate("2021-04-27T09:19:48.183Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f38"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rustup 1.24.0 已官宣发布，及其新特性详述",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 4 月 27 日，Rustup 工作组发布 Rustup 1.24.0：支持工具链定义文件 rust-toolchain.toml，更好地支持低内存（low-memory）系统，更好地支持 Windows 添加/删除程序，以及其它更新等。但莫要急着升级，Rustup 1.24.0 版的 `rustfmt` 和 `cargo fmt` 有问题。",
+    slug: "rustup-1.24.0-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    uri: "/budshome/rustup-1.24.0-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    content: "> **注**：先**莫要急着升级**，Rustup 1.24.0 版的 `rustfmt` 和 `cargo fmt` 有问题，下文有详述。\r\n\r\n2021 年 4 月 27 日，Rustup 工作组发布公告 *[Announcing Rustup 1.24.0](https://blog.rust-lang.org/2021/04/27/Rustup-1.24.0.html)*，宣布发布 Rustup 1.24.0，本文为其新特性详述。\r\n\r\n> 此版本发布后不久，我们收到了一份[回归报告](https://github.com/rust-lang/rustup/issues/2737)。因为在升级到 Rustup 1.24.0 之后，用户无法运行 `rustfmt` 和 `cargo fmt`。因此，我们将版本**恢复**为 1.23.1。\r\n>\r\n> 如果你升级后出现上述问题，需要将版本恢复为 1.23.1，可以运行如下命令：\r\n>\r\n> ```\r\n> rustup self update\r\n> ```\r\n\r\nrustup 工作组很高兴地宣布：rustup 发布版本 1.24.0。[Rustup](https://rustup.rs) 是安装 [Rust](https://www.rust-lang.org) 的官方推荐工具。Rust 编程语言，赋能每个人都能够构建可靠高效的软件。\r\n\r\n如果安装了早期版本的 rustup，那么获取 rustup 1.24.0 相当容易。关闭 IDE 并运行：\r\n\r\n```\r\nrustup self update\r\n```\r\n\r\nrustup 也可以在更新工具链的过程结束时，自动更新自身：\r\n\r\n```\r\nrustup update\r\n```\r\n\r\n若你还未有安装 rustup，可以从 Rust 官网[获取 rustup](https://rustup.rs)。\r\n\r\n## rustup 1.24.0 的新特性\r\n\r\n### 支持工具链定义文件 `rust-toolchain.toml`\r\n\r\n2020 年，我们为 `rust-toolchain` 文件发布了一个新的 `toml` 语法格式。Cargo 工具是以 `.cargo/config` 文件为中心的，为了使 Rustup 更符合其操作方式，我们现在支持该文件的 `.toml` 扩展名。如果你调用工具链文件 `rust-toolchain.toml`，则必须使用 `toml` 语法格式，而不是以前的单行格式。\r\n\r\n如果 `rust-toolchain` 和 `rust-toolchain.toml` 都存在，那么前者将优先，这是为了确保 Rustup 版本之间的兼容性。\r\n\r\n### 更好地支持低内存（low-memory）系统\r\n\r\nrustup 的组件解包器已经优化，在解包大型组件时，具有较小的内存占用。对于诸如树莓派等嵌入式之类的内存受限（memory-constrained）系统来说，其用户安装更新的 Rust 工具链时，将允许其中包含较大文件。\r\n\r\n### 更好地支持 Windows 添加/删除程序\r\n\r\nWindows 系统中，新安装的 Rustup，现在将自己出现在程序列表中。如此，你就可以通过触发“添加/删除程序”对话框，与任何其它 Windows 程序类似，以卸载 Rustup。\r\n\r\n_此特性仅在执行安装程序后生效，因此需要你在电脑上重新运行 `rustup-init.exe`。_\r\n\r\n### 其它更新\r\n\r\n关于 rustup 1.24.0 更详细的更新描述，请参与[更新日志](https://github.com/rust-lang/rustup/blob/stable/CHANGELOG.md)。\r\n\r\n同时，[rustup 文档](https://rust-lang.github.io/rustup/)已经更新生效。\r\n\r\n## 致谢\r\n\r\n感谢所有贡献者，你们帮助 rustup 1.24.0 成功发布！\r\n\r\n- Alex Chan\r\n- Aloïs Micard\r\n- Andrew Norton\r\n- Avery Harnish\r\n- chansuke\r\n- Daniel Alley\r\n- Daniel Silverstone\r\n- Eduard Miller\r\n- Eric Huss\r\n- est31\r\n- Gareth Hubball\r\n- Gurkenglas\r\n- Jakub Stasiak\r\n- Joshua Nelson\r\n- Jubilee (workingjubilee)\r\n- kellda\r\n- Michael Cooper\r\n- Philipp Oppermann\r\n- Robert Collins\r\n- SHA Miao\r\n- skim (sl4m)\r\n- Tudor Brindus\r\n- Vasili (3point2)\r\n- наб (nabijaczleweli)\r\n- 二手掉包工程师 (hi-rustin)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-28T02:51:32.236Z"),
+    "updated_at": ISODate("2021-04-28T02:51:32.236Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f41"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（4）- 变更服务，以及第二次重构",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "基于 tide + async-graphql + mongodb 构建 Rust 异步 GraphQL 服务的变更服务教程，包括依赖项的更新和配置。以及 async-graphql 简单对象类型、复杂对象类型、输入对象类型的迭代和开发。新用户的插入，包括根据用户唯一性标志属性验证。",
+    slug: "gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(4)--bian-geng-fu-wu-,yi-ji-di-er-ci-zhong-gou",
+    uri: "/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(4)--bian-geng-fu-wu-,yi-ji-di-er-ci-zhong-gou",
+    content: "在[构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（3）- 第一次重构](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(3)--zhong-gou)之后，因这段时间事情较多，所以一直未着手`变更服务`的开发示例。现在私事稍稍告一阶段，让我们一起进行`变更服务`的开发，以及第二次重构。\r\n\r\n# 一点意外\r\n\r\n首先要说，和笔者沟通使用 [`Tide 框架`](https://tide.budshome.com)做 Rust Web 开发的朋友之多，让笔者感到意外。因为 [`Tide 框架`](https://tide.budshome.com)的社区，目前并不活跃，很多 bug 已经拖很久了。大部分实践，笔者接触到的 Rust Web 开发人员，都未选择 [`Tide 框架`](https://tide.budshome.com)。\r\n\r\n对于使用 [`Tide 框架`](https://tide.budshome.com)做 GraphQL 开发的朋友，笔者有一个基于 tide、async-graphql，以及 mongodb 实现 GraphQL 服务的较完整项目模板，实现了如下功能：\r\n\r\n- 用户注册\r\n- 使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算\r\n- 整合 JWT 鉴权的用户登录\r\n- 密码修改、资料更新\r\n- 用户查询和变更、项目查询和变更\r\n- 使用基于 Rust 实现 graphql-client 获取 GraphQL 服务端数据\r\n- 渲染 GraphQL 数据到 handlebars-rust 模板引擎\r\n\r\n更多详细功能请参阅 [github 仓库 tide-async-graphql-mongodb](https://github.com/zzy/tide-async-graphql-mongodb)，欢迎朋友们参与，共同完善。\r\n\r\n另外，基于此模板项目，笔者正在以“三天打鱼，两天晒网”的方式开发一个博客，即本博文发布的站点，也开源在 [github 仓库 surfer](https://github.com/zzy/surfer)。同样，欢迎朋友们参与，共同完善。\r\n\r\n接下来，让我进行基于 tide + async-graphql + mongodb 开发 GraphQL 服务的第二次重构。\r\n\r\n# 依赖项更新\r\n\r\n自[构建 Rust 异步 GraphQL 服务：基于 tide + async-graphql + mongodb（3）- 第一次重构](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(3)--zhong-gou)之后，已经大抵过去一个月时间了。这一个月以来，活跃的 Rust 社区生态，进行了诸多更新：[Rust 版本已经为 1.51.0](https://blog.budshome.com/budshome/rust-1.51.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu)，[Rust 2021 版即将发布](https://blog.budshome.com/budshome/rust-2021-ban-ben-te-xing-yu-lan-,yi-ji-gong-zuo-ji-hua)……本示例项目中，使用的依赖项 `futures`、`mongodb`、`bson`、`serde` 等 crate 都有了 1-2 个版本的升级。特别是 `async-graphql`，在孙老师的辛苦奉献下，版本升级数量达到两位数，依赖项引入方式已经发生了变化。\r\n\r\n你可以使用 `cargo upgrade` 升级，或者直接修改 `Cargo.toml` 文件，全部使用最新版本的依赖 crate：\r\n\r\n``` toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"我是谁？\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nfutures = \"0.3.14\"\r\ntide = \"0.16.0\"\r\nasync-std = { version = \"1.9.0\", features = [\"attributes\"] }\r\n\r\ndotenv = \"0.15.0\"\r\nlazy_static = \"1.4.0\"\r\n\r\nasync-graphql = { version = \"2.8.4\", features = [\"bson\", \"chrono\"] }\r\nmongodb = { version = \"1.2.1\", default-features = false, features = [\"async-std-runtime\"] }\r\nbson = \"1.2.2\"\r\nserde = { version = \"1.0.125\", features = [\"derive\"] }\r\n```\r\n\r\n# 第二次重构：`async-graphql` 对象类型的使用\r\n\r\n在另一个 Rust Web 技术栈示例项目[基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（3） - 重构](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(3)---zhong-gou)中，代码更为精简一些。因为我们使用了 `async-graphql` 的简单对象类型、复杂对象类型。\r\n\r\n## 使用`简单对象类型`\r\n\r\n上一篇文章中，我们使用的是 `async-graphql` 的`普通对象类型`，即 `./src/users/models.rs` 文件如下所示：\r\n\r\n``` rust\r\n...\r\n\r\npub struct User {\r\n    pub _id: ObjectId,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::Object]\r\nimpl User {\r\n    pub async fn id(&self) -> ObjectId {\r\n    ...\r\n    pub async fn email(&self) -> &str {\r\n    ...\r\n    pub async fn username(&self) -> &str {\r\n    ...\r\n}\r\n```\r\n\r\n如果在实现 `User` 类型时，并未有对字段的计算处理，那么这些 `getter`、`setter` 方法是否显得很多余？如果我们使用`简单对象类型`，则可以对代码进行精简，省略这些枯燥的 `getter`、`setter` 方法。\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\npub struct User {\r\n    pub _id: ObjectId,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n```\r\n\r\n**注意**，上部分代码块，使用`普通对象类型`，为了节省篇幅，我们使用 `...` 表示省略粘贴部分代码；而使用`简单对象类型`的下部分代码块，是完整的。需要**强调**的是：如果对类型字段未有计算处理，使用`简单对象类型`可以对代码进行精简。\r\n\r\n## 使用`复杂对象类型`\r\n\r\n但有时，除了自定义结构体中的字段外，我们还需要返回一些计算后的数据。比如，我们要在邮箱应用中，显示发件人信息，一般是 `username<email>` 这样的格式。对此实现有两种方式：\r\n\r\n### 使用`普通对象类型`\r\n\r\n我们需要编写 `getter`、`setter` 方法，补充代码如下：\r\n\r\n``` rust\r\n#[async_graphql::Object]\r\nimpl User {\r\n    …… 原有字段 `getter`、`setter` 方法\r\n\r\n    // 补充如下方法\r\n    pub async fn from(&self) -> String {\r\n        let mut from =  String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n```\r\n\r\n### 使用`复杂对象类型`\r\n\r\nasync-graphql 的新版本中，可以将复杂对象类型和简单对象类型整合使用。这样，既可以省去省去满篇的 `getter`、`setter`，还可以自定义对结构体字段计算后的返回数据。如下 `users/models.rs` 文件，是完整的代码：\r\n\r\n``` rust\r\nuse bson::oid::ObjectId;\r\nuse serde::{Deserialize, Serialize};\r\n\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\n#[graphql(complex)]\r\npub struct User {\r\n    pub _id: ObjectId,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::ComplexObject]\r\nimpl User {\r\n    pub async fn from(&self) -> String {\r\n        let mut from = String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n```\r\n\r\n我们可以看到，GraphQL 的文档中，已经多了一个类型定义：\r\n\r\n![复杂对象类型 from 定义](https://blog.budshome.com/static/articles/1618479793.jpg)\r\n\r\n执行查询，我们看看返回结果：\r\n\r\n![复杂对象类型 from 查询](https://blog.budshome.com/static/articles/1619603426.jpg)\r\n\r\n# 变更服务\r\n\r\n接下来，我们开发 GraphQL 的变更服务。示例中，我们以`模型 -> 服务 -> 总线`的顺序来开发。这个顺序并非固定，在实际开发中，可以根据自己习惯进行调整。\r\n\r\n## 定义 `NewUser` 输入对象类型\r\n\r\n在此，我们定义一个欲插入 `users` 集合中的结构体，包含对应字段即可，其为 `async-graphql` 中的 `输入对象类型`。需要注意的是，mongodb 中，`_id` 是根据时间戳自动生成，因此不需要定义此字段。`cred` 是计划使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算后的鉴权码，需要定义，但无需在新增是填写。因此，在此我们需要介绍一个 `async-graphql` 中的标记 `#[graphql(skip)]`，其表示此字段不会映射到 GraphQL。\r\n\r\n代码较简单，所以我们直接贴 `users/models.rs` 文件完整代码：\r\n\r\n``` rust\r\nuse bson::oid::ObjectId;\r\nuse serde::{Deserialize, Serialize};\r\n\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\n#[graphql(complex)]\r\npub struct User {\r\n    pub _id: ObjectId,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::ComplexObject]\r\nimpl User {\r\n    pub async fn from(&self) -> String {\r\n        let mut from = String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n\r\n#[derive(Serialize, Deserialize, async_graphql::InputObject)]\r\npub struct NewUser {\r\n    pub email: String,\r\n    pub username: String,\r\n    #[graphql(skip)]\r\n    pub cred: String,\r\n}\r\n```\r\n\r\n## 编写服务层代码，将 `NewUser` 结构体插入 MongoDB\r\n\r\n服务层 `users/services.rs` 中，我们仅需定义一个函数，用于将 `NewUser` 结构体插入 MongoDB 数据库。我们从 GraphiQL/playground 中获取 `NewUser` 结构体时，因为我们使用了标记 `#[graphql(skip)]`，所以 `cred` 字段不会映射到 GraphQL。对于 MongoDB 的文档数据库特性，插入是没有问题的。但查询时如果包括 `cred` 字段，对于不包含此字段的 MongoDB 文档，则需要特殊处理。我们目前仅是为了展示`变更服务`的实例，所以对于 `cred` 字段写入一个固定值。随着本教程的逐渐深入，我们会迭代为关联用户特定值，使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算后的鉴权码。\r\n\r\n同时，实际应用中，插入用户时，我们应当设定一个用户唯一性的标志属性，以用来判断数据库是否已经存在此用户。本实例中，我们使用 `email` 作为用户的唯一性标志属性。因此，我们需要开发 `get_user_by_email` 服务。\r\n\r\n再者，我们将 `NewUser` 结构体插入 MongoDB 数据库后，应当返回插入结果。因此，我们还需要开发一个根据 `username` 或者 `email` 查询用户的 GraphQL 服务。因为我们已经设定 `email` 为用户的唯一性标志属性，因此直接使用 `get_user_by_email` 查询已经插入用户即可。\r\n\r\nMongoDB 数据库的 Rust 驱动使用，本文简要提及，不作详细介绍。\r\n\r\n服务层 `users/services.rs` 文件完整代码如下：\r\n\r\n``` rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse futures::stream::StreamExt;\r\nuse mongodb::Database;\r\n\r\nuse crate::users::models::{NewUser, User};\r\nuse crate::util::constant::GqlResult;\r\n\r\npub async fn all_users(db: Database) -> GqlResult<Vec<User>> {\r\n    let coll = db.collection(\"users\");\r\n\r\n    let mut users: Vec<User> = vec![];\r\n\r\n    // 查询集合中的所有文档\r\n    let mut cursor = coll.find(None, None).await.unwrap();\r\n\r\n    // 数据游标结果迭代\r\n    while let Some(result) = cursor.next().await {\r\n        match result {\r\n            Ok(document) => {\r\n                let user =\r\n                    bson::from_bson(bson::Bson::Document(document)).unwrap();\r\n                users.push(user);\r\n            }\r\n            Err(error) => Err(Error::new(\"1-all-users\").extend_with(|_, e| {\r\n                e.set(\"details\", format!(\"文档有错：{}\", error))\r\n            }))\r\n            .unwrap(),\r\n        }\r\n    }\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"1-all-users\")\r\n            .extend_with(|_, e| e.set(\"details\", \"无记录\")))\r\n    }\r\n}\r\n\r\n// get user info by email\r\npub async fn get_user_by_email(db: Database, email: &str) -> GqlResult<User> {\r\n    let coll = db.collection(\"users\");\r\n\r\n    let exist_document = coll.find_one(bson::doc! {\"email\": email}, None).await;\r\n\r\n    if let Ok(user_document_exist) = exist_document {\r\n        if let Some(user_document) = user_document_exist {\r\n            let user: User =\r\n                bson::from_bson(bson::Bson::Document(user_document)).unwrap();\r\n            Ok(user)\r\n        } else {\r\n            Err(Error::new(\"2-email\")\r\n                .extend_with(|_, e| e.set(\"details\", \"email 不存在\")))\r\n        }\r\n    } else {\r\n        Err(Error::new(\"2-email\")\r\n            .extend_with(|_, e| e.set(\"details\", \"查询 mongodb 出错\")))\r\n    }\r\n}\r\n\r\npub async fn new_user(db: Database, mut new_user: NewUser) -> GqlResult<User> {\r\n    let coll = db.collection(\"users\");\r\n\r\n    new_user.email = new_user.email.to_lowercase();\r\n\r\n    if self::get_user_by_email(db.clone(), &new_user.email).await.is_ok() {\r\n        Err(Error::new(\"email 已存在\")\r\n            .extend_with(|_, e| e.set(\"details\", \"1_EMAIL_EXIStS\")))\r\n    } else {\r\n        new_user.cred =\r\n            \"P38V7+1Q5sjuKvaZEXnXQqI9SiY6ZMisB8QfUOP91Ao=\".to_string();\r\n        let new_user_bson = bson::to_bson(&new_user).unwrap();\r\n\r\n        if let bson::Bson::Document(document) = new_user_bson {\r\n            // Insert into a MongoDB collection\r\n            coll.insert_one(document, None)\r\n                .await\r\n                .expect(\"文档插入 MongoDB 集合时出错\");\r\n\r\n            self::get_user_by_email(db.clone(), &new_user.email).await\r\n        } else {\r\n            Err(Error::new(\"3-new_user\").extend_with(|_, e| {\r\n                e.set(\"details\", \"转换 BSON 对象为 MongoDB 文档时出错\")\r\n            }))\r\n        }\r\n    }\r\n}\r\n```\r\n\r\n## 将服务添加到服务总线\r\n\r\n查询服务对应的服务总线为 `gql/queries.rs`，变更服务对应的服务总线为 `gql/mutations.rs`。到目前为止，我们一直未有编写变更服务总线文件 `gql/mutations.rs`。现在，我们将 `new_user` 变更服务和 `get_user_by_email` 查询服务分别添加到变更和查询服务总线。\r\n\r\n加上我们查询服务的 `all_users` 服务，服务总线共计 2 个文件，3 个服务。\r\n\r\n### 查询服务总线 `gql/queries.rs`\r\n\r\n``` rust\r\nuse async_graphql::Context;\r\n\r\nuse crate::dbs::mongo::DataSource;\r\nuse crate::users::{self, models::User};\r\nuse crate::util::constant::GqlResult;\r\n\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // 获取所有用户\r\n    async fn all_users(&self, ctx: &Context<'_>) -> GqlResult<Vec<User>> {\r\n        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();\r\n        users::services::all_users(db).await\r\n    }\r\n\r\n    //根据 email 获取用户\r\n    async fn get_user_by_email(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n        email: String,\r\n    ) -> GqlResult<User> {\r\n        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();\r\n        users::services::get_user_by_email(db, &email).await\r\n    }\r\n}\r\n```\r\n\r\n### 变更服务总线 `gql/mutations.rs`\r\n\r\n``` rust\r\nuse async_graphql::Context;\r\n\r\nuse crate::dbs::mongo::DataSource;\r\nuse crate::users::{\r\n    self,\r\n    models::{NewUser, User},\r\n};\r\nuse crate::util::constant::GqlResult;\r\n\r\npub struct MutationRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl MutationRoot {\r\n    // 插入新用户\r\n    async fn new_user(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n        new_user: NewUser,\r\n    ) -> GqlResult<User> {\r\n        let db = ctx.data_unchecked::<DataSource>().db_budshome.clone();\r\n        users::services::new_user(db, new_user).await\r\n    }\r\n}\r\n```\r\n\r\n## 第一次验证\r\n\r\n查询服务、变更服务均编码完成，我们验证下开发成果。通过 `cargo run` 或者 `cargo watch` 启动应用程序，浏览器输入 `http://127.0.0.1:8080/v1i`，打开 graphiql/playgound 界面。\r\n\r\n> 如果你的配置未跟随教程，请根据你的配置输入正确链接，详见你的 `.env` 文件配置项。\r\n\r\n但是，如果你此时通过 graphiql/playgound 界面的 `docs` 选项卡查看，仍然仅能看到查询服务下有一个孤零零的 `allUsers: [User!]!`。这是因为，我们前几篇教程中，仅编写查询服务代码，所以服务器 `Schema` 构建时使用的是 `EmptyMutation`。我们需要将我们自己的变更服务总线 `gql/mutations.rs`，添加到 `SchemaBuilder` 中。\r\n\r\n涉及 `gql/mod.rs` 和 `main.rs` 2 个文件。\r\n\r\n## 将变更服务总线添加到 `SchemaBuilder`\r\n\r\n`gql/mod.rs` 文件完整代码如下：\r\n\r\n``` rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse crate::util::constant::CFG;\r\nuse tide::{http::mime, Body, Request, Response, StatusCode};\r\n\r\nuse async_graphql::{\r\n    http::{playground_source, receive_json, GraphQLPlaygroundConfig},\r\n    EmptySubscription, Schema,\r\n};\r\n\r\nuse crate::State;\r\n\r\nuse crate::dbs::mongo;\r\n\r\nuse crate::gql::{queries::QueryRoot, mutations::MutationRoot};\r\n\r\npub async fn build_schema() -> Schema<QueryRoot, MutationRoot, EmptySubscription>\r\n{\r\n    // 获取 mongodb datasource 后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 Tide 的应用状态 State；\r\n    // 3. 使用 lazy-static.rs\r\n    let mongo_ds = mongo::DataSource::init().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mongodb datasource  in the schema object.\r\n    // let mut schema = Schema::new(QueryRoot, MutationRoot, EmptySubscription)\r\n    Schema::build(QueryRoot, MutationRoot, EmptySubscription)\r\n        .data(mongo_ds)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(req: Request<State>) -> tide::Result {\r\n    let schema = req.state().schema.clone();\r\n    let gql_resp = schema.execute(receive_json(req).await?).await;\r\n\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(Body::from_json(&gql_resp)?);\r\n\r\n    Ok(resp.into())\r\n}\r\n\r\npub async fn graphiql(_: Request<State>) -> tide::Result {\r\n    let mut resp = Response::new(StatusCode::Ok);\r\n    resp.set_body(playground_source(GraphQLPlaygroundConfig::new(\r\n        CFG.get(\"GRAPHQL_PATH\").unwrap(),\r\n    )));\r\n    resp.set_content_type(mime::HTML);\r\n\r\n    Ok(resp.into())\r\n}\r\n```\r\n\r\n## 将变更服务总线添加到应用程序作用域状态\r\n\r\n`main.rs` 文件完整代码如下：\r\n\r\n``` rust\r\nmod dbs;\r\nmod gql;\r\nmod users;\r\nmod util;\r\n\r\nuse crate::gql::{build_schema, graphiql, graphql};\r\nuse crate::util::constant::CFG;\r\n\r\n#[async_std::main]\r\nasync fn main() -> Result<(), std::io::Error> {\r\n    // tide logger\r\n    tide::log::start();\r\n\r\n    // 初始 Tide 应用程序状态\r\n    let schema = build_schema().await;\r\n    let app_state = State { schema: schema };\r\n    let mut app = tide::with_state(app_state);\r\n\r\n    // 路由配置\r\n    app.at(CFG.get(\"GRAPHQL_PATH\").unwrap()).post(graphql);\r\n    app.at(CFG.get(\"GRAPHIQL_PATH\").unwrap()).get(graphiql);\r\n\r\n    app.listen(format!(\r\n        \"{}:{}\",\r\n        CFG.get(\"ADDRESS\").unwrap(),\r\n        CFG.get(\"PORT\").unwrap()\r\n    ))\r\n    .await?;\r\n\r\n    Ok(())\r\n}\r\n\r\n//  Tide 应用程序作用域状态 state.\r\n#[derive(Clone)]\r\npub struct State {\r\n    pub schema: async_graphql::Schema<\r\n        gql::queries::QueryRoot,\r\n        gql::mutations::MutationRoot,\r\n        async_graphql::EmptySubscription,\r\n    >,\r\n}\r\n```\r\n\r\nOkay，大功告成，我们进行第二验证。\r\n\r\n## 第二次验证\r\n\r\n打开方式和注意事项和第一次验证相同。\r\n\r\n正常启动后，如果你此时通过 graphiql/playgound 界面的 `docs` 选项卡查看，将看到查询和变更服务的列表都有了变化。如下图所示：\r\n\r\n![变更服务 new_user](https://blog.budshome.com/static/articles/1619612698.jpg)\r\n\r\n### 插入一个新用户（重复插入）\r\n\r\n插入的 `newUser` 数据为（注意，GraphQL 中自动转换为驼峰命名）：\r\n\r\n``` json\r\n    newUser: { \r\n      email: \"budshome@budshome.com\", \r\n      username: \"我是谁\" \r\n    }\r\n```\r\n\r\n第一次插入，然会正确的插入结果：\r\n\r\n``` json\r\n{\r\n  \"data\": {\r\n    \"newUser\": {\r\n      \"cred\": \"P38V7+1Q5sjuKvaZEXnXQqI9SiY6ZMisB8QfUOP91Ao=\",\r\n      \"email\": \"budshome@budshome.com\",\r\n      \"from\": \"我是谁<budshome@budshome.com>\",\r\n      \"id\": \"608954d900136b6c0041ae09\",\r\n      \"username\": \"我是谁\"\r\n    }\r\n  }\r\n}\r\n```\r\n\r\n第二次重复插入，因为 `email` 已存在，则返回我们开发中定义的错误信息：\r\n\r\n``` json\r\n{\r\n  \"data\": null,\r\n  \"errors\": [\r\n    {\r\n      \"message\": \"email 已存在\",\r\n      \"locations\": [\r\n        {\r\n          \"line\": 2,\r\n          \"column\": 3\r\n        }\r\n      ],\r\n      \"path\": [\r\n        \"newUser\"\r\n      ],\r\n      \"extensions\": {\r\n        \"details\": \"1_EMAIL_EXIStS\"\r\n      }\r\n    }\r\n  ]\r\n}\r\n```\r\n\r\n请自己查看你的数据库，已经正常插入了目标数据。\r\n\r\n至此，变更服务开发完成。\r\n\r\n> 因为已经将更为完整的模板项目 [tide-async-graphql-mongodb](https://github.com/zzy/tide-async-graphql-mongodb) 放在了 github 仓库，所以本教程代码未有放在云上。如果你在实践中遇到问题，需要完成代码包，请联系我（微信号 yupen-com）。\r\n\r\n# 下篇计划\r\n\r\n变更服务开发完成后，后端我们告一阶段。下篇开始，我们进行前端的开发，仍然使用 Rust 技术栈：tide、rhai、handlebars-rust、surf，以及 graphql_client。\r\n\r\n本次实践，我们称之为 **Rust 全栈开发** ;-)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-28T12:46:14.453Z"),
+    "updated_at": ISODate("2021-04-28T12:46:14.453Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("60899dc20034b56e00ac1f49"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 387 期（2021-04-21）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 387 期：Rust 核心更新、Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘，以及 Rust 开发者引语等。第 387 期的技术文章中，技术深入分析较多，适合精读类不少。 ",
+    slug: "rust-guan-fang-zhou-bao-387-qi-(2021-04-21)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-387-qi-(2021-04-21)",
+    content: "> [Rust 官方周报（中文版）仓库为 github.com/zzy/this-week-in-rust-zh-cn](https://github.com/zzy/this-week-in-rust-zh-cn)，欢迎您的参与，一起丰富中文网络的 Rust 资源。\r\n\r\n大家好，欢迎查阅第 387 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一门系统编程语言，专注于三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github 向我们[发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n本周无论文或研究探讨。\r\n\r\n### 官方\r\n\r\n* \\[内部\\] [Rust 编译器（Compiler）团队 4 月份计划 - Rust Compiler April Steering Cycle](https://blog.budshome.com/budshome/rust-bian-yi-qi-(compiler)tuan-dui-4-yue-fen-ji-hua---rust-compiler-april-steering-cycle)\r\n* \\[内部\\] [Rust 语言团队 4 月份更新简报](https://blog.rust-lang.org/inside-rust/2021/04/17/lang-team-apr-update.html)\r\n* \\[内部\\] [Jacob Hoffman-Andrews 加入 Rustdoc 团队](https://blog.budshome.com/budshome/jacob-hoffman-andrews-jia-ru-rustdoc-tuan-dui)\r\n* \\[基金会\\] [成员介绍：Jane Lusby](https://foundation.rust-lang.org/posts/2021-04-15-introducing-jane-lusby/)（译注：项目主管，协作团队）\r\n* \\[基金会\\] [成员介绍：Shane Miller](https://foundation.rust-lang.org/posts/2021-04-15-introducing-shane-miller/)（译注：董事成员，亚马逊）\r\n\r\n### 简讯\r\n\r\n### 项目/工具更新\r\n\r\n* [rust-analyzer 更新日志 #73](https://rust-analyzer.github.io/thisweek/2021/04/19/changelog-73.html)\r\n* [Knurling-rs 更新日志 #23](https://ferrous-systems.com/blog/knurling-changelog-23/)（译注：Knurling-rs 主要致力于嵌入式 Rust 体验）\r\n* [Ballista 周报 #11](https://ballistacompute.org/thisweek/2021/04/18/this-week-in-ballista-11/)（译注：Ballista 项目是 Rust 开发的类似 Spark 的分布式计算平台，目前已被捐赠给了 Apache Arrow 项目组。笔者已经在使用中。其还支持  Python、C++，以及 Java 等语言，且不用为序列化付出额外开销代价）\r\n* [欢迎 Alice Ryhl 成为第一个受薪的 Tokio 项目贡献者](https://tokio.rs/blog/2021-04-welcome-alice)（译注：通过 github 赞助）\r\n* [Zellij：Rust 实现的终端复用器，已经发布 beta 版本](https://zellij.dev/news/beta/)（译注：类似 `tmux` 或者 `gnu screen`）\r\n* [faux：结构体模拟（mocking）库 - v0.1 发布](https://nrxus.github.io/faux/blog/landing-v-0-1.html)（译注：允许模拟结构体的方法进行测试，而不会使代码复杂化或污染代码）\r\n* [Otter - 棋盘类游戏服务器](https://diziet.dreamwidth.org/8121.html)，主要使用 [Rust 开发](https://www.chiark.greenend.org.uk/\\~ianmdlvl/otter/docs/build.html)\r\n* \\[音频\\] [Rust 1.50 和 1.51 的新特性](https://rustacean-station.org/episode/033-rust-1.50-1.51/)\r\n\r\n### 观测/思考\r\n\r\n* [实际上，“红色”函数和“蓝色”函数都是合理的](https://blainehansen.me/post/red-blue-functions-are-actually-good/)（译注：红色/蓝色函数象征同步/异步函数，函数的`颜色（colored）`源自 JavaScript，比喻 JavaScript 和其它语言中，同步函数和异步函数那些令人痛苦的不匹配难题。本文是对上期文章《[Rust 语言中，让异步函数和同步函数匹配，不是什么大问题](https://blog.budshome.com/budshome/rust-guan-fang-zhou-bao-386-qi-(2021-04-14))》的回应）\r\n* [Rust 赋能 Temporal 的新核心 SDK](https://docs.temporal.io/blog/why-rust-powers-core-sdk/)\r\n* [Rust 中的数独（sudoku）求解优化](https://www.simonclark.dev/2020/08/10/optimizing-sudoku-solver.html)（译注：文章不长，值得一读）\r\n* [我的 Rust 语言理解之旅](https://daveshawley.medium.com/my-journey-to-understand-rust-lang-28e4cf808b12)\r\n* [如何在 Rust 中实现 `/dev/printerfact`](https://christine.website/blog/dev-printerfact-2021-04-17)\r\n* [为什么使用 Rust 重新实现 fnm](https://gal.hagever.com/posts/why-fnm-was-rewritten-in-rust/)（译注：fnm 是系统应用，包括文件系统、网络，以及用户输入等）\r\n* [在 AWS Lambda 之上，使用 Rust 运行 GraphQL 服务](https://dev.to/dbanty/running-graphql-on-lambda-with-rust-1lak)\r\n* [运行时（Runtime）类型别名检测](https://myrrlyn.net/blog/bitvec/alias-detection)（译注：指针值（pointer-value）的类型别名分析）\r\n* [`box` 里面隐藏着什么？](https://fasterthanli.me/articles/whats-in-the-box)（译注：指 `Box<dyn Error>` 或 `Box<T>` 的 `box`）\r\n* \\[视频\\] [嵌入式 Rust 生态概览](https://youtu.be/vLYit_HHPaY)（译注：值得一看）\r\n\r\n### Rust 演练\r\n\r\n* [午夜忏悔（Late Night Confessions） — 使用 Rust、Rocket、Diese，以及 Askama 进行站点构建（1）](https://medium.com/perimeterx/late-night-confessions-building-a-website-using-rust-rocket-diesel-and-askama-part-1-aeccade43252)（译注：站点名本无需翻译，但这个站名象电影名字，不由得手痒 ;-)）\r\n* [Rust 之标准库 `trait` 之旅](https://github.com/pretzelhammer/rust-blog/blob/master/posts/tour-of-rusts-standard-library-traits.md)（译注：好文章，适合精读）\r\n* [Rust 学习 #3：crates.io 及发布新包](https://hamatti.org/posts/learning-rust-3-crates-io-publishing-your-package/)\r\n* [Rust 技术栈中，使用 Nakama 制作多人在线游戏](https://heroiclabs.com/blog/tutorials/rust-fishgame/)\r\n* [使用 React 和 WebAssembly 创建明亮的砌砖画廊（Sleek Masonry Gallery）](https://dev.to/rvanderlaan/creating-a-sleek-masonry-gallery-with-react-and-webassembly-17p2)\r\n* [GPIO 之战：类型状态骤升后的宏保护（2）](https://www.ecorax.net/macro-bunker-2/)\r\n* [在嵌入式 Rust 中使用 `std`](https://timmmm.github.io/std-embedded-rust/index.html)\r\n* [Rust 和 TUI：在 Rust 中 构建命令行（command-line）界面](https://blog.logrocket.com/rust-and-tui-building-a-command-line-interface-in-rust/)（译注：`tui` 类似 JavaScript 的界面库 `blessed-contrib` 或 Go 的界面库 `termui`）\r\n* [Rust：Serde：处理无类型的 JSON 数据](https://youtu.be/NwYY00paiH0)\r\n* \\[系列\\] [Rust 中编写 NES 模拟器](https://bugzmanov.github.io/nes_ebook/index.html)\r\n\r\n### 其它\r\n\r\n* [rustc、iOS，以及 M1](https://fnordig.de/2021/04/16/rustc-ios-and-an-m1/)\r\n* [微软预发布 Rust For Windows](https://www.tectalk.co/microsoft-previews-rust-for-windows/)（译注：简单说，支持 Rust 象 C 一样通过元数据访问 Windows API）\r\n* [Rustls 已为广泛使用做好准备](https://www.abetterinternet.org/post/preparing-rustls-for-wider-adoption/)\r\n* [错误还在吗（Are We Yeet Yet）？](https://areweyeetyet.rs/)（译注：以**有些“火气”的语气**说出：错误还在吗？此站点是错误追踪类）\r\n* [使用 BL602 IoT SDK 运行 Rust RISC-V 固件](https://lupyuen.github.io/articles/rust)\r\n* \\[视频\\] [斯坦福大学研讨会 - 新机器的灵魂：重新思考计算机](https://youtu.be/vvZA9n3e5pc)\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [deltoid](https://github.com/jjpe/deltoid)，用于增量压缩 Rust 数据结构的 crate。\r\n\r\n谢谢 [Joey Ezechiëls](https://users.rust-lang.org/t/crate-of-the-week/2704/904) 的提议。\r\n\r\n[关于下周最佳 crate，请您提议，并投票!](https://users.rust-lang.org/t/crate-of-the-week/2704)！\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n# Rust 核心更新\r\n\r\n[292 PR 在上周被合并](https://github.com/search?q=is%3Apr+org%3Arust-lang+is%3Amerged+merged%3A2021-04-12..2021-04-19)\r\n\r\n## Rust 编译器性能\r\n\r\n又是一个安静的一周，编译器的性能变化很小。\r\n\r\n验测工作是由 **@rylev** 完成的。修正范围：[5258a74..6df26f](https://perf.rust-lang.org/?start=5258a74c887f8ae14717e1f98b652b470877ce4e&end=6df26f897cffb2d86880544bb451c6b5f8509b2d&absolute=false&stat=instructions%3Au)\r\n\r\n## 已核准的 RFCs\r\n\r\nRust 的改进遵循 [RFC（request for comments）流程](https://github.com/rust-lang/rfcs#rust-rfcs)。如下是本周核准实现的 RFCs：\r\n\r\n* [try_trait_v2：`?` 脱糖（desugaring）语法的新设计](https://github.com/rust-lang/rfcs/pull/3058)\r\n\r\n## 新的 RFCs\r\n\r\n*无。*\r\n\r\n# 近期活动\r\n\r\n### 线上活动\r\n\r\n* [April 21, 温哥华, BC, CA - Rust 的研讨/Hack/闲逛 之夜 - Vancouver Rust](https://www.meetup.com/Vancouver-Rust/events/npqfbsyccgbcc/)\r\n* [April 27, 柏林, DE - Rust 和 Tell - Rust Berlin](https://www.meetup.com/Rust-Berlin/events/277590271)\r\n* [April 27, 伦敦, UK - LDN Virtual Talks Apr 2021 - Red Badger Takeover - Rust London User Group](https://www.meetup.com/Rust-London-User-Group/events/277520645/)\r\n* [April 27, Dallas, TX, US - Last Tuesday - Dallas Rust](https://www.meetup.com/Dallas-Rust/events/jqxqwryccgbkc/)\r\n* [April 28, Online - Ockam Open Source Community Call - Live coding walkthrough of building end-to-end encrypted communication in Rust](https://github.com/ockam-network/ockam/discussions/1303)\r\n* [May 4, Buffalo, NY, US - Buffalo Rust User Group, Tues May 4th - Buffalo Rust Meetup](https://www.meetup.com/Buffalo-Rust-Meetup/events/277402612/)\r\n\r\n### 欧洲\r\n\r\n* [April 21, Moscow, RU - Monthly Meetup - Rust Moscow](https://www.meetup.com/ru-RU/Rust-%D0%B2-%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B5/events/277259838/)\r\n\r\n如果你正在运作一次 Rust 活动，请将其[添加到日历](https://www.google.com/calendar/embed?src=apd9vmbc22egenmtu5l6c5jbfc%40group.calendar.google.com)中，以便在此处提及。请向 [Rust 社区团队](mailto:community-team@rust-lang.org)发送电子邮件，以获取访问日历权限。\r\n\r\n# Rust 招聘信息\r\n\r\n**Grover GmbH**\r\n\r\n* **[柏林或者远程](https://grnh.se/15fcbda73us)**[ - Software Engineer - Risk & Data, Rust & Python](https://grnh.se/15fcbda73us)\r\n\r\n**Massa Labs**\r\n\r\n* **[远程](https://massa.network/#jobs)**[ - Rust Blockchain Developer](https://massa.network/#jobs)\r\n\r\n**Instaclustr**\r\n\r\n* [Software Engineer (Canberra, AU)](https://www.seek.com.au/job/52021829)\r\n\r\n**Subspace Labs**\r\n\r\n* **[远程](https://jobs.lever.co/subspacelabs/7f6a654b-60a8-4740-aa19-36b9f7a9e624?lever-origin=applied&lever-source%5B%5D=Twitter)**[ - Core Protocol Engineer](https://jobs.lever.co/subspacelabs/7f6a654b-60a8-4740-aa19-36b9f7a9e624?lever-origin=applied&lever-source%5B%5D=Twitter)\r\n\r\n**Paige**\r\n\r\n* **[远程/欧洲](https://boards.greenhouse.io/paige/jobs/5217029002)**[ - Senior Software Engineer, Visualization](https://boards.greenhouse.io/paige/jobs/5217029002)\r\n\r\n**Luminovo**\r\n\r\n* **[远程，中欧夏令时区](https://luminovo.jobs.personio.de/job/357453)**[ - (Senior) Software Engineer - Rust](https://luminovo.jobs.personio.de/job/357453)\r\n\r\n*通过 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，tweet 信息给我们，以便于我们在此处列出你的招聘信息！*\r\n\r\n# 本周引语\r\n\r\n> 我们认为：Rust 现在已经为加入 C 做好了准备，成为实现 \\[Linux\\] 内核的实用语言。Rust 可以帮助我们减少特权代码中潜在的 bug，减少安全漏洞的数量。同时，Rust 可以很好地处理核心内核，并保持其性能特色。\r\n\r\n– [Wedson Almeida Filho 发表于 Google 安全博客](https://security.googleblog.com/2021/04/rust-in-linux-kernel.html)\r\n\r\n谢谢 [Jacob Pratt](https://users.rust-lang.org/t/twir-quote-of-the-week/328/1040) 的提议！\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman)。*\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-28T17:39:14.413Z"),
+    "updated_at": ISODate("2021-04-28T17:39:14.413Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("608b70bc0034b56e00ac1f4d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 388 期（2021-04-28）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 388 期：Rust 核心更新、Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘、Rust 开发者引语，尤其是本期具有论文和研究探讨等。第 388 期的技术文章中，技术深入分析较多，适合精读类不少。另外，本周最佳 crate 对代码调试很有用。 ",
+    slug: "rust-guan-fang-zhou-bao-388-qi-(2021-04-28)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-388-qi-(2021-04-28)",
+    content: "> [Rust 官方周报（中文版）仓库为 github.com/zzy/this-week-in-rust-zh-cn](https://github.com/zzy/this-week-in-rust-zh-cn)，欢迎您的参与，一起丰富中文网络的 Rust 资源。\r\n\r\n大家好，欢迎查阅第 388 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一门系统编程语言，专注于三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github 向我们[发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n本周无论文或研究探讨。\r\n\r\n### 官方\r\n\r\n* [Rustup 1.24.0 已官宣发布，及其新特性详述 ](https://blog.budshome.com/budshome/rustup-1.24.0-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu)\r\n* \\[内部\\] [Rust 编译器团队对成员 Aaron Hill 的祝贺](https://blog.budshome.com/budshome/rust-bian-yi-qi-tuan-dui-dui-cheng-yuan-aaron-hill-de-zhu-he)\r\n* \\[基金会\\] [成员介绍：Josh Stone](https://foundation.rust-lang.org/posts/2021-04-22-introducing-josh-stone/)（译注：项目主管，质量团队）\r\n* \\[Foundation\\] [成员介绍：Lars Bergstrom](https://foundation.rust-lang.org/posts/2021-04-22-introducing-lars-bergstrom/)（译注：董事成员，谷歌）\r\n\r\n### 简讯\r\n\r\n### 项目/工具更新\r\n\r\n* [rust-analyzer 更新日志 #74](https://rust-analyzer.github.io/thisweek/2021/04/26/changelog-74.html)\r\n* [IntelliJ Rust 更新 #146](https://intellij-rust.github.io/2021/04/26/changelog-146.html)\r\n* [Lemmy 发布 v0.11.0 版](https://lemmy.ml/post/61856)（译注：`lemmy` 是 Rust 技术栈为主实现的，类似于 `Reddit`、`Lobste.rs`，或 `Hacker News`）\r\n* [simdutf v0.1.1 - 语义版本的一小步，性能提升的一大步](https://www.reddit.com/r/rust/comments/mz44xi/simdutf_v011_a_small_step_for_semver_one_giant/)（译注：基于 simdjson 的实现，simd 加速和 UTF8 验证）\r\n* [好玩有趣的 itch.io 线上益智游戏，适用于 Windows 和 Linux，界面外观精美。感谢 Rust 社区，创造了了如此棒的语言和生态工具](https://www.reddit.com/r/rust/comments/mx3enm/the_playable_demo_of_outer_wonders_our_cute/)\r\n\r\n### 观测/思考\r\n\r\n* [基于 evcxr 的 Rust 交互式笔记本（notebook）：David Lattimore 访谈](https://blog.abor.dev/p/evcxr)（译注：`evcxr` 是 `eval()` 的 Rust 实现，David Lattimore 是 Rust Jupyter 的核心创造者。Rust Jupyter 开源在谷歌公司仓库）\r\n* [Rust 中的迭代器（iterator）及零成本抽象（Zero Cost Abstractions）的开销](https://github.com/mike-barber/rust-zero-cost-abstractions/blob/main/README.md)（附带视频，译注：此文和 C#、Java 语言做了比较，值得一读）\r\n* [Rust 中移动（move）构造函数（constructor）：有可能吗？](https://mcyoung.xyz/2021/04/26/move-ctors/)（译注：要用到 `unsafe`，值得一读）\r\n* [basedrop：Rust 生态中，适用于实时音频的垃圾收集器](https://blog.budshome.com/budshome/basedrop:rust-sheng-tai-zhong-,gua-yong-yu-shi-shi-yin-pin-de-la-ji-shou-ji-qi)\r\n* [TurboWish 路线规划（1）：目标](http://blog.pnkfx.org/blog/2021/04/26/road-to-turbowish-part-1-goals/)（译注：嗯，名字很吸引人，但爪子？目前只是 crate 名字的占位符，大家还需期待）\r\n* [TurboWish 路线规划（2）：功能特性](http://blog.pnkfx.org/blog/2021/04/27/road-to-turbowish-part-2-stories/)（译注：同上，作者的规划和思考）\r\n* [Rust 中路径解析的痛点](https://www.fpcomplete.com/blog/pains-path-parsing/)（译注：篇幅不长的好文，关于网络路径及其疯狂的百分比编码，此文推荐一读）\r\n* [若果今天你可以重新设计 Rust，你会做哪些改变？](https://www.reddit.com/r/rust/comments/my3ipa/if_you_could_redesign_rust_from_scratch_today/)（译注：讨论火热，大部分是其它语言而来的惯性）\r\n* [实际上，“红色”函数和“蓝色”函数都是合理的](https://blainehansen.me/post/red-blue-functions-are-actually-good/)（译注：红色/蓝色函数象征同步/异步函数，函数的`颜色（colored）`源自 JavaScript，比喻 JavaScript 和其它语言中，同步函数和异步函数那些令人痛苦的不匹配难题。本文是对上期文章《[Rust 语言中，让异步函数和同步函数匹配，不是什么大问题](https://blog.budshome.com/budshome/rust-guan-fang-zhou-bao-386-qi-(2021-04-14))》的回应）\r\n\r\n### Rust 演练\r\n\r\n* [Rust 中，使用 BBS+ 创建隐私保护（privacy-preserving）签名](https://github.com/ockam-network/ockam/blob/develop/implementations/rust/ockam/signature_bbs_plus/GUIDE.md)\r\n* [午夜忏悔（Late Night Confessions） — 使用 Rust、Rocket、Diese，以及 Askama 进行站点构建（2）](https://medium.com/perimeterx/late-night-confessions-building-a-website-using-rust-rocket-diesel-and-askama-part-2-fc87c463e8f3)（译注：站点名本无需翻译，但这个站名象电影名字，不由得手痒 ;-)）\r\n* [如何在 Rust 中自定义测试套件（Test Harness）](https://www.fluvio.io/blog/2021/04/rust-custom-test-harness/)\r\n* [Rust 生态中的 gRPC 介绍](https://romankudryashov.com/blog/2021/04/grpc-rust/)\r\n* \\[Rust 中，打印格式化（Pretty Printer）的 Postgres SQL（2）\\](v)\r\n* \\[系列\\] [Rust 旅程](https://dev.to/basman/series/12170)\r\n* \\[中文\\] \\[系列\\] [基于 Async Rust 构建 GraphQL 服务，使用 tide + async-graphql + mongodb（2）](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(2)--cha-xun-fu-wu)\r\n* \\[中文\\] \\[系列\\] [基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（1）](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu---qi-bu-ji-crate-xuan-ze)\r\n* \\[视频\\] [Rust 是什么？为什么说 Rust 很重要？](https://youtu.be/kdv1EBk6Xgc)\r\n* \\[视频\\] [Rust 中使用 `Iterator::colect`](https://youtu.be/ECwy6s_h7T8)\r\n* \\[视频\\] [RustConf 2020 - jam1garner 开发的更具生产力/更高效的宏（Macros）](https://youtu.be/HN6EUcnGN1s)\r\n\r\n### 论文/研究探讨\r\n\r\n* [嵌入 Rust 的 DSL](https://dl.acm.org/doi/10.1145/3310232.3310241)\r\n* [跨编程语言的能效率（Energy Efficiency）](https://greenlab.di.uminho.pt/wp-content/uploads/2017/09/paperSLE.pdf)\r\n\r\n### 其它\r\n\r\n* [Linus Torvalds 访谈：Linux 和 Git](https://www.tag1consulting.com/blog/interview-linus-torvalds-linux-and-git)\r\n* [编程语言现状：JavaScript 拥有最多开发人员，但 Rust 增长最快](https://www.zdnet.com/google-amp/article/programming-languages-javascript-has-most-developers-but-rust-is-the-fastest-growing/)\r\n* [部分 tensorboard 正在使用 Rust 重写，性能提升了 100-400 倍](https://www.reddit.com/r/rust/comments/mzlg5s/parts_of_tensorboard_are_being_rewritten_in_rust/)（译注：早在 2015 年 12 月，tensorflow 即提供了 Rust API，但并不活跃）\r\n* [我们可在 Rust 中获得有保障的尾递归（Tail Calls）么？](https://www.reddit.com/r/rust/comments/my6k5i/are_we_finally_about_to_gain_guaranteed_tail/)\r\n* [Rust 项目的 GitHub Actions 最佳实践](https://www.fluvio.io/blog/2021/04/github-actions-best-practices/)\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [cargo-rr](https://github.com/danielzfranklin/cargo-rr)，`cargo` 子命令，“时光旅游”式的代码 `rr` 调试器。\r\n\r\n谢谢 [Willi Kappler](https://users.rust-lang.org/t/crate-of-the-week/2704/905) 的提议。\r\n\r\n> **译注**：非常有用，代码调试体验更好。如下示例：\r\n>\r\n> ``` bash\r\n> > cargo rr test my_test\r\n> \r\n> thread 'main' panicked at 'assertion failed: `(left == right)`\r\n>  left: `1`,\r\n> right: `2`', tests/tests.rs:100\r\n> \r\n> test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.06s\r\n> ```\r\n>\r\n> 还有重放功能：\r\n>\r\n> ``` bash\r\n> > cargo rr replay\r\n> \r\n> (rr) continue\r\n> \r\n> thread 'main' panicked at 'assertion failed: `(left == right)`\r\n>   left: `1`,\r\n>  right: `42`', tests/tests.rs:100\r\n> \r\n> test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.06s\r\n> ```\r\n\r\n[关于下周最佳 crate，请您提议，并投票](https://users.rust-lang.org/t/crate-of-the-week/2704)！\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n[jsonschema-rs：格式化关键字的用户定义验证](https://github.com/Stranger6667/jsonschema-rs/issues/158)（译注：jsonschema 是 JSON 模式（schema）验证器的 Rust 实现。它将模式编译为验证树，以便尽可能快地进行验证）\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n# Rust 核心更新\r\n\r\n[350 PRs  在上周被合并](https://github.com/search?q=is%3Apr+org%3Arust-lang+is%3Amerged+merged%3A2021-04-19..2021-04-26)\r\n\r\n## Rust 编译器性能\r\n\r\n本周编译器境况不错，没有任何回退，并有 2 个小进步 🎉🎉.\r\n\r\n验测工作是由 **@rylev** 完成的。修正范围：[6df26f8..537544](https://perf.rust-lang.org/?start=6df26f897cffb2d86880544bb451c6b5f8509b2d&end=537544b1061467ee4b74ef7f552fab3d513e5caf&absolute=false&stat=instructions%3Au)\r\n\r\n## 已核准的 RFCs\r\n\r\nRust 的改进遵循 [RFC（request for comments）流程](https://github.com/rust-lang/rfcs#rust-rfcs)。如下是本周核准实现的 RFCs：\r\n\r\n*无*\r\n\r\n## 新的 RFCs\r\n\r\n* [增加对 `bitfields` 的支持](https://github.com/rust-lang/rfcs/pull/3113)\r\n* [Rust 2021 edition（trait-only edition）中的新 `prelude`](https://github.com/rust-lang/rfcs/pull/3114)\r\n\r\n# 近期活动\r\n\r\n### 线上活动\r\n\r\n* [April 28, Online - Ockam Open Source Community Call - Rust 中构建端到端加密通信的实时编码演练](https://github.com/ockam-network/ockam/discussions/1303)\r\n* [May 3, 2021, Online - Cloud Native Rust Day](https://events.linuxfoundation.org/cloud-native-rust-day/)\r\n* [May 4, 2021, Online - Cloud Native WASM Day](https://events.linuxfoundation.org/cloud-native-wasm-day/)\r\n* [May 4, 2021, Dublin, IE - Rust Dublin May Remote Meetup - Rust Dublin](https://www.meetup.com/Rust-Dublin/events/277860218/)\r\n* [May 4, Buffalo, NY, US - Buffalo Rust User Group, Tues May 4th - Buffalo Rust Meetup](https://www.meetup.com/Buffalo-Rust-Meetup/events/277402612/)\r\n* [May 11, Seattle, WA, US - Monthly meetup - Seattle Rust Meetup](https://www.meetup.com/Seattle-Rust-Meetup/events/gskksrycchbpb/)\r\n\r\n如果你正在运作一次 Rust 活动，请将其[添加到日历](https://www.google.com/calendar/embed?src=apd9vmbc22egenmtu5l6c5jbfc%40group.calendar.google.com)中，以便在此处提及。请向 [Rust 社区团队](mailto:community-team@rust-lang.org)发送电子邮件，以获取访问日历权限。\r\n\r\n# Rust 招聘信息\r\n\r\n**Collabora**\r\n\r\n* **[远程](https://arbeitnow.com/view/rust-developerpromoter-collabora-36866)**[ - Rust developer/promoter](https://arbeitnow.com/view/rust-developerpromoter-collabora-36866)\r\n\r\n**Paige**\r\n\r\n* **[远程/欧洲](https://boards.greenhouse.io/paige/jobs/5210311002)**[ - Senior Software Engineer, Visualization](https://boards.greenhouse.io/paige/jobs/5210311002)\r\n\r\n**Confio GmbH**\r\n\r\n* **[远程](https://jobs.gohire.io/confio-gmbh-ggtjivjy/rust-engineer-39453/)**[ - Rust Engineer at Confio GmbH](https://jobs.gohire.io/confio-gmbh-ggtjivjy/rust-engineer-39453/)\r\n\r\n**CoBloX**\r\n\r\n* **[远程](https://comit.network/blog/2021/03/01/we-are-hiring/)**[ - Software Engineer](https://comit.network/blog/2021/03/01/we-are-hiring/)\r\n\r\n**Gattaca**\r\n\r\n* [Software Engineer - Rust & Python](https://gattaca.com/jobspec.html)\r\n\r\n**Wallaroo**\r\n\r\n* **[远程](https://wallaroo.breezy.hr/p/47862ae31c91-senior-client-solutions-engineer-remote-even-after-covid)**[ - Senior Client Solutions Engineer](https://wallaroo.breezy.hr/p/47862ae31c91-senior-client-solutions-engineer-remote-even-after-covid)\r\n\r\n**Parity Technologies**\r\n\r\n* **[远程](https://grnh.se/2dd887b13us)**[ - Blockchain Developer - Consensus](https://grnh.se/2dd887b13us)\r\n* [Numerous other Rust engineering openings](https://www.parity.io/jobs/)\r\n\r\n**Kollider**\r\n\r\n* **[远程](https://kollider.homerun.co/junior-backend-engineer/en)**[ - Junior Backend Engineer](https://kollider.homerun.co/junior-backend-engineer/en)\r\n* **[远程](https://kollider.homerun.co/senior-backend-engineer/en)**[ - Senior Backend Engineer](https://kollider.homerun.co/senior-backend-engineer/en)\r\n* **[远程](https://kollider.homerun.co/devops-engineer/en)**[ - DevOps Engineer](https://kollider.homerun.co/devops-engineer/en)\r\n\r\n**Chainflip**\r\n\r\n* [Rust / C++ Backend Engineer (Berlin, DE)](https://angel.co/company/chainflip/jobs/1162345-rust-c-backend-engineer)\r\n* [Security Engineer (Berlin, DE)](https://angel.co/company/chainflip/jobs/1293957-security-engineer)\r\n* [Junior/Mid Backend Rust/C++ Developer (Melbourne, AU)](https://angel.co/company/chainflip/jobs/1305439-junior-mid-backend-rust-c-developer)\r\n\r\n**Kraken**\r\n\r\n* [Several Rust Engineering Positions](https://jobs.lever.co/kraken?team=Engineering)\r\n\r\n*通过 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，tweet 信息给我们，以便于我们在此处列出你的招聘信息！*\r\n\r\n# 本周引语\r\n\r\n> 此错误消息*不真实（UNREAL）*\r\n\r\n– [Ash 2X3 发布于 Twitter](https://twitter.com/ash2x3/status/1384986537167892483)\r\n\r\n谢谢 [Nixon Enraght-Moony](https://users.rust-lang.org/t/twir-quote-of-the-week/328/1046) 的提议！\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman)。*\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-30T02:51:40.252Z"),
+    "updated_at": ISODate("2021-04-30T02:51:40.252Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("608ba5dd0034b56e00ac1f51"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rustup 1.24.1 已官宣发布，及其新特性详述",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 4 月 29 日，Rustup 工作组发布 Rustup 1.24.1：支持工具链定义文件 rust-toolchain.toml，更好地支持低内存（low-memory）系统，更好地支持 Windows 添加/删除程序，以及其它更新等。在 rustup 1.24.0 版本发布后不久，我们收到了一份回归报告。言其在升级到 rustup 1.24.0 之后，用户无法运行 rustfmt 和 cargo fmt。因此，我们将版本恢复为 1.23.1。1.24.0 和 1.24.1 之间，唯一实质性的变化是纠正此次回归。",
+    slug: "rustup-1.24.1-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    uri: "/budshome/rustup-1.24.1-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    content: "2021 年 4 月 29 日，Rustup 工作组发布公告 *[Announcing Rustup 1.24.1](https://blog.rust-lang.org/2021/04/29/Rustup-1.24.1.html)*，宣布发布 Rustup 1.24.1，本文为其新特性详述。\r\n\r\nrustup 工作组很高兴地宣布：rustup 发布版本 1.24.1。[Rustup](https://rustup.rs) 是安装 [Rust](https://www.rust-lang.org) 的官方推荐工具。Rust 编程语言，赋能每个人都能够构建可靠高效的软件。\r\n\r\n如果安装了早期版本的 rustup，那么获取 rustup 1.24.1 相当容易。关闭 IDE 并运行：\r\n\r\n```\r\nrustup self update\r\n```\r\n\r\nRustup 也可以在更新工具链的过程结束时，自动更新自身：\r\n\r\n```\r\nrustup update\r\n```\r\n\r\n若你还未有安装 rustup，可以从 Rust 官网[获取 rustup](https://rustup.rs)。\r\n\r\n## rustup 1.24.1 的新特性\r\n\r\n首先，新特性已经在《[Rustup 1.24.0 已官宣发布，及其新特性详述](https://blog.budshome.com/budshome/rustup-1.24.0-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu)》一文中完整阐述。如果你还未阅读此文，那么，简而言之：rustup 1.24 更好地支持低内存（low-memory）系统；更好地支持 Windows 添加/删除程序，可将自身安装到 Windows 平台的“添加/删除程序”列表中；同时，现在支持工具链定义文件 `rust-toolchain.toml`。\r\n\r\n在 rustup 1.24.0 版本发布后不久，我们收到了一份[回归报告](https://github.com/rust-lang/rustup/issues/2737)。言其在升级到 rustup 1.24.0 之后，用户无法运行 `rustfmt` 和 `cargo fmt`。因此，我们将版本**恢复**为 1.23.1。1.24.0 和 1.24.1 之间，唯一实质性的变化是纠正此次回归。\r\n\r\n### 其它更新\r\n\r\n请查阅 [rustup 更新日志](https://github.com/rust-lang/rustup/blob/stable/CHANGELOG.md)，详细了解 1.24.0 和 1.24.1 的所有更新项。\r\n\r\n同时，[rustup 文档](https://rust-lang.github.io/rustup/)已经更新生效。\r\n\r\n## 致谢\r\n\r\n再次感谢所有贡献者，你们帮助 rustup 1.24.0 和 1.24.1 成功发布！\r\n\r\n- Alex Chan\r\n- Aloïs Micard\r\n- Andrew Norton\r\n- Avery Harnish\r\n- chansuke\r\n- Daniel Alley\r\n- Daniel Silverstone\r\n- Eduard Miller\r\n- Eric Huss\r\n- est31\r\n- Gareth Hubball\r\n- Gurkenglas\r\n- Jakub Stasiak\r\n- Joshua Nelson\r\n- Jubilee (workingjubilee)\r\n- kellda\r\n- Michael Cooper\r\n- Philipp Oppermann\r\n- Robert Collins\r\n- SHA Miao\r\n- skim (sl4m)\r\n- Tudor Brindus\r\n- Vasili (3point2)\r\n- наб (nabijaczleweli)\r\n- 二手掉包工程师 (hi-rustin)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-30T06:38:21.905Z"),
+    "updated_at": ISODate("2021-04-30T06:38:21.905Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("608bafc70034b56e00ac1f56"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 基金会迎来新的白金会员：Facebook",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 4 月 29 日，Facebook宣布以白金会员（Platinum Member，最高级别）的身份加入 Rust 基金会，将会与其它基金会成员共同负责 Rust 开源生态，以及推动 Rust 社区的运作和发展。加入 Rust 基金会，加强了 Facebook 支持开源技术的力度，以及对开发者社区可持续发展的承诺。",
+    slug: "rust-ji-jin-hui-ying-lai-xin-de-bai-jin-hui-yuan-:facebook",
+    uri: "/budshome/rust-ji-jin-hui-ying-lai-xin-de-bai-jin-hui-yuan-:facebook",
+    content: "2021 年 4 月 29 日，FOS（Facebook Open Source）在 Facebook 开发者站点发表文章 [Facebook Joins the Rust Foundation](https://developers.facebook.com/blog/post/2021/04/29/facebook-joins-rust-foundation/)。宣布以白金会员（Platinum Member，最高级别）的身份加入 Rust 基金会，将会与其它基金会成员共同负责 Rust 开源生态，以及推动 Rust 社区的运作和发展。\r\n\r\n![Rust 基金会](https://blog.budshome.com/static/articles/rust-jijinhui.jpg)\r\n\r\n*以下为公告原文——*\r\n\r\nFOS（Facebook Open Source）很高兴宣布：我们支持 Rust 基金会的高层。与其它基金会成员一起，Facebook 致力于维持和发展 Rust 开源生态的系统和社区。\r\n\r\n“Facebook 从 2016 年就开始接受 Rust，并将其应用于开发的各个方面——从源代码控制到编译器。” Facebook 开源生态系统负责人、现任 Rust 基金会董事成员的 Joel Marcey 说。“我们正在加入 Rust 基金会，帮助促进、改进和发展这门语言，这门语言对我们和世界各地的开发人员来说，非常有价值。我们期待着与其它基金会成员，以及 Rust 社区共同参与，使得 Rust 成为系统编程和其它领域的主流语言。”\r\n\r\nRust 基金会临时执行董事 Ashley Williams 表示：“Facebook 一段时间以来，一直是 Rust 的坚定支持者——我记得是在 2017 年的 Rust Belt Rust 大会上，第一次见到他们的。他们能够加入 Rust 基金会，我非常高兴，并让 Joel 担任董事会代表。Joel 的经验非常丰富，从标准机构到文档框架，都与 Rust 有着极其密切的关系。我认为：随着 Rust 基金会履行其责任，Joel 的观点将具有难以置信的价值。”\r\n\r\n2021 年，Facebook 将在内部加强对 Rust 开发者的支持。除了公司中不同的团队编写 Rust 代码外，现在还有一个专门的 Rust 团队，主要负责公司内部 Rust 开发范围增长，以及对 Rust 和基于 Rust 的项目进行开源贡献，包括与 Rust 社区的合作。\r\n\r\n“当我加入 Facebook 时，我惊讶于 Rust 在其整个技术栈中的使用量。”Facebook 的 Rust 团队负责人、长期的 Rust 贡献者 Patrick Walton 说。“我真的很高兴，看到我们对 Rust 语言的贡献提升到了一个新的水平。加入 Rust 基金会是一个伟大的步骤，标志着未来几年致力于改善语言和生态系统。”\r\n\r\n加入 Rust 基金会，加强了 Facebook 支持开源技术的力度，以及对开发者社区可持续发展的承诺。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-04-30T07:20:39.219Z"),
+    "updated_at": ISODate("2021-04-30T07:20:39.219Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f5d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 生态中，最不知名的贡献者和轶事",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 语言和生态的成功，是许许多多的微小奇迹，汇聚而成的巨大奇迹。作者 Brian Anderson 回忆了 Rust 发布前的发展历程，致敬了使得 Rust 获得伟大成功，但个人却在 Rust 生态中不知名的 Dave Herman。他是 Mozilla 中代表 Rust 的最高层，对 Rust 的成功负有最大贡献的人之一，几乎完全没有得到承认，也没有试图要求过任何有关 Rust 的荣誉。",
+    slug: "rust-sheng-tai-zhong-,na-xie-zui-bu-zhi-ming-de-gong-xian-zhe-he-yi-shi",
+    uri: "/budshome/rust-sheng-tai-zhong-,na-xie-zui-bu-zhi-ming-de-gong-xian-zhe-he-yi-shi",
+    content: "大家五一假期愉快！\r\n\r\n昨晚睡前无意识网络闲逛，看到了 [Brian Anderson](https://github.com/brson) 于 2021 年 5 月 2 日 撰写的文章 *[Rust's Most Unrecognized Contributor](https://brson.github.io/2021/05/02/rusts-most-unrecognized-contributor)*。文章或许存在争议，但文笔很棒，我们也可以多看多思：作为成年人，我们都晓得，任何伟大的背后，无一例外都沉积着丰厚的、但举足轻重的不知名，或者说默默无闻。笔者不由得希望将此文分享，共同向诸多先行者致敬。\r\n\r\n*以下为原文翻译——*\r\n\r\n我认为：Rust 语言是一个伟大的成功。当我回想起来的时候，我感到敬畏：有那么多的事情要去寻找正确的方向，才能驻足于我们现在的位置。有那么多的犯错机会，使得 Rust 语言经历了许多微小的奇迹，才变成现在的样子。然而，这些奇迹并不是偶然发生的：每一个奇迹都是由真实的个人创造的，而每个人的精心策划，才使得 Rust 成为伟大的技术。\r\n\r\n有许多人，促成了 Rust 的成功。但是，对 Rust 的成功负有最大贡献的人之一，几乎完全没有得到承认。\r\n\r\n# Rust 起步于 Mozilla 研究院\r\n\r\n2009 年，Mozilla 已经从与谷歌的利润丰厚的搜索交易中，积累了可观的现金储备。据我了解，Mozilla 管理层决定是时候投资这笔钱了，公司进入了快速扩张期。\r\n\r\n作为扩张的一部分，Mozilla 创建了一个新的部门，Mozilla 研究院。这个部门的任务独立于 Firefox 产品，专注于尝试雄心勃勃的新想法。同时，与计算机科学相关学术界建立关系。\r\n\r\nMozilla 研究院的第一个大创意就是 [Servo](http://venge.net/graydon/talks/intro-talk-2.pdf)，或者说是 Rust。\r\n\r\n当时，Mozilla 研究院的领导者之一是 [Dave Herman](https://github.com/dherman)。\r\n\r\n# Dave Herman，何许人也？\r\n\r\nDave Herman 是一位程序设计语言理论家，也是一位宏学家（macrologist，超级热爱宏的人）。同时，他也是 Mozilla 在 ECMAScript 委员会的代表之一。他和创造 Rust 的工程师 Graydon Hoare，都曾合作开发过 [ECMAScript 4](https://en.wikipedia.org/wiki/ECMAScript#4th_Edition_(abandoned)) 标准（遗憾的是，ECMAScript 4 后来被废弃了）。\r\n\r\n他们都对创造新的编程语言，有很大的兴趣。\r\n\r\n除了 Servo、Rust 和 Dave Herman，在 Mozilla 研究院还发生了很多事情，但我们今天不谈及。\r\n\r\n我们聊一聊关于 Dave Herman 是如何悄悄地塑造 Rust 项目的故事。\r\n\r\n# Dave Herman 对 Rust 的贡献\r\n\r\n虽然，Rust 是在 2010 年 6 月发布的，但实际上，Mozilla 内部的 Rust 工作是在 2009 年底开始的。唯一公开的 Rust 发展记录，存在于 [Rust 史前（rust-prehistory）](https://github.com/graydon/rust-prehistory)仓库。\r\n\r\n在 2010 年 6 月之前的数月里，人们争相向公众展示 Rust。Dave Herman 就是其中之一：\r\n\r\n``` json\r\n~/rust-prehistory $ git shortlog -sn\r\n  1156  Graydon Hoare\r\n   163  Andreas Gal\r\n   104  Dave Herman\r\n    59  graydon@pobox.com\r\n    55  Patrick Walton\r\n    37  Graydon Hoare ext:(%22)\r\n    13  Roy Frostig\r\n     9  graydon@mozilla.com\r\n     6  Brendan Eich\r\n     5  Michael Bebenita\r\n     1  Brian Campbell\r\n```\r\n\r\n此后，他将编码工作交给了 Graydon 领导的 Rust 团队。但后来几年的 Rust 开发中，Dave 一直在参与。\r\n\r\n那时，大多数 Rust 语言的开发者，实际上都在同一个办公室工作（除了最著名的 Graydon，他远程工作）。他们经常聚集在 Mozilla 山景城（Mountain View）总部的某一个小会议室的桌子旁：一小群全职员工、一大群实习生，以及 Dave Herman。\r\n\r\n我猜想，Dave Herman 认为自己是一个导师，根据自己使用 ECMAScript 的经验和自己对语言设计的兴趣，轻轻地推动团队朝着富有成效的方向发展。Dave Herman 从来没有以任何方式行使过权力，直到今天，他也没有试图要求过任何有关 Rust 的荣誉。\r\n\r\nDave Herman 几乎完全是在幕后做着贡献，温和地发挥自己的影响力。\r\n\r\n在那个会议室里，有许多早期的基本辩论。当然，今天看来无关紧要的、琐碎的事情，比如：“从函数返回的关键字是什么？”；或者不那么琐碎的事情，比如：“你如何安全地持有一个指向结构体字段域的指针？”。那个时候的问题，今天觉得遥远而不重要，但那是因为当时这些问题被深入地讨论过。Rust 语言被反复地塑造、重塑，直到所有的小问题都被解决，形成一个一致的整体。在会议室里面，Dave 是为数不多的在设计真正的产品化编程语言方面有经验的人之一。如果没有 Dave 指导团队克服这些微不足道的语言设计障碍，Rust 肯定会一团糟。\r\n\r\nDave 的品味塑造了团队的品味，从而塑造了 Rust 语言。所以大部分时间，Dave 对团队的决定都很满意。\r\n\r\nDave 不止对所有早期的 Rust 设计主题有发言权。Rust 语言的关键设计中，Dave 所指导的有很多。如果你对 Rust 有了解，我想你会很熟悉这些设计主题：\r\n\r\n- **教授（Pedagogy）**，即 Rust 的“教学方法”。\r\n\r\nDave 有学术背景，总是根据如何教授和理解来考虑每一个 Rust 语言的设计决策。\r\n\r\n- **治理（Governance）**，以及社区管理。\r\n\r\nRust 从一开始就被设计成一个社区项目。我认为，在很大程度上，是受到了 Dave 个人经验的影响。人们一直认为：最成功的语言不是由一大群人和公司拥有的，而是由他们自己的兴趣和动机共同设计的。\r\n\r\n正因如此，在 Rust 形成过程中的每个设计，在当时总被认为是合理的。举个例子，Rust 最早的发展过程，在[公开的会议纪要](https://github.com/rust-lang/meeting-minutes)中都有记载。我认为这几乎完全归功于 Dave 自己的纪律性。而且我知道，其中许多记录都是他亲自录制的。\r\n\r\n把培养一种语言的社区放在首位，可能是 Dave 最大的遗产。\r\n\r\n- **宏（Macros）**\r\n\r\n如前所述，Dave 是一位宏学家（macrologist）；他是宏方面的专家，有 [Racket 语言](https://racket-lang.org/)背景。\r\n\r\n> **译注**：Racket 语言号称“面向‘语言’的程序设计语言”，在灵活的表达式方面非常有特色。但是，括号真的太多了。如下官网示例：\r\n>\r\n> ``` rust\r\n> ;; Using higher-order occurrence typing\r\n> (define-type SrN (U String Number))\r\n> (: tog ((Listof SrN) -> String))\r\n> (define (tog l)\r\n>   (apply string-append\r\n>          (filter string? l)))\r\n> (tog (list 5 \"hello \"\r\n>            1/2 \"world\" (sqrt -1)))\r\n> ```\r\n>\r\n> 目前，NSF、微软、谷歌，以及 Mozilla 都对其有帮助。\r\n\r\n尽管主要由实习生实现，特别是 [Paul Stansifer](https://github.com/paulstansifer)，以及 [John Clements](https://github.com/jbclements) 的一些重要贡献。但是，正因为 Dave，Rust 才拥有强大而健康（hygienic）的声明宏（macro_rules!）。\r\n\r\n虽然，这完全不是我参与的领域，但我记得 Dave 和 Paul 花了很多时间讨论：如何在类 Lisp（Lispish）传统中设计健康的宏系统，使得 Rust 栖息于类 C 语言世界。\r\n\r\n- Dave 参与的其它关键决策包括：\r\n  - 将 Rust 语言从语句语言转换为表达式语言；\r\n  - 雇佣 Niko 设计 Rust 的所有权（ownership）系统；\r\n  - 雇佣 [Yehuda Katz](https://github.com/wycats) 设计 Cargo；\r\n\r\n除了这些显而易见的贡献之外，Dave 还在 Rust 中扮演了另一个重要角色：成为 Rust 团队在 Mozilla 管理层中的代言人。\r\n\r\n在所有致使 Rust 成功的奇迹中，也许最伟大的是 Mozilla 为此付出了许多。但是，Rust 存在于 Mozilla 的整个期间中，Rust 团队有一种明显的感觉，即项目随时都可能被取消。尤其是当 Brendan Eich 离开 Mozilla 之时，情况更是如此。这就是为什么在语言上建立一个强大的社区如此必要的原因之一——时间会冲淡一切。\r\n\r\n不过，Dave 是个 Rust 信徒，是代表 Rust 团队在 Mozilla 的最高职位。他竭尽所能宣传 Rust 对 Mozilla 使命般的重要性，以保持 Rust 的人员和资源配置。真的，我不知道 Dave 在管理岗位上处理了什么，但这绝对是关键所在——他为了让整个“球队”能够专注于 Rust。\r\n\r\n不管怎样，Rust 总是人手不足。我记得当时对此非常愤怒：全职工程师却如此之少，我们怎么能与谷歌和苹果竞争？这个问题的一半答案当然是培养投资和多样化的贡献者社区，但这是一个缓慢和不确定的过程。解决这个问题的另一半答案还是要感谢 Dave：实习生，非常多的实习生。Rust 的实习生通常比全职员工多，他们是由 Dave 雇佣的。Dave 可以凭借自己在学术界的诚意，轻松招募 PL 人才。这也是 Mozilla 研究院的部分策略。\r\n\r\n有一点值得赞赏的事实：Rust 主要是由学生建造的，他们中的许多人在 Mozilla 实习。\r\n\r\n# 关于 Rust 设计的轶事\r\n\r\n我觉得应该在此文中，包括一些关于 Dave 设计贡献的个人轶事。首先，想到的是他不同意团队的决定。因此，这不是 Dave 贡献的一个好例子，但也许仍然值得分享。这也是他如何指导团队，同时也相信团队决定的例子。\r\n\r\n目前为止，我很难记住确切的细节，但我清楚地记得，有一次 Dave 肯定不同意团队做出的决定：那是在我们引入可变变量、不可变变量绑定之间的区别时。我们只是在决定何种语言使用何种语法，一件简单的事情。在辩论结束时，有两个明显的选择，分别是不可变绑定和可变绑定：\r\n\r\n- `let` 和 `let mut`\r\n- `let` 和 `var`\r\n\r\n第一个选项是我们最终确定的结果，第二个直接借用 JavaScript，这两者都有很好的理由。目前的主要问题是：在两个选项中，选择合适的一种，选择“更难”，或者“更丑”。强制用户键入两个关键字（**译注**：即 `let mut`）来创建可变绑定，是语言设计者悄悄地影响程序员，以考虑引入可变性的额外因素。\r\n\r\n我记得 Dave 不同意团队在这个问题上的决定。回想起来，我认同他不同意“体罚”用户选择编码模式的原则，但我记不清具体了。不过，我仍然认为团队在这一点上是正确的：额外的 `mut`，不仅增加了一些额外的工作来增加变量的可变性，而且 `mut` 自然地扩展到了 Rust 类型系统的其它领域，比如：`&mut`；而可变性的识别和管理，已经成为语言的一个决定性特征。\r\n\r\n# 给成功以准备\r\n\r\nDave 对于 Rust 设计的直接参与，我想是在 2014 年或 2015 年结束的。可能在 Rust 社区的大多数人，都不晓得 Dave Herman 的存在。\r\n\r\nDave 并未创造 Rust。公开的 Rust 仓库中，他总共仅有 6 次提交（commit）。在邮件列表上，他也只有 4 次发言。\r\n\r\nDave 所做的，是创建一个团队，他相信这个团队能够向世界传递独特的愿景，并在这个团队中巧妙地植入一套价值观。Dave 使得 Rust 语言能够超越了 Mozilla 的边界，超越了任何个人的参与和个性。\r\n\r\n事实正是如此。\r\n\r\nRust 成功的原因有很多，从成千上万的贡献者，数千个微小的奇迹，凝聚成一个有条理而一致连贯的整体。\r\n\r\n但是，微小的奇迹，并不会偶然变成巨大的奇迹。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-03T03:37:24.726Z"),
+    "updated_at": ISODate("2021-05-03T03:37:24.726Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f64"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 1.52.0 稳定版预发布测试中，关键新特性一瞥",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 5 月 4 日，Rust 内部论坛，PRust 发布团队宣布：Rust 1.52.0 预发布版本已经为测试做好准备，预定的发布日程为 本周四（2021 年 5 月 6 日）。本文描述其安装方法，以及语法、编译、库、已稳定 APIs 等关键新特性。",
+    slug: "rust-1.52.0-wen-ding-ban-yu-fa-bu-ce-shi-zhong-,guan-jian-xin-te-xing-yi-pie",
+    uri: "/budshome/rust-1.52.0-wen-ding-ban-yu-fa-bu-ce-shi-zhong-,guan-jian-xin-te-xing-yi-pie",
+    content: "2021 年 5 月 4 日，Rust 内部论坛，Pietro Albini 代表 [Rust 发布团队](https://www.rust-lang.org/governance/teams/release)宣布 *[1.52.0 pre-release testing](https://blog.rust-lang.org/inside-rust/2021/05/04/1.52.0-prerelease.html)*。\r\n\r\nRust 1.52.0 预发布版本已经为测试做好准备，预定的发布日程为 本周四（2021 年 5 月 6 日）。请查看[发布说明](https://github.com/rust-lang/rust/blob/stable/RELEASES.md#version-1520-2021-05-06)，详细了解新版本的改进项。\r\n\r\n# 安装 Rust 1.52.0 稳定版\r\n\r\n因为还未正式发布，不能从 Rust 国内工具链镜像源获取，需要从 `https://dev-static.rust-lang.org` 站点下载，您可以运行如下命令安装 Rust 1.52.0 到本地系统：\r\n\r\n- Linux、macOS\r\n\r\n``` Bash\r\nRUSTUP_DIST_SERVER=https://dev-static.rust-lang.org rustup update stable\r\n```\r\n\r\n- Windows\r\n\r\n``` Bash\r\nset RUSTUP_DIST_SERVER=https://dev-static.rust-lang.org\r\nrustup update stable\r\n```\r\n\r\n安装后，请通过 `rustc` 和 `cargo` 命令查看新的版本号。\r\n\r\n关于 Rust 工具链的国内源，可以参阅《[配置 Rust 工具链的国内源](https://rust-guide.budshome.com/3-env/3.1-rust-toolchain-cn.html)》。\r\n\r\n# 关键新特性一瞥\r\n\r\n> 假期回程，赶路前对关键新特性简要一瞥。详细请查阅[发布说明](https://github.com/rust-lang/rust/blob/stable/RELEASES.md#version-1520-2021-05-06)，或者关注本站，周五进行新特性的详细汇总。\r\n\r\n## 语法\r\n\r\n* [增加代码分析（lint）`unsafe_op_in_unsafe_fn`，用于检查 `unsafe fn` 中的不安全（unsafe）代码，是否被包裹在 `unsafe` 代码块中](https://github.com/rust-lang/rust/pull/79208)。此代码分析（lint）特性默认开启，未来的版本中，可能会成为警告或错误。\r\n* Rust 1.52.0 开始，[可以将数组的可变引用，强制转换为包含相同元素类型的指针](https://github.com/rust-lang/rust/pull/81479)。\r\n\r\n## 编译器\r\n\r\n* [升级默认的 LLVM 为 LLVM 12](https://github.com/rust-lang/rust/pull/81451)。\r\n\r\n对以下目标提供 3\\* 层架构支持：\r\n\r\n* [`s390x-unknown-linux-musl`](https://github.com/rust-lang/rust/pull/82166)\r\n* [`riscv32gc-unknown-linux-musl` 和 `riscv64gc-unknown-linux-musl`](https://github.com/rust-lang/rust/pull/82202)\r\n* [`powerpc-unknown-openbsd`](https://github.com/rust-lang/rust/pull/82733)\r\n\r\n## 库\r\n\r\n* [`OsString` 实现了 `Extend` 和 `FromIterator`](https://github.com/rust-lang/rust/pull/82121)\r\n* [`cmp::Reverse` 增加 `#[repr(transparent)]` 属性表示](https://github.com/rust-lang/rust/pull/81879)\r\n* [`Arc<impl Error>` 实现 `error::Error`](https://github.com/rust-lang/rust/pull/80553)\r\n* [所有整数除法和余数运算，现在都为 `const`](https://github.com/rust-lang/rust/pull/80962)\r\n\r\n## 已稳定 APIs\r\n\r\n* `Arguments::as_str`\r\n* `char::MAX`\r\n* `char::REPLACEMENT_CHARACTER`\r\n* `char::UNICODE_VERSION`\r\n* `char::decode_utf16`\r\n* `char::from_digit`\r\n* `char::from_u32_unchecked`\r\n* `char::from_u32`\r\n* `slice::partition_point`\r\n* `str::rsplit_once`\r\n* `str::split_once`\r\n\r\n上个版本中，稳定的如下 APIs，现在为 `const`：\r\n\r\n* `char::len_utf8`\r\n* `char::len_utf16`\r\n* `char::to_ascii_uppercase`\r\n* `char::to_ascii_lowercase`\r\n* `char::eq_ignore_ascii_case`\r\n* `u8::to_ascii_uppercase`\r\n* `u8::to_ascii_lowercase`\r\n* `u8::eq_ignore_ascii_case`\r\n\r\n请关注本站，周五进行新特性的详细汇总。\r\n\r\n若你在测试过程中发现任何问题，可以通过[内部论坛帖子](https://internals.rust-lang.org/t/1-52-0-prerelease-testing)进行反馈。\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-04T23:46:59.482Z"),
+    "updated_at": ISODate("2021-05-04T23:46:59.482Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6093887f0034b56e00ac1f69"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（4） - 变更服务，以及小重构",
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    summary: "基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建 Rust 异步 GraphQL 服务的变更服务教程，包括依赖项的更新和配置。以及 async-graphql 简单对象类型、复杂对象类型、输入对象类型的迭代和开发。新用户的插入，包括根据用户唯一性标志属性验证。",
+    slug: "ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(4)---bian-geng-fu-wu-,yi-ji-xiao-zhong-gou",
+    uri: "/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(4)---bian-geng-fu-wu-,yi-ji-xiao-zhong-gou",
+    content: "前 3 篇文章中，我们初始化搭建了工程结构，选择了必须的 crate，并成功构建了 GraphQL 查询服务，以及对代码进行了第一次重构。本篇文章，是我们进行 GraphQL 服务后端开发的最后一篇：变更服务。本篇文章之后，GraphQL 服务后端开发第一阶段告一阶段，之后我们进行 基于 Rust 的 Web 前端开发。本系列文章中，采用螺旋式思路，Web 前端基础开发之后，再回头进行 GraphQL 后端开发的改进。\r\n\r\n# 自定义表名的小重构\r\n\r\n有查阅[基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（2） - 查询服务](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(2)---cha-xun-fu-wu)文章的朋友联系笔者，关于文章中 `user` 表和 `User` 结构体同名的问题。表名可以自定义的，然后在 `rbatis` 中指定即可。比如，我们将上一篇中的 `user` 表改名为 `users`，那么 `async-graphql` 简单对象的代码如下：\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[rbatis::crud_enable(table_name:\"users\")]\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\n#[graphql(complex)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::ComplexObject]\r\nimpl User {\r\n    pub async fn from(&self) -> String {\r\n        let mut from = String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n```\r\n\r\n> 其中 `#[rbatis::crud_enable(table_name:\"users\")]` 中的表名，可以不用双引号包裹。示例代码的引号，仅是笔者习惯。\r\n\r\n# 依赖项更新\r\n\r\n自[基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（3） - 重构](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(3)---zhong-gou)之后，已经大抵过去半个月时间了。这半个月以来，活跃的 Rust 社区生态，进行了诸多更新：Rust 版本即将更新为 1.52.0，Rust 2021 版即将发布……本示例项目中，使用的依赖项 `async-graphql` / `async-graphql-actix-web`（感谢孙老师的辛勤奉献，建议看到此文的朋友，`star` 孙老师的 [`async-graphql` 仓库](https://github.com/async-graphql/async-graphql)）、`rbatis` 等 crate 都有了 1-2 个版本的升级。\r\n\r\n你可以使用 cargo upgrade 升级，或者直接修改 Cargo.toml 文件，全部使用最新版本的依赖 crate：\r\n\r\n``` toml\r\n[package]\r\nname = \"backend\"\r\nversion = \"0.1.0\"\r\nauthors = [\"我是谁？\"]\r\nedition = \"2018\"\r\n\r\n# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html\r\n\r\n[dependencies]\r\nactix-web = \"3.3.2\"\r\n\r\ndotenv = \"0.15.0\"\r\nlazy_static = \"1.4.0\"\r\n\r\n\r\nasync-graphql = { version = \"2.8.4\", features = [\"chrono\"] }\r\nasync-graphql-actix-web = \"2.8.4\"\r\nrbatis = { version = \"1.8.84\", default-features = false, features = [\"mysql\", \"postgres\"] }\r\n\r\nserde = { version = \"1.0.125\", features = [\"derive\"] }\r\n```\r\n\r\n> 本系列文章中，对于 crate 的依赖，采取**非必要不引入**的原则。带最终完成，共计依赖项约为 56 个。\r\n\r\n# 变更服务\r\n\r\n接下来，我们开发 GraphQL 的变更服务。示例中，我们以`模型 -> 服务 -> 总线`的顺序来开发。这个顺序并非固定，在实际开发中，可以根据自己习惯进行调整。\r\n\r\n## 定义 `NewUser` 输入对象类型\r\n\r\n在此，我们定义一个欲插入 `users` 集合中的结构体，包含对应字段即可，其为 async-graphql 中的`输入对象类型`。需要注意的是，mysql 或 postgres 中，`id` 是自增主键，因此不需要定义此字段。`cred` 是计划使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算后的鉴权码，需要定义，但无需在新增时填写。因此，在此我们需要介绍一个 async-graphql 中的属性标记 `#[graphql(skip)]`，其表示此字段不会映射到 GraphQL。\r\n\r\n代码较简单，所以我们直接贴 `users/models.rs` 文件完整代码：\r\n\r\n``` rust\r\nuse serde::{Serialize, Deserialize};\r\n\r\n#[rbatis::crud_enable(table_name:\"users\")]\r\n#[derive(async_graphql::SimpleObject, Serialize, Deserialize, Clone, Debug)]\r\n#[graphql(complex)]\r\npub struct User {\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    pub cred: String,\r\n}\r\n\r\n#[async_graphql::ComplexObject]\r\nimpl User {\r\n    pub async fn from(&self) -> String {\r\n        let mut from = String::new();\r\n        from.push_str(&self.username);\r\n        from.push_str(\"<\");\r\n        from.push_str(&self.email);\r\n        from.push_str(\">\");\r\n\r\n        from\r\n    }\r\n}\r\n\r\n#[rbatis::crud_enable(table_name:\"users\")]\r\n#[derive(async_graphql::InputObject, Serialize, Deserialize, Clone, Debug)]\r\npub struct NewUser {\r\n    #[graphql(skip)]\r\n    pub id: i32,\r\n    pub email: String,\r\n    pub username: String,\r\n    #[graphql(skip)]\r\n    pub cred: String,\r\n}\r\n```\r\n\r\n## 编写服务层代码，将 `NewUser` 结构体插入数据库\r\n\r\n服务层 `users/services.rs` 中，我们仅需定义一个函数，用于将 `NewUser` 结构体插入 mysql/postgres 数据库。我们从 GraphiQL/playground 中获取 `NewUser` 结构体时，因为我们使用了标记 `#[graphql(skip)]`，所以 `id`、`cred` 字段不会映射到 GraphQL。对于 mysql/postgres 的文档数据库特性，`id` 是自增字段；`cred` 我们设定为非空，所以对于其要写入一个固定值。随着本教程的逐渐深入，我们会迭代为关联用户特定值，使用 PBKDF2 对密码进行加密（salt）和散列（hash）运算后的鉴权码。\r\n\r\n同时，实际应用中，插入用户时，我们应当设定一个用户唯一性的标志属性，以用来判断数据库是否已经存在此用户。本实例中，我们使用 email 作为用户的唯一性标志属性。因此，我们需要开发 get_user_by_email 服务。\r\n\r\n再者，我们将 NewUser 结构体插入 mysql/postgres 数据库后，应当返回插入结果。因此，我们还需要开发一个根据 username 或者 email 查询用户的 GraphQL 服务。因为我们已经设定 email 为用户的唯一性标志属性，因此直接使用 get_user_by_email 查询已经插入用户即可。\r\n\r\n服务层 `users/services.rs` 文件完整代码如下：\r\n\r\n``` rust\r\nuse async_graphql::{Error, ErrorExtensions};\r\nuse rbatis::rbatis::Rbatis;\r\nuse rbatis::crud::CRUD;\r\n\r\nuse crate::util::constant::GqlResult;\r\nuse crate::users::models::{NewUser, User};\r\n\r\n// 查询所有用户\r\npub async fn all_users(my_pool: &Rbatis) -> GqlResult<Vec<User>> {\r\n    let users = my_pool.fetch_list::<User>(\"\").await.unwrap();\r\n\r\n    if users.len() > 0 {\r\n        Ok(users)\r\n    } else {\r\n        Err(Error::new(\"1-all-users\")\r\n            .extend_with(|_, e| e.set(\"details\", \"No records\")))\r\n    }\r\n}\r\n\r\n// 通过 email 获取用户\r\npub async fn get_user_by_email(\r\n    my_pool: &Rbatis,\r\n    email: &str,\r\n) -> GqlResult<User> {\r\n    let email_wrapper = my_pool.new_wrapper().eq(\"email\", email);\r\n    let user = my_pool.fetch_by_wrapper::<User>(\"\", &email_wrapper).await;\r\n\r\n    if user.is_ok() {\r\n        Ok(user.unwrap())\r\n    } else {\r\n        Err(Error::new(\"email 不存在\")\r\n            .extend_with(|_, e| e.set(\"details\", \"1_EMAIL_NOT_EXIStS\")))\r\n    }\r\n}\r\n\r\n// 插入新用户\r\npub async fn new_user(\r\n    my_pool: &Rbatis,\r\n    mut new_user: NewUser,\r\n) -> GqlResult<User> {\r\n    new_user.email = new_user.email.to_lowercase();\r\n\r\n    if self::get_user_by_email(my_pool, &new_user.email).await.is_ok() {\r\n        Err(Error::new(\"email 已存在\")\r\n            .extend_with(|_, e| e.set(\"details\", \"1_EMAIL_EXIStS\")))\r\n    } else {\r\n        new_user.cred =\r\n            \"P38V7+1Q5sjuKvaZEXnXQqI9SiY6ZMisB8QfUOP91Ao=\".to_string();\r\n        my_pool.save(\"\", &new_user).await.expect(\"插入 user 数据时出错\");\r\n\r\n        self::get_user_by_email(my_pool, &new_user.email).await\r\n    }\r\n}\r\n```\r\n\r\n## 将服务添加到服务总线\r\n\r\n查询服务对应的服务总线为 `gql/queries.rs`，变更服务对应的服务总线为 `gql/mutations.rs`。到目前为止，我们一直未有编写变更服务总线文件 `gql/mutations.rs`。现在，我们将 `new_user` 变更服务和 `get_user_by_email` 查询服务分别添加到变更和查询服务总线。\r\n\r\n加上我们查询服务的 `all_users` 服务，服务总线共计 2 个文件，3 个服务。\r\n\r\n### 查询服务总线 `gql/queries.rs`\r\n\r\n``` rust\r\nuse async_graphql::Context;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\nuse crate::util::constant::GqlResult;\r\nuse crate::users::{self, models::User};\r\npub struct QueryRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl QueryRoot {\r\n    // 获取所有用户\r\n    async fn all_users(&self, ctx: &Context<'_>) -> GqlResult<Vec<User>> {\r\n        let my_pool = ctx.data_unchecked::<Rbatis>();\r\n        users::services::all_users(my_pool).await\r\n    }\r\n\r\n    //根据 email 获取用户\r\n    async fn get_user_by_email(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n        email: String,\r\n    ) -> GqlResult<User> {\r\n        let my_pool = ctx.data_unchecked::<Rbatis>();\r\n        users::services::get_user_by_email(my_pool, &email).await\r\n    }\r\n}\r\n```\r\n\r\n变更服务总线 `gql/mutations.rs`\r\n\r\n``` rust\r\nuse async_graphql::Context;\r\nuse rbatis::rbatis::Rbatis;\r\n\r\nuse crate::users::{\r\n    self,\r\n    models::{NewUser, User},\r\n};\r\nuse crate::util::constant::GqlResult;\r\n\r\npub struct MutationRoot;\r\n\r\n#[async_graphql::Object]\r\nimpl MutationRoot {\r\n    // 插入新用户\r\n    async fn new_user(\r\n        &self,\r\n        ctx: &Context<'_>,\r\n        new_user: NewUser,\r\n    ) -> GqlResult<User> {\r\n        let my_pool = ctx.data_unchecked::<Rbatis>();\r\n        users::services::new_user(my_pool, new_user).await\r\n    }\r\n}\r\n```\r\n\r\n## 第一次验证\r\n\r\n查询服务、变更服务均编码完成，我们验证下开发成果。通过 `cargo run` 或者 `cargo watch` 启动应用程序，浏览器输入 http://127.0.0.1:8080/v1i，打开 graphiql/playgound 界面。\r\n\r\n> 如果你的配置未跟随教程，请根据你的配置输入正确链接，详见你的 `.env` 文件配置项。\r\n\r\n但是，如果你此时通过 graphiql/playgound 界面的 `docs` 选项卡查看，仍然仅能看到查询服务下有一个孤零零的 `allUsers: [User!]!`。这是因为，我们前几篇教程中，仅编写查询服务代码，所以服务器 `Schema` 构建时使用的是 `EmptyMutation`。我们需要将我们自己的变更服务总线 `gql/mutations.rs`，添加到 `SchemaBuilder` 中。\r\n\r\n仅仅涉及 `gql/mod.rs` 文件。\r\n\r\n### 将变更服务总线添加到 SchemaBuilder\r\n\r\n`gql/mod.rs` 文件完整代码如下：\r\n\r\n``` rust\r\npub mod mutations;\r\npub mod queries;\r\n\r\nuse actix_web::{web, HttpResponse, Result};\r\nuse async_graphql::http::{playground_source, GraphQLPlaygroundConfig};\r\nuse async_graphql::{EmptySubscription, Schema};\r\nuse async_graphql_actix_web::{Request, Response};\r\n\r\nuse crate::util::constant::CFG;\r\nuse crate::dbs::mysql::my_pool;\r\nuse crate::gql::{queries::QueryRoot, mutations::MutationRoot};\r\n\r\ntype ActixSchema = Schema<\r\n    queries::QueryRoot,\r\n    mutations::MutationRoot,\r\n    async_graphql::EmptySubscription,\r\n>;\r\n\r\npub async fn build_schema() -> ActixSchema {\r\n    // 获取 mysql 数据池后，可以将其增加到：\r\n    // 1. 作为 async-graphql 的全局数据；\r\n    // 2. 作为 actix-web 的应用程序数据，优势是可以进行原子操作；\r\n    // 3. 使用 lazy-static.rs\r\n    let my_pool = my_pool().await;\r\n\r\n    // The root object for the query and Mutatio, and use EmptySubscription.\r\n    // Add global mysql pool  in the schema object.\r\n    Schema::build(QueryRoot, MutationRoot, EmptySubscription)\r\n        .data(my_pool)\r\n        .finish()\r\n}\r\n\r\npub async fn graphql(schema: web::Data<ActixSchema>, req: Request) -> Response {\r\n    schema.execute(req.into_inner()).await.into()\r\n}\r\n\r\npub async fn graphiql() -> Result<HttpResponse> {\r\n    Ok(HttpResponse::Ok().content_type(\"text/html; charset=utf-8\").body(\r\n        playground_source(\r\n            GraphQLPlaygroundConfig::new(CFG.get(\"GQL_VER\").unwrap())\r\n                .subscription_endpoint(CFG.get(\"GQL_VER\").unwrap()),\r\n        ),\r\n    ))\r\n}\r\n```\r\n\r\nOkay，大功告成，我们进行第二验证。\r\n\r\n## 第二次验证\r\n\r\n打开方式和注意事项和第一次验证相同。\r\n\r\n正常启动后，如果你此时通过 graphiql/playgound 界面的 `docs` 选项卡查看，将看到查询和变更服务的列表都有了变化。如下图所示：\r\n\r\n![actix-graphql 变更服务](https://blog.budshome.com/static/articles/1620280667.jpg)\r\n\r\n### 插入一个新用户（重复插入）\r\n\r\n插入的 `newUser` 数据为（注意，GraphQL 中自动转换为驼峰命名）：\r\n\r\n``` json\r\n   newUser: { \r\n      email: \"budshome@budshome.com\", \r\n      username: \"我是谁\" \r\n    }\r\n```\r\n\r\n第一次插入，然会正确的插入结果：\r\n\r\n``` json\r\n{\r\n  \"data\": {\r\n    \"newUser\": {\r\n        \"cred\": \"P38V7+1Q5sjuKvaZEXnXQqI9SiY6ZMisB8QfUOP91Ao=\",\r\n        \"email\": \"budshome@budshome.com\",\r\n        \"from\": \"我是谁<budshome@budshome.com>\",\r\n        \"id\": 5,\r\n        \"username\": \"我是谁\"\r\n    }\r\n  }\r\n}\r\n```\r\n\r\n第二次重复插入，因为 `email` 已存在，则返回我们开发中定义的错误信息：\r\n\r\n``` json\r\n{\r\n  \"data\": null,\r\n  \"errors\": [\r\n    {\r\n      \"message\": \"email 已存在\",\r\n      \"locations\": [\r\n        {\r\n          \"line\": 2,\r\n          \"column\": 3\r\n        }\r\n      ],\r\n      \"path\": [\r\n        \"newUser\"\r\n      ],\r\n      \"extensions\": {\r\n        \"details\": \"1_EMAIL_EXIStS\"\r\n      }\r\n    }\r\n  ]\r\n}\r\n```\r\n\r\n请自己查看你的数据库，已经正常插入了目标数据。\r\n\r\n至此，变更服务开发完成。\r\n\r\n此[实例源码仓库在 github](https://github.com/zzy/actix-web-async-graphql-rbatis)，欢迎您共同完善。\r\n\r\n# 下篇计划\r\n\r\n变更服务开发完成后，后端我们告一阶段。下篇开始，我们进行前端的开发，仍然使用 Rust 技术栈：`actix-web`、`rhai`、`handlebars-rust`、`surf`，以及 `graphql_client`。\r\n\r\n本次实践，我们称之为 **Rust 全栈**开发 ;-)\r\n\r\n谢谢您的阅读！\r\n\r\n---\r\n\r\n欢迎交流（指正、错别字等均可）。我的联系方式为页底邮箱，或者微信号 yupen-com。\r\n\r\n![yupen-com](https://blog.budshome.com/static/users/yupen-com.jpg)",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-06T06:11:11.873Z"),
+    "updated_at": ISODate("2021-05-06T06:11:11.873Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6093ce650034b56e00ac1f70"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 官方周报 389 期（2021-05-05）",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "Rust 官方周报 389 期：Rust 核心更新、Rust 社区更新、官方资讯、项目/工具更新、观测/思考文章、实际演练文章、周最佳 crate、Rust 近期活动、Rust 工作招聘、Rust 开发者引语，尤其是本期具有论文和研究探讨等。第 389 期的技术文章中，技术演练丰富；技术基础较多，适合新手学习，熟练者温故。另外，本周最佳 crate 对可以给开发中的信息输出提供很大方便。 ",
+    slug: "rust-guan-fang-zhou-bao-389-qi-(2021-05-05)",
+    uri: "/budshome/rust-guan-fang-zhou-bao-389-qi-(2021-05-05)",
+    content: "> [Rust 官方周报（中文版）仓库为 github.com/zzy/this-week-in-rust-zh-cn](https://github.com/zzy/this-week-in-rust-zh-cn)，欢迎您的参与，一起丰富中文网络的 Rust 资源。\r\n\r\n大家好，欢迎查阅第 389 期《Rust 周报》！[Rust](http://rust-lang.budshome.com) 是一门系统编程语言，专注于三个要素：安全性、并发性，以及高性能。本文是其开发进展和社区生态的每周摘要。如果您想提出意见或建议，请在推特联系我们账号 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，或者在 github 向我们[发送 PR](https://github.com/rust-lang/this-week-in-rust)。想参与吗？我们[期待您的贡献](https://github.com/rust-lang/rust/blob/master/CONTRIBUTING.md)。\r\n\r\n# Rust 社区更新\r\n\r\n### 官方\r\n\r\n* [Rustup 1.24.1 已官宣发布，及其新特性详述](https://blog.budshome.com/budshome/rustup-1.24.1-yi-guan-xuan-fa-bu-,ji-qi-xin-te-xing-xiang-shu)\r\n* \\[内部\\] [Rustup 1.24.0 发布后的 bug 事件报告（2021-04-27）](https://blog.rust-lang.org/inside-rust/2021/04/28/rustup-1.24.0-incident-report.html)（译注：指有用户升级到 rustup 1.24.0 之后，用户无法运行 `rustfmt` 和 `cargo fmt`。因此，官方将版本恢复为 1.23.1）\r\n* \\[内部\\] [Rust 1.52.0 稳定版预发布测试中，关键新特性一瞥](https://blog.budshome.com/budshome/rust-1.52.0-wen-ding-ban-yu-fa-bu-ce-shi-zhong-,guan-jian-xin-te-xing-yi-pie)\r\n* \\[内部\\] [核心团队 2021 年 5 月报告](https://blog.rust-lang.org/inside-rust/2021/05/04/core-team-update.html)（译注：指核心团队关于 2021 年路线图、团队章程，以及对 crate 的审核策略）\r\n* \\[基金会\\] [Q12021 Rust 基金会成员更新](https://foundation.rust-lang.org/posts/2021-04-29-membership-update/)（译注：指 [Facebook 成为 Rust 基金会新的白金会员](https://blog.budshome.com/budshome/rust-ji-jin-hui-ying-lai-xin-de-bai-jin-hui-yuan-:facebook)；Zama、Tag1Consulting、CleverCloud 成为 Rust 基金会新的白银会员）\r\n\r\n### 简讯\r\n\r\n* [Rust 操作系统开发（OSDev）月报（2021 年 4 月）](https://rust-osdev.com/this-month/2021-04/)\r\n\r\n### 项目/工具更新\r\n\r\n* [回顾 2021 年已逝的三分之一](https://isomorphicdb.io/blog/2021/05/05/One-Third-of-2021/)（译注：IsomorphicDB 是 Rust 实现的兼容 PostgreSQL 的分布式数据库的核心，此文是作者对其 2021 年前 4 个月的开发回顾）\r\n* [TensorBase 周报 1 期](https://tensorbase.io/thisweek/2021-05-01-tw_1/)（译注：TensorBase 是基于 Rust 的现代化开源数据仓库，详细中文介绍见页面内的链接。也可以直接在张老师整理的《[Rust语言开源杂志（2021）](https://rustmagazine.github.io/rust_magazine_2021/chapter_4/tensorbase.html)》中查阅）\r\n* [gfx/wgpu 0.8 发布](https://gfx-rs.github.io/2021/04/30/release-0.8.html)（译注：原生（native）WebGPU）\r\n* [Flott（Rust 中的运动控制工具包）上月回顾 - 2021 年 5 月](https://flott-motion.org/news/last-month-in-flott-may-2021/)（译注：[Rust 官方周报 385 期](https://blog.budshome.com/budshome/rust-guan-fang-zhou-bao-385-qi-(2021-04-07))中介绍过的包，前景很不错，但关注人数还不多，github 星星很少）\r\n* [rust-analyzer 更新日志 #75](https://rust-analyzer.github.io/thisweek/2021/05/03/changelog-75.html)\r\n* [GCC Rust 月报 #5 2021 年 4 月](https://thephilbert.io/2021/05/03/gcc-rust-monthly-report-5-april-2021/)\r\n* [RustCrypto 发布公告（`aead`、`cipher`、`crypto`、`elliptic-curve`，以及 `ecdsa` 等等）](https://users.rust-lang.org/t/rustcrypto-release-announcements/59149)（译注：RustCrypto 是纯粹 Rust 实现加密算法的团队）\r\n\r\n### 观测/思考\r\n\r\n* [Rust 是如何让 Rayon 的数据并行（parallelism）变的神奇的？](https://developers.redhat.com/blog/2021/04/30/how-rust-makes-rayons-data-parallelism-magical/)（译注：Rayon 是 Rust 实现的无数据竞争（data race）的数据并行库，笔者的项目中用到此包蛮多频次。实例请参阅[来自于 rust-cookbook 的 rayon 数据并行处理](https://rust-guide.budshome.com/8-concurrency/8.2-parallel.html)）\r\n* [使用 Rust 进行艺术创作（Making Generative Art with Rust）](https://blog.abor.dev/p/making-generative-art-with-rust)（译注：图形处理、媒体制作等，可以结合 `gfx/wgpu` 等库一起理解）\r\n* [过程宏（Proc Macro）阐述：为我节省了大约 4000 行 Rust 代码](https://mbuffett.com/posts/incomplete-macro-walkthrough/)\r\n* [最被低估，但非常有用的 Rust 标准库类型](https://dev.to/thepuzzlemaker/the-most-underrated-but-useful-rust-standard-library-type-59b1)\r\n* [保持独特性；或者说，内部测试为什么让人伤脑筋](https://dev.to/ecton/guaranteed-unique-or-why-dogfooding-can-be-taxing-2gcn)\r\n* [让我们用 Rust 重写那些伟大的软件吧（The Great Rewriting in Rust）](https://blog.budshome.com/budshome/rang-wo-men-yong-rust-zhong-xie-na-xie-wei-da-de-ruan-jian-ba)（译注：作者确信 Rust 会接管 `Linux` 内核开发，重写 `LaTeX`，以及蓝牙等）\r\n* [关于 async Rust 和使用 `!Send` 类型的经历](https://procmarco.netlify.app/blog/2021-05-04-a-story-about-async-rust-and-using-send-types/)\r\n* [以 Rust 编译器（Compilers）为师](https://ferrous-systems.com/blog/compilers-as-teachers/)\r\n* [使用 Rust 进行艺术创作（Making Generative Art with Rust）：Alexis André 访谈](https://blog.abor.dev/p/making-generative-art-with-rust)\r\n* [站在巨人的肩膀上：TensorFlow 和 Rust 的组合](https://www.crowdstrike.com/blog/how-crowdstrike-combines-tensorflow-and-rust-for-performance/)\r\n* [让一切皆可迭代 - 在 Rest API 中进行迭代分页](https://0x709394.me/Let's-make%20everything%20iterable)\r\n* \\[视频\\] [Niko Matsakis 访谈，Rust 语言团队的联席领导](https://youtu.be/alD0l_8W9Sc)\r\n\r\n### Rust 演练\r\n\r\n* [Rust 生态中的 gRPC 介绍](https://dev.to/rkudryashov/introduction-to-grpc-in-rust-4dgg)\r\n* [Pinephone 中的 I2C](https://dev.to/pcvonz/i-c-on-the-pinephone-5090)（译注：Pinephone 是 Manjaro 推出的预装 Linux 的智能手机）\r\n* [午夜忏悔（Late Night Confessions） — 使用 Rust、Rocket、Diese，以及 Askama 进行站点构建（3）](https://dev.to/pxjohnny/late-night-confessions-building-a-website-using-rust-rocket-diesel-and-askama-part-3-46i9)\r\n* [Rust 之所有权（ownership）和借用（borrow）- 和借用检查器（borrow-checker）的战斗](https://dev.to/daaitch/rust-ownership-and-borrows-fighting-the-borrow-checker-4ea3)（译注：推荐，不论老鸟新手，都会有收获）\r\n* [在 Android 上运行 Rust](https://blog.svgames.pl/article/running-rust-on-android)（译注：笔者去年就试过，很折腾）\r\n* [使用 GDB 和 defmt 调试嵌入式程序](https://ferrous-systems.com/blog/gdb-and-defmt/)\r\n* [Rust 中的数据建模](https://phazer99.blogspot.com/2021/05/data-modelling-in-rust.html)\r\n* [Rust 中的数据建模 - 续篇](https://phazer99.blogspot.com/2021/05/data-modelling-in-rust-continued.html)\r\n* [将 Rust 代码嵌入 Java Jar，以进行分发](https://www.fluvio.io/blog/2021/05/java-client/)（译注：github 有[完整的实例](https://github.com/drrb/java-rust-example)）\r\n* 使用 KAS GUI 开发[计数器](https://kas-gui.github.io/tutorials/counter.html)和[计算器](https://kas-gui.github.io/tutorials/calculator.html)（译注：`kas` 是受 Qt 启发的 Rust GUI 库）\r\n* \\[中文\\] \\[系列\\] [基于 Async Rust 构建 GraphQL 服务，使用 tide + async-graphql + mongodb（3）- 重构](https://blog.budshome.com/budshome/gou-jian-rust-yi-bu-graphql-fu-wu-:ji-yu-tide-+-async-graphql-+-mongodb(3)--zhong-gou)\r\n* \\[中文\\] \\[系列\\] [基于 actix-web + async-graphql + rbatis + postgresql / mysql 构建异步 Rust GraphQL 服务（2）- 查询服务](https://blog.budshome.com/budshome/ji-yu-actix-web-+-async-graphql-+-rbatis-+-postgresql---mysql-gou-jian-yi-bu-rust-graphql-fu-wu-(2)---cha-xun-fu-wu)\r\n* \\[视频\\] [Crust of Rust：调度（Dispatch）和宽指针（Fat Pointer）](https://youtu.be/xcygqF5LVmM)\r\n* \\[视频\\] [Ockam | 开源软件（OSS）社区对话（Community Call）| 2021 年 4 月](https://www.youtube.com/watch?v=ndujK8lTTVY)\r\n\r\n### 论文/研究探讨\r\n\r\n* [Rust 实现的 Buer Loader 新变体（New Variant of Buer Loader）](https://www.proofpoint.com/us/blog/threat-insight/new-variant-buer-loader-written-rust)\r\n* [在安全、稳定的 Rust 中，编写零开销（overhead-free）循环数据结构（data-structures），是否可能？](https://www.reddit.com/r/rust/comments/n420cg/is_it_possible_to_write_overheadfree_cyclic/)\r\n\r\n### 其它\r\n\r\n* [Rust 生态中，最不知名的贡献者和轶事](https://blog.budshome.com/budshome/rust-sheng-tai-zhong-,na-xie-zui-bu-zhi-ming-de-gong-xian-zhe-he-yi-shi)\r\n* [Rust 基金会迎来新的白金会员：Facebook](https://blog.budshome.com/budshome/rust-ji-jin-hui-ying-lai-xin-de-bai-jin-hui-yuan-:facebook)\r\n* [Rust 在 Facebook 的应用简史](https://engineering.fb.com/2021/04/29/developer-tools/rust/)\r\n* [自 Rust 1.46 到 1.51，rustc 性能提升比较](https://www.reddit.com/r/rust/comments/n2lh7z/rustc_performance_improvement_from_rust_146_to_151/)\r\n* [微软加入字节码联盟（Bytecode Alliance），以推进 `WebAssembly` - 也就是说，在浏览器中即可运行 `C/C++/Rust` 的编译代码](https://www.theregister.com/2021/04/28/microsoft_bytecode_alliance/)（译注：字节码联盟（Bytecode Alliance）由 Mozilla 携手英特尔等公司成立于 2019 年末，以扩展 `WebAssembly`）\r\n\r\n# 周最佳 crate\r\n\r\n本周最佳 crate 是 [display_utils](https://docs.rs/display_utils)，具备可`展示`的结构体的库，让字符串操作更容易。\r\n\r\n> 译注：使用蛮方便，笔者已经使用过。可以通过一个简单示例看看带来的方便，比如此官方示例 `for` 循环代码：\r\n>\r\n> ``` rust\r\n> for (i, item) in list.iter().enumerate() {\r\n>     if i == list.len() - 1 {\r\n>         println!(\"{}\", item);\r\n>     } else {\r\n>         print!(\"{} - \", item);\r\n>     }\r\n> }\r\n> ```\r\n>\r\n> 使用 `display_utils` 库，可以简化为一行：\r\n>\r\n> ``` rust\r\n> println!(\"{}\", display_utils::join(list, \" - \"));\r\n> ```\r\n\r\n谢谢 [kangalioo](https://users.rust-lang.org/t/crate-of-the-week/2704/908) 的提议。\r\n\r\n[关于下周最佳 crate，请您提议，并投票](https://users.rust-lang.org/t/crate-of-the-week/2704)！\r\n\r\n# 参与邀请\r\n\r\n您一直想为开源项目做贡献，但却不知道从哪里开始吗？每周，我们都会强调一些来自 Rust 社区的任务。您可以挑选，并开始参与！\r\n\r\n有些任务可能还有导师，请访问具体任务页面，以了解更多信息。\r\n\r\n如果你是 Rust 项目所有人，正在寻求贡献人员，请提交任务到[这个页面](https://users.rust-lang.org/t/twir-call-for-participation/4821)。\r\n\r\n* [paru - Add -P --stats](https://github.com/Morganamilo/paru/issues/357)\r\n\r\n# Rust 核心更新\r\n\r\n[322 PRs 在上周被合并](https://github.com/search?q=is%3Apr+org%3Arust-lang+is%3Amerged+merged%3A2021-04-26..2021-05-03)\r\n\r\n## Rust 编译器性能\r\n\r\n安静的一周，没有显著变化。\r\n\r\n验测工作是由 **@simulacrum** 完成的。修正范围：[537544..7a0f178](https://perf.rust-lang.org/?start=537544b1061467ee4b74ef7f552fab3d513e5caf&end=7a0f1781d04662041db5deaef89598a8edd53717&absolute=false&stat=instructions%3Au)\r\n\r\n[此处可查阅完整报告](https://github.com/rust-lang/rustc-perf/blob/master/triage/2021-05-04.md)。\r\n\r\n## 已核准的 RFCs\r\n\r\nRust 的改进遵循 [RFC（request for comments）流程](https://github.com/rust-lang/rfcs#rust-rfcs)。如下是本周核准实现的 RFCs：\r\n\r\n* [Target tier 策略](https://github.com/rust-lang/rfcs/pull/2803)\r\n* [增加 const-ub RFC](https://github.com/rust-lang/rfcs/pull/3016)\r\n\r\n## 新的 RFCs\r\n\r\n* [RFC: 未稳定特性（Unstable Features）预览](https://github.com/rust-lang/rfcs/pull/3120)\r\n* [Rust-lang crate 所有权（ownership）策略](https://github.com/rust-lang/rfcs/pull/3119)\r\n\r\n# 近期活动\r\n\r\n### 线上\r\n\r\n* [May 6, New York, NY, US - Rust Lightning Talks - Rust NYC](https://www.meetup.com/Rust-NYC/events/277822386)\r\n* [May 11, Seattle, WA, US - Monthly meetup - Seattle Rust Meetup](https://www.meetup.com/Seattle-Rust-Meetup/events/gskksrycchbpb/)\r\n* [May 11, Saarbücken, Saarland, DE - Meetup: 11u16 (virtual) - Rust Saar](https://www.meetup.com/de-DE/Rust-Saar/events/277607432/)\r\n* [May 12, Online - Rust Meetup May 2021 - Rust Malaysia](https://docs.google.com/forms/d/e/1FAIpQLSf_hz-ZDwYEhVmIH0uzJ0uH41aXWZ_zRDsI0XENpfkKHvh_Jg/viewform)\r\n* [May 15 - June 7, Online - Solana Season Hackathon - Registration open now](https://twitter.com/solana/status/1387411221717176323?s=20)\r\n* [May 17, 2021, Cardiff, UK - Rust and Cpp Cardiff :: v2.0 - Rust and C++ Cardiff](https://secure.meetup.com/register/?referrer_n=event&referrer_i=278002832&ctx=ref)\r\n* [May 20, 2021, Online - Go vs Rust | Round table discussion](https://rustlab.it/en/rust-vs-go/)\r\n\r\n如果你正在运作一次 Rust 活动，请将其[添加到日历](https://www.google.com/calendar/embed?src=apd9vmbc22egenmtu5l6c5jbfc%40group.calendar.google.com)中，以便在此处提及。请向 [Rust 社区团队](mailto:community-team@rust-lang.org)发送电子邮件，以获取访问日历权限。\r\n\r\n# Rust 招聘信息\r\n\r\n**Fiberplane**\r\n\r\n* **远程** - [Rust Engineer](https://fiberplane.dev/careers/rust-engineer/)\r\n\r\n**Paige**\r\n\r\n* **远程/欧洲** - [Senior Software Engineer, Visualization](https://boards.greenhouse.io/paige/jobs/5210311002)\r\n\r\n**Netlify**\r\n\r\n* **远程或旧金山** - [Senior Backend Engineer (Go/Rust)](https://boards.greenhouse.io/netlify/jobs/5054144002)\r\n\r\n**e.ventures**\r\n\r\n* **远程/美洲** - [Rust backend engineer](https://old.reddit.com/r/rust/comments/mfstaz/official_rrust_whos_hiring_thread_for_jobseekers/gspq9v1/)\r\n\r\n**ConsenSys**\r\n\r\n* [Rust Software Engineer (Protocol Engineering)](https://arbeitnow.com/view/rust-software-engineer-protocol-engineering-consensys-459183)\r\n\r\n**Spacemesh**\r\n\r\n* **远程** - [Rust Developer](https://spacemesh.io/rust-developer/)\r\n\r\n**DEX Labs**\r\n\r\n* **远程** - [Senior Software Engineer – 全栈](https://dex-labs.breezy.hr/p/49c5370a8473)\r\n\r\n**Kollider**\r\n\r\n* **远程** - [Junior Backend Engineer](https://kollider.homerun.co/junior-backend-engineer/en)\r\n* **远程** - [Senior Backend Engineer](https://kollider.homerun.co/senior-backend-engineer/en)\r\n* **远程** - [DevOps Engineer](https://kollider.homerun.co/devops-engineer/en)\r\n\r\n**Ockam**\r\n\r\n* [Multiple Rust Engineering Positions](https://www.ockam.io/team#open-roles)\r\n\r\n**Kraken**\r\n\r\n* [Several Rust Engineering Positions](https://jobs.lever.co/kraken?team=Engineering)\r\n\r\n*通过 [@ThisWeekInRust](https://twitter.com/ThisWeekInRust)，tweet 信息给我们，以便于我们在此处列出你的招聘信息！*\r\n\r\n# 本周引语\r\n\r\n> 使用 R 语言或 Numpy（译注：Python 语言的一个扩展程序库，支持大量的维度数组与矩阵运算）就像开运动跑车似的：你只要转动方向盘，踩油门，然后“燃烧”轮胎。而 Rust，以及其它系统语言，就像获得了一艘宇宙飞船。你可以去梦想的地方，做一些你在开运动跑车时做梦也想不到的事情。Rust 更难驾驶，但可能性似乎是无限的！由于 Rust 生态系统仍在发展中，这种感觉好像是：你的宇宙飞船的零部件，装在标有“需要某些组件”的盒子里。\r\n\r\n– [Erik Rose 发表在 rust-users 论坛](https://users.rust-lang.org/t/rust-for-data-first-problems/58887/16)\r\n\r\n谢谢 [Phlopsi](https://users.rust-lang.org/t/twir-quote-of-the-week/328/1047) 的提议！\r\n\r\n[欢迎提交下周引语！](https://users.rust-lang.org/t/twir-quote-of-the-week/328)\r\n\r\n*Rust 周报编辑人员：[nellshamrell](https://github.com/nellshamrell), [llogiq](https://github.com/llogiq)、[cdmistman](https://github.com/cdmistman)。*\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-06T11:09:25.35Z"),
+    "updated_at": ISODate("2021-05-06T11:09:25.35Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6094857a0034b56e00ac1f74"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "Rust 1.52.0 已正式发布，及其新特性详述",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "2021 年 5 月 6 日，Rust 发布团队官宣 Rust 发布 1.52.0 稳定版。其最重要的变化不是语法或标准库，而是对 Clippy 工具支持的增强。执行 cargo 时，用户将获得预期的行为，不再因为运行命令的顺序而受到影响。",
+    slug: "rust-1.52.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    uri: "/budshome/rust-1.52.0-yi-zheng-shi-fa-bu-,ji-qi-xin-te-xing-xiang-shu",
+    content: "2021 年 5 月 6 日，Rust 发布团队官宣 Rust 发布 1.52.0 稳定版：[Announcing Rust 1.52.0](https://blog.rust-lang.org/2021/05/06/Rust-1.52.0.html)。\r\n\r\n*以下为官方公告原文——*\r\n\r\nRust 团队很高兴地宣布，Rust 语言有了新版本：1.52.0。Rust 是一门编程语言，它使每个人都能够构建安全、高效的软件。\r\n\r\n如果你已通过 rustup 安装了 Rust 的早期版本，那么更新到 Rust 1.52.0 相当容易：\r\n\r\n```console\r\nrustup update stable\r\n```\r\n\r\n如果您还未安装过 Rust，可以从 Rust 官网页面[获取 `rustup`](https://www.rust-lang.org/install.html)，并可以在 GitHub 站点查阅 [Rust 1.52.0 的详细发行说明](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1520-2021-05-06)。\r\n\r\n## Rust 1.52.0 稳定版的新特性\r\n\r\nRust 1.52.0 稳定版中，最重要的变化不是语法或标准库，而是对 `Clippy` 工具支持的增强。\r\n\r\n先前的版本中，先运行 `cargo check`，然后再运行 `cargo clippy` 时，实际上并未运行 `Clippy`：`cargo` 在构建缓存时，没有区分两者。然而，在 1.52 中，这一点已经被修复。这意味着用户将获得预期的行为，不再因为运行这两个命令的顺序而受到影响。\r\n\r\n> 其中语法、编译器、库的新特性，由笔者整理自 Rust 发布团队的内部论坛帖子 [Rust 1.52.0 稳定版预发布测试中，关键新特性一瞥](https://blog.budshome.com/budshome/rust-1.52.0-wen-ding-ban-yu-fa-bu-ce-shi-zhong-,guan-jian-xin-te-xing-yi-pie)。\r\n\r\n### 语法\r\n\r\n* [增加代码分析（lint）`unsafe_op_in_unsafe_fn`，用于检查 `unsafe fn` 中的不安全（unsafe）代码，是否被包裹在 `unsafe` 代码块中](https://github.com/rust-lang/rust/pull/79208)。此代码分析（lint）特性默认开启，未来的版本中，可能会成为警告或错误。\r\n* Rust 1.52.0 开始，[可以将数组的可变引用，强制转换为包含相同元素类型的指针](https://github.com/rust-lang/rust/pull/81479)。\r\n\r\n### 编译器\r\n\r\n* [升级默认的 LLVM 为 LLVM 12](https://github.com/rust-lang/rust/pull/81451)。\r\n\r\n对以下目标提供 3\\* 层架构支持：\r\n\r\n* [`s390x-unknown-linux-musl`](https://github.com/rust-lang/rust/pull/82166)\r\n* [`riscv32gc-unknown-linux-musl` 和 `riscv64gc-unknown-linux-musl`](https://github.com/rust-lang/rust/pull/82202)\r\n* [`powerpc-unknown-openbsd`](https://github.com/rust-lang/rust/pull/82733)\r\n\r\n### 库\r\n\r\n* [`OsString` 实现了 `Extend` 和 `FromIterator`](https://github.com/rust-lang/rust/pull/82121)\r\n* [`cmp::Reverse` 增加 `#[repr(transparent)]` 属性表示](https://github.com/rust-lang/rust/pull/81879)\r\n* [`Arc<impl Error>` 实现 `error::Error`](https://github.com/rust-lang/rust/pull/80553)\r\n* [所有整数除法和余数运算，现在都为 `const`](https://github.com/rust-lang/rust/pull/80962)\r\n\r\n### 已稳定 APIs\r\n\r\n下列方法已经稳定。\r\n\r\n- [`Arguments::as_str`](https://doc.rust-lang.org/stable/std/fmt/struct.Arguments.html#method.as_str)\r\n- [`char::MAX`](https://doc.rust-lang.org/std/primitive.char.html#associatedconstant.MAX)\r\n- [`char::REPLACEMENT_CHARACTER`](https://doc.rust-lang.org/std/primitive.char.html#associatedconstant.REPLACEMENT_CHARACTER)\r\n- [`char::UNICODE_VERSION`](https://doc.rust-lang.org/std/primitive.char.html#associatedconstant.UNICODE_VERSION)\r\n- [`char::decode_utf16`](https://doc.rust-lang.org/std/primitive.char.html#method.decode_utf16)\r\n- [`char::from_digit`](https://doc.rust-lang.org/std/primitive.char.html#method.from_digit)\r\n- [`char::from_u32_unchecked`](https://doc.rust-lang.org/std/primitive.char.html#method.from_u32_unchecked)\r\n- [`char::from_u32`](https://doc.rust-lang.org/std/primitive.char.html#method.from_u32)\r\n- [`slice::partition_point`](https://doc.rust-lang.org/stable/std/primitive.slice.html#method.partition_point)\r\n- [`str::rsplit_once`](https://doc.rust-lang.org/stable/std/primitive.str.html#method.rsplit_once)\r\n- [`str::split_once`](https://doc.rust-lang.org/stable/std/primitive.str.html#method.split_once)\r\n\r\n上个版本中，稳定的如下 APIs，现在为 `const`：\r\n\r\n- [`char::len_utf8`](https://doc.rust-lang.org/stable/std/primitive.char.html#method.len_utf8)\r\n- [`char::len_utf16`](https://doc.rust-lang.org/stable/std/primitive.char.html#method.len_utf16)\r\n- [`char::to_ascii_uppercase`](https://doc.rust-lang.org/stable/std/primitive.char.html#method.to_ascii_uppercase)\r\n- [`char::to_ascii_lowercase`](https://doc.rust-lang.org/stable/std/primitive.char.html#method.to_ascii_lowercase)\r\n- [`char::eq_ignore_ascii_case`](https://doc.rust-lang.org/stable/std/primitive.char.html#method.eq_ignore_ascii_case)\r\n- [`u8::to_ascii_uppercase`](https://doc.rust-lang.org/stable/std/primitive.u8.html#method.to_ascii_uppercase)\r\n- [`u8::to_ascii_lowercase`](https://doc.rust-lang.org/stable/std/primitive.u8.html#method.to_ascii_lowercase)\r\n- [`u8::eq_ignore_ascii_case`](https://doc.rust-lang.org/stable/std/primitive.u8.html#method.eq_ignore_ascii_case)\r\n\r\n### 其他更新\r\n\r\nRust 1.52.0 版本中，还有些其它更新。请查阅如下页面：[Rust](https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1520-2021-05-06)、[Cargo](https://github.com/rust-lang/cargo/blob/master/CHANGELOG.md#cargo-152-2021-05-06)、[Clippy](https://github.com/rust-lang/rust-clippy/blob/master/CHANGELOG.md#rust-152)。\r\n\r\n## Rust 1.52.0 的贡献者\r\n\r\n很多人共同协作，才创造了 Rust 1.52.0。没有你们，我们不可能成功。[谢谢您们！](https://thanks.rust-lang.org/rust/1.52.0/)\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-07T00:10:34.622Z"),
+    "updated_at": ISODate("2021-05-07T00:10:34.622Z")
+} ]);
+db.getCollection("articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    subject: "让我们用 Rust 重写那些伟大的软件吧",
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    summary: "20 世纪 20 年代，时代选择的语言可能是（也许已经是）Rust。这是一门罕见的，能让软件程序员和硬件程序员都满意的语言。目前，很多伟大的软件，都在用 Rust 进行重写。这些事情是潮流，并非 Rust 在炒作。",
+    slug: "rang-wo-men-yong-rust-zhong-xie-na-xie-wei-da-de-ruan-jian-ba",
+    uri: "/budshome/rang-wo-men-yong-rust-zhong-xie-na-xie-wei-da-de-ruan-jian-ba",
+    content: "本文摘选和整理自 *De Programmatica Ipsum* 月刊的一篇由 Adrian Kosmaczewski 于 2021 年 3 月 3 日发表的文章 *[The Great Rewriting In Rust](https://deprogrammaticaipsum.com/the-great-rewriting-in-rust/)*、Geoffroy Couprie 个人站点文章 *[Why you should, actually, rewrite it in Rust](https://unhandledexpression.com/rust/2017/07/10/why-you-should-actually-rewrite-it-in-rust.html)*，以及 ansuz/RIIR 项目文章 *[Have you considered Rewriting It In Rust?](https://transitiontech.ca/random/RIIR)*。其中后两篇文章比较早了，朋友们可以直接略过，了解有这么个因果即可。\r\n\r\n> *De Programmatica Ipsum* 是一本月刊，由 Graham Lee 和 Adrian Kosmaczewski 合作主编，自称是“两个脑子被烧坏了的老家伙，呼喊着冲向虚空”。这个月刊介绍软件工程的工艺、软件开发人员的生活；重点关注程序员生活中的包容、倦怠/疲惫、创业生活；另外，此月刊也乐于炒作，以及一些不合常理，甚至“异端邪说”的话题——比如上面提到的文章。\r\n\r\n# 关于安全编程\r\n\r\n2002 年，微软出版社出版了 David LeBlanc 和 Michael Howard 合著的书籍，《[编写安全代码（Writing Secure Code），第二版](https://www.microsoftpressstore.com/store/writing-secure-code-9780735617223)》。此书曾是微软的必读书目，紧随着比尔·盖茨（Bill Gates）的“[可信计算（Trustworthy Computing）](https://www.wired.com/2002/01/bill-gates-trustworthy-computing/)”备忘录。《编写安全代码（Writing Secure Code），第二版》的第五章题为“第 1 号公敌：[缓冲区溢出（Buffer Overrun）](https://en.wikipedia.org/wiki/Buffer_overflow)”，它从一个非常有趣的历史角度出发，阐述如何编写安全代码，防范缓冲区溢出。书中以 1986 年的莫里斯蠕虫（Morris Worm）为例，甚至可以追溯到 20 世纪 60 年代。\r\n\r\nC 语言，通常被称为“可移植汇编（portable assembly）”，没有提供任何防范这种“公敌”的措施。如果你错误地（或有意地）分配了 N 字节的内存，但又写了 N + k（其中 k 是一个严格大于零的无符号整数）。那么，几乎会必然导致缓冲区溢出。比起修复 bug，你还不如重写正在运行的软件。\r\n\r\n可以说，缓冲区溢出导致过行业数十亿美元的损失，每一代计算机科学家都为解决这个问题提出了新的想法。曾经寄希望于托管代码和 `.NET` 框架。关于此，《编写安全代码（Writing Secure Code），第二版》一书第 18 章是以一个轶事开始的：\r\n\r\n> 在 2001 年 11 月的微软专业开发者大会上，我为两篇安全软件论文制作幻灯片时，一位朋友告诉我，我很快就会失业。因为一旦托管代码和 `.NET` 框架发布，所有的安全问题都会消失。这使我把 SQL 注入演示代码，从 C++ 转换成 C 语言，以证明他错了。\r\n\r\n啊，软件从业人员！\r\n\r\n安全编程方面，也曾将希望寄予 Java 和 C#，数以百万计的应用程序和数十亿行代码，被一次又一次地用这些现代编程语言重写。虽然 Joel Spolsky、Steve Blank，以及 Peter Seibel 都阐述过重写软件这种做法的愚蠢，重写软件也在圈子内被广泛嘲笑。但是，在软件行业里面，重写软件仍然是一项乐此不疲的运动。\r\n\r\n# 各时代的编程语言\r\n\r\n回顾过去，每一个十年，都有自己时代选择的编程语言，世界被一次又一次地改写。\r\n\r\n* 20 世纪 60 年代：Fortran（因为 IBM！）\r\n* 20 世纪 70 年代：BASIC（因为 Byte Magazine！）\r\n* 20 世纪 80 年代：Pascal（因为结构化编程！）\r\n* 20 世纪 90 年代：C++（因为面向对象！）\r\n* 21 世纪初：Java（因为万维网！）\r\n* 2010 年：JavaScript（因为……啥原因？！）\r\n\r\n我们来玩预测游戏，哪一个编程语言将是 21 世纪 20 年代的选择，也就是说，世界将被哪一个编程语言改写？\r\n\r\n显然不是 Java、C#、F#、Dart、Swift，或者 Kotlin。\r\n\r\n是 Go 吗？显然不是，因为它在某种程度上被限制了，仅限于创造本地云工具或独立的跨平台命令行程序。\r\n\r\n# Rust 将改写世界\r\n\r\n经过仔细分析，20 世纪 20 年代，时代选择的语言可能是（也许已经是）Rust。这是一门罕见的，能让软件程序员和硬件程序员都满意的语言。\r\n\r\nRust 显示了许多迹象（非全部）：\r\n\r\n* 开源的，[托管在 github](https://github.com/rust-lang)，我们都知道：[开放者总会胜利（open always wins）](https://deprogrammaticaipsum.com/open-always-wins/)。\r\n* 具备[泛型特性](https://doc.rust-lang.org/rust-by-example/generics.html)，这是解决霍尔难题的基础选项（译注：托尼·霍尔，Tony Hoare，快速排序算法、霍尔逻辑、交谈循序程式设计者，图灵奖得主）。\r\n* 没有继承（inheritance）特性，而是由 `trait` 组合（composition）。\r\n* 不依赖异常来处理错误，而是 `Result` 泛型类型。\r\n* 没有垃圾收集器，而是在编译期间控制引用生命周期和所有权。\r\n* 包括流行的功能性编程结构，如：lambdas、map/filter/reduce，甚至做的更好。\r\n* 免费图书，以及在线演练。不必在本地计算机上安装任何东西，就可以学习 Rust。\r\n* 即使为了使代码看起来像脚本，而使用了类型推断，但 Rust 有一个强大的类型系统，可以在编译时解决缓冲区溢出问题。\r\n* 可以通过 `curl` 脚本安装在任何终端。\r\n* 现成的算法和抽象库，以“自带电池”的方式吸引了系统和应用程序开发人员。\r\n* 具有内置功能单元测试.\r\n* 变量在默认情况下是不可变的。\r\n* Rust 宏，C 语言宏的智能进化，混合了 C++ 模板元编程。\r\n* 数组，将长度作为其类型的一部分，可以很容易地在同一处初始化。\r\n* 编译器生成非常高效的代码，并且可以进行交叉编译。甚至可以生成独立的静态链接二进制文件，准备在 Docker 容器中使用。\r\n* 有年度开发者大会，名为 RustConf，有专有的 [Rust 官方周报](https://blog.budshome.com/topics/rust-guan-fang-zhou-bao)；有专有的 Awesome Rust 页面，在 Stack Overflow 上有很多问题和答案。\r\n* 使用大括号，并且 `rustfmt` 工具消除了因样式而造成代码冲突的风险。\r\n* `goto` 不是关键词，尊重迪杰斯特拉（ Dijkstra）戒律。\r\n* ……\r\n\r\n简而言之，Rust 会成为时代的选择。\r\n\r\n# Rust 生态系统\r\n\r\n让我们来看看 Rust 在各个行业的使用。\r\n\r\n* Mozilla（Rust 创造者）用 Rust 重写旗舰浏览器。\r\n* Linus Torvalds [确信 Rust 将接管 Linux 内核](https://www.theregister.com/2020/06/30/hard_to_find_linux_maintainers_says_torvalds/)。同时，很多公司都在用 Rust 重写其软件或者游戏，如 coreutils（GNU）、alacritty（OpenGL）、……，甚至包括 LaTeX。\r\n* 微软，在“可信计算”演示后的 20 年，仍然认为内存安全问题占所有安全漏洞的 70%。因此 Rust 是目前安全系统编程的最佳机会。微软对 Rust 的兴趣如此之大，以致于它加入 Rust 基金会，促进 Rust 成为在 Kubernetes 上的应用程序的可靠替代方案。\r\n* 谷歌正在[将 Rust 推向安卓](https://blog.budshome.com/budshome/android-tuan-dui-xuan-bu-android-kai-yuan-xiang-mu-(aosp),yi-zhi-chi-rust-yu-yan-lai-kai-fa-android-xi-tong-ben-shen)（用于[重写蓝牙部分](https://blog.budshome.com/budshome/android-ping-tai-ji-chu-zhi-chi-zhuan-xiang-rust)），及[其 Linux 内核](https://blog.budshome.com/budshome/android-zhi-chi-rust-bian-cheng-yu-yan-,yi-bi-mian-nei-cun-que-xian)。Rust 也用在谷歌的新操作系统 Fuchsia。\r\n* 英特尔说 Rust 是“系统编程的未来”。\r\n* 亚马逊使用 Rust 建造 AWS Firecracker 系统。\r\n* Dropbox 使用 Rust 重写它的同步引擎。\r\n* 苹果招聘了大量 Rust 工程师。\r\n* JetBrains 有支持 Rust 的IDE 插件（vsCode 也有，eclipse、vim 等同样有）。\r\n* IBM 开发者网站一直在进行 Rust 教授。\r\n* Stack Overflow，Rust 语言连续 5 年在“最想学语言排行榜”位列榜首。\r\n* Discord 切换到 Rust 语言。\r\n* Figma 在生产环境中，将 Rust 引入后端产品。\r\n* 云应用中，Linkerd（Rust 开发）比 Istio（Go 开发）更高效和受欢迎。\r\n* 甚至 JavaScript 和 npm 都正在使用 Rust 重建。\r\n* Python 和 Rust 的互操作已经较为成熟。\r\n* 有人在忙于开发 Java 和 Rust 的互操作。\r\n* 有人在忙于开发 .net 和 Rust 的互操作。\r\n* ……\r\n\r\n即使不是所有人抱有同样的热情，但很明显，这些事情是潮流，并非 Rust 在炒作。\r\n\r\n# RIIR（Rewrite It In Rust），用 Rust 重写它\r\n\r\n你可能经常在博客上、在 github issues 中、在朋友圈等地方看到一些“讨厌的”言论——用 Rust 重写它？现在，在 [github 上 有个项目称作 RIIR](https://github.com/ansuz/RIIR/)（Rewrite It In Rust，用 Rust 重写它），星星数 300 左右；也有其 [twitter 账户](https://twitter.com/rustevangelism)。另外，本文开头提到的后 2 篇文章中，阐述用 Rust 重写的合理性、可能性，以及示范先行项目。\r\n\r\n说这个项目是个玩笑，但又有那么些真实性。毕竟现在，不少公司真的在用 Rust 重写一些久远的软件。\r\n\r\n# 结语\r\n\r\nRust 会解决今天的一些问题，比如安全编程相关。同时，我们也需要明白，虽然目前无法预料，但 Rust 也会带来新的问题。\r\n\r\n让时间来验证吧！\r\n\r\n谢谢您的阅读！\r\n\r\n---",
+    published: true,
+    top: true,
+    recommended: true,
+    "created_at": ISODate("2021-05-07T04:15:47.737Z"),
+    "updated_at": ISODate("2021-05-07T04:15:47.737Z")
+} ]);
+
+// ----------------------------
+// Collection structure for categories
+// ----------------------------
+db.getCollection("categories").drop();
+db.createCollection("categories");
+
+// ----------------------------
+// Documents of categories
+// ----------------------------
+db.getCollection("categories").insert([ {
+    _id: ObjectId("60177b8c007a4a3800926991"),
+    name: "创业",
+    description: "开创事业、实现价值方面的博文",
+    slug: "chuang-ye",
+    quotes: NumberLong("0"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/chuang-ye"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("60177bad0098eee300926992"),
+    name: "书籍",
+    description: "各类书籍、教材、论文等",
+    slug: "shu-ji",
+    quotes: NumberLong("0"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/shu-ji"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("60177bb200b85e3900926993"),
+    name: "培训",
+    description: "培训博文、课程，以及信息",
+    slug: "pei-xun",
+    quotes: NumberLong("0"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/pei-xun"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("60188438003bfa6f008e958a"),
+    name: "随笔",
+    description: "随手笔录，思考、抒情、叙事，或评论等不拘",
+    slug: "sui-bi",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    quotes: NumberLong("0"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/sui-bi"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("601bca20009ad863004b3f8b"),
+    name: "技术",
+    description: "各类技术方面的博文",
+    quotes: NumberLong("0"),
+    slug: "ji-shu",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/ji-shu"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("601bcaf300b5c70100e2a323"),
+    name: "生活",
+    description: "技术不忘生活",
+    quotes: NumberLong("0"),
+    slug: "sheng-huo",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/sheng-huo"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("60379fdcd44500003d0019b2"),
+    name: "旅游",
+    description: "徒步、骑行、自驾，以及探险等旅游博文",
+    slug: "lu-you",
+    quotes: NumberLong("0"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/lu-you"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("6052d0e59528000070004cf2"),
+    name: "Rust",
+    description: "Rust 程序设计语言",
+    slug: "rust",
+    quotes: NumberLong("1"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/rust"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("6052d1239528000070004cf3"),
+    name: "Python",
+    description: "Python 程序设计语言",
+    quotes: NumberLong("0"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    slug: "python",
+    uri: "/categories/python"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("6052ec5b9528000070004d00"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    description: "GraphQL 查询语言",
+    name: "GraphQL",
+    quotes: NumberLong("3"),
+    slug: "graphql",
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    uri: "/categories/graphql"
+} ]);
+db.getCollection("categories").insert([ {
+    _id: ObjectId("608789231430000011000d12"),
+    description: "机器人平台开发、新闻，以及趋势",
+    name: "机器人",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    quotes: NumberLong("0"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    slug: "ji-qi-ren",
+    uri: "/categories/ji-qi-ren"
+} ]);
+
+// ----------------------------
+// Collection structure for categories_users
+// ----------------------------
+db.getCollection("categories_users").drop();
+db.createCollection("categories_users");
+
+// ----------------------------
+// Documents of categories_users
+// ----------------------------
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("60177b8c007a4a3800926991"),
+    "category_id": ObjectId("60177b8c007a4a3800926991"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6017db7b797a0000f00027a2"),
+    "category_id": ObjectId("60177bad0098eee300926992"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6017dbde797a0000f00027a3"),
+    "category_id": ObjectId("6052d0e59528000070004cf2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6017f3cb008a20ee009c1503"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "category_id": ObjectId("6052d1239528000070004cf3")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6052d1749528000070004cf4"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "category_id": ObjectId("601bca20009ad863004b3f8b")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6052d1a99528000070004cf5"),
+    "category_id": ObjectId("601bcaf300b5c70100e2a323"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6052d1bd9528000070004cf6"),
+    "category_id": ObjectId("60379fdcd44500003d0019b2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("6052f4599528000070004d01"),
+    "category_id": ObjectId("6052ec5b9528000070004d00"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("categories_users").insert([ {
+    _id: ObjectId("60878c351430000011000d13"),
+    "category_id": ObjectId("608789231430000011000d12"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+
+// ----------------------------
+// Collection structure for topics
+// ----------------------------
+db.getCollection("topics").drop();
+db.createCollection("topics");
+
+// ----------------------------
+// Documents of topics
+// ----------------------------
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052e20d9528000070004cf8"),
+    name: "tello",
+    quotes: NumberLong("1"),
+    slug: "tello",
+    uri: "/topics/tello",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052e2259528000070004cf9"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "drone",
+    quotes: NumberLong("1"),
+    slug: "drone",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/drone"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052e2449528000070004cfa"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "rust",
+    quotes: NumberLong("64"),
+    slug: "rust",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/rust"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052e2629528000070004cfb"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "无人机",
+    quotes: NumberLong("1"),
+    slug: "wu-ren-ji",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/wu-ren-ji"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f5029528000070004d02"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "tide",
+    quotes: NumberLong("3"),
+    slug: "tide",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/tide"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f5059528000070004d03"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "async-graphql",
+    quotes: NumberLong("8"),
+    slug: "async-graphql",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/async-graphql"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f51e9528000070004d04"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "graphql",
+    quotes: NumberLong("9"),
+    slug: "graphql",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/graphql"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f5bb9528000070004d05"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "mongodb",
+    quotes: NumberLong("4"),
+    slug: "mongodb",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/mongodb"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f5c79528000070004d06"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "json-web-token",
+    quotes: NumberLong("3"),
+    slug: "json-web-token",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/json-web-token"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6052f5c99528000070004d07"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "jwt",
+    quotes: NumberLong("3"),
+    slug: "jwt",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/jwt"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6056a7adbb7d0000a9007c14"),
+    name: "用户隐私",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("2"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    slug: "yong-hu-yin-si",
+    uri: "/topics/yong-hu-yin-si"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6056a7afbb7d0000a9007c15"),
+    name: "隐私数据",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    slug: "yin-si-shu-ju",
+    uri: "/topics/yin-si-shu-ju"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6059738375550000ac001562"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "markdown",
+    quotes: NumberLong("1"),
+    slug: "markdown",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/markdown"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("605973af75550000ac001563"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "html",
+    quotes: NumberLong("1"),
+    slug: "html",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/html"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("605ac8db964000002e005983"),
+    name: "crate",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    slug: "crate",
+    uri: "/topics/crate"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("605c6667063f0000bd002083"),
+    name: "async",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    slug: "async",
+    uri: "/topics/async"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("605c666a063f0000bd002084"),
+    name: "异步",
+    slug: "yi-bu",
+    uri: "/topics/yi-bu",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("605cec6788290000d20071e2"),
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    name: "cargo",
+    quotes: NumberLong("2"),
+    slug: "cargo",
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/cargo"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60607d90ae050000eb0018a4"),
+    name: "旅游",
+    slug: "lv-you",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/lv-you"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60607d91ae050000eb0018a5"),
+    name: "不忘生活",
+    slug: "bu-wang-sheng-huo",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/bu-wang-sheng-huo"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60607d93ae050000eb0018a6"),
+    name: "葛仙山",
+    slug: "ge-xian-shan",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/ge-xian-shan"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6061544f1d78000032003b54"),
+    name: "学习资料",
+    slug: "xue-xi-zi-liao",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("2"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/xue-xi-zi-liao"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062a36438350000d8000692"),
+    name: "技术延伸",
+    slug: "ji-shu-yan-shen",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("2"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/ji-shu-yan-shen"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062bedb38350000d8000693"),
+    name: "python",
+    slug: "python",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("13"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/python"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062bedd38350000d8000694"),
+    name: "hpy",
+    slug: "hpy",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/hpy"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062beef38350000d8000695"),
+    name: "python-扩展",
+    slug: "python-kuo-zhan",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("1"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/python-kuo-zhan"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062c16d38350000d800069b"),
+    name: "ai",
+    slug: "ai",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("2"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/ai"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6062c16e38350000d800069c"),
+    name: "人工智能",
+    slug: "ren-gong-zhi-neng",
+    "created_at": ISODate("2021-03-18T04:50:29.455Z"),
+    quotes: NumberLong("2"),
+    "updated_at": ISODate("2021-03-18T04:50:29.455Z"),
+    uri: "/topics/ren-gong-zhi-neng"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6064b45e006135f6004c319a"),
+    name: "mysql",
+    quotes: NumberLong("6"),
+    slug: "mysql",
+    uri: "/topics/mysql",
+    "created_at": ISODate("2021-03-31T17:41:50.049Z"),
+    "updated_at": ISODate("2021-03-31T17:41:50.049Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6064b812001bd8c10024ceba"),
+    name: "postgresql",
+    quotes: NumberLong("3"),
+    slug: "postgresql",
+    uri: "/topics/postgresql",
+    "created_at": ISODate("2021-03-31T17:57:38.744Z"),
+    "updated_at": ISODate("2021-03-31T17:57:38.744Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b680042504e"),
+    name: "正则表达式",
+    quotes: NumberLong("1"),
+    slug: "zheng-ze-biao-da-shi",
+    uri: "/topics/zheng-ze-biao-da-shi",
+    "created_at": ISODate("2021-04-02T15:51:04.06Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.06Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b680042504f"),
+    name: "解析器组合因子",
+    quotes: NumberLong("1"),
+    slug: "jie-xi-qi-zu-he-yin-zi",
+    uri: "/topics/jie-xi-qi-zu-he-yin-zi",
+    "created_at": ISODate("2021-04-02T15:51:04.144Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.144Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b6800425050"),
+    name: "组合器",
+    quotes: NumberLong("1"),
+    slug: "zu-he-qi",
+    uri: "/topics/zu-he-qi",
+    "created_at": ISODate("2021-04-02T15:51:04.24Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.24Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b6800425051"),
+    name: "regular-expression",
+    quotes: NumberLong("1"),
+    slug: "regular-expression",
+    uri: "/topics/regular-expression",
+    "created_at": ISODate("2021-04-02T15:51:04.333Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.333Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b6800425052"),
+    name: "parser-combinator",
+    quotes: NumberLong("1"),
+    slug: "parser-combinator",
+    uri: "/topics/parser-combinator",
+    "created_at": ISODate("2021-04-02T15:51:04.419Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.419Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60673d6800472b6800425053"),
+    name: "regex",
+    quotes: NumberLong("1"),
+    slug: "regex",
+    uri: "/topics/regex",
+    "created_at": ISODate("2021-04-02T15:51:04.502Z"),
+    "updated_at": ISODate("2021-04-02T15:51:04.502Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e68"),
+    name: "rust-官方周报",
+    quotes: NumberLong("6"),
+    slug: "rust-guan-fang-zhou-bao",
+    uri: "/topics/rust-guan-fang-zhou-bao",
+    "created_at": ISODate("2021-04-02T19:37:48.932Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.932Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e69"),
+    name: "官方更新",
+    quotes: NumberLong("1"),
+    slug: "guan-fang-geng-xin",
+    uri: "/topics/guan-fang-geng-xin",
+    "created_at": ISODate("2021-04-02T19:37:48.933Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.933Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e6a"),
+    name: "rust-工作招聘",
+    quotes: NumberLong("1"),
+    slug: "rust-gong-zuo-zhao-pin",
+    uri: "/topics/rust-gong-zuo-zhao-pin",
+    "created_at": ISODate("2021-04-02T19:37:48.934Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.934Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e6b"),
+    name: "rust-技术资料",
+    quotes: NumberLong("1"),
+    slug: "rust-ji-zhu-zi-liao",
+    uri: "/topics/rust-ji-zhu-zi-liao",
+    "created_at": ISODate("2021-04-02T19:37:48.934Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.934Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e6c"),
+    name: "rust-周最佳-crate",
+    quotes: NumberLong("1"),
+    slug: "rust-zhou-zui-jia--crate",
+    uri: "/topics/rust-zhou-zui-jia--crate",
+    "created_at": ISODate("2021-04-02T19:37:48.935Z"),
+    "updated_at": ISODate("2021-04-02T19:37:48.935Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e74"),
+    name: "rust-web",
+    quotes: NumberLong("1"),
+    slug: "rust-web",
+    uri: "/topics/rust-web",
+    "created_at": ISODate("2021-04-03T06:07:13.057Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.057Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e75"),
+    name: "webassembly",
+    quotes: NumberLong("1"),
+    slug: "webassembly",
+    uri: "/topics/webassembly",
+    "created_at": ISODate("2021-04-03T06:07:13.057Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.057Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e76"),
+    name: "wasm",
+    quotes: NumberLong("1"),
+    slug: "wasm",
+    uri: "/topics/wasm",
+    "created_at": ISODate("2021-04-03T06:07:13.058Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.058Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e77"),
+    name: "rust-web-框架",
+    quotes: NumberLong("1"),
+    slug: "rust-web-kuang-jia",
+    uri: "/topics/rust-web-kuang-jia",
+    "created_at": ISODate("2021-04-03T06:07:13.059Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.059Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e78"),
+    name: "rust-web-framework",
+    quotes: NumberLong("1"),
+    slug: "rust-web-framework",
+    uri: "/topics/rust-web-framework",
+    "created_at": ISODate("2021-04-03T06:07:13.059Z"),
+    "updated_at": ISODate("2021-04-03T06:07:13.059Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e80"),
+    name: "rust-核心团队",
+    quotes: NumberLong("1"),
+    slug: "rust-he-xin-tuan-dui",
+    uri: "/topics/rust-he-xin-tuan-dui",
+    "created_at": ISODate("2021-04-03T14:25:02.541Z"),
+    "updated_at": ISODate("2021-04-03T14:25:02.541Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e81"),
+    name: "rust-core-team",
+    quotes: NumberLong("1"),
+    slug: "rust-core-team",
+    uri: "/topics/rust-core-team",
+    "created_at": ISODate("2021-04-03T14:25:02.542Z"),
+    "updated_at": ISODate("2021-04-03T14:25:02.542Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e82"),
+    name: "rust-language-team",
+    quotes: NumberLong("1"),
+    slug: "rust-language-team",
+    uri: "/topics/rust-language-team",
+    "created_at": ISODate("2021-04-03T14:25:02.542Z"),
+    "updated_at": ISODate("2021-04-03T14:25:02.542Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e88"),
+    name: "pyo3",
+    quotes: NumberLong("1"),
+    slug: "pyo3",
+    uri: "/topics/pyo3",
+    "created_at": ISODate("2021-04-03T17:20:17.841Z"),
+    "updated_at": ISODate("2021-04-03T17:20:17.841Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e89"),
+    name: "rust-python-集成",
+    quotes: NumberLong("1"),
+    slug: "rust-python-ji-cheng",
+    uri: "/topics/rust-python-ji-cheng",
+    "created_at": ISODate("2021-04-03T17:20:17.842Z"),
+    "updated_at": ISODate("2021-04-03T17:20:17.842Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e8a"),
+    name: "python-性能改进",
+    quotes: NumberLong("1"),
+    slug: "python-xing-neng-gai-jin",
+    uri: "/topics/python-xing-neng-gai-jin",
+    "created_at": ISODate("2021-04-03T17:20:17.842Z"),
+    "updated_at": ISODate("2021-04-03T17:20:17.842Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e91"),
+    name: "迭代器",
+    quotes: NumberLong("1"),
+    slug: "die-dai-qi",
+    uri: "/topics/die-dai-qi",
+    "created_at": ISODate("2021-04-04T04:14:08.164Z"),
+    "updated_at": ISODate("2021-04-04T04:14:08.164Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e92"),
+    name: "iterator-trait",
+    quotes: NumberLong("1"),
+    slug: "iterator-trait",
+    uri: "/topics/iterator-trait",
+    "created_at": ISODate("2021-04-04T04:14:08.165Z"),
+    "updated_at": ISODate("2021-04-04T04:14:08.165Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e97"),
+    name: "国际象棋",
+    quotes: NumberLong("1"),
+    slug: "guo-ji-xiang-qi",
+    uri: "/topics/guo-ji-xiang-qi",
+    "created_at": ISODate("2021-04-05T03:03:13.379Z"),
+    "updated_at": ISODate("2021-04-05T03:03:13.379Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e98"),
+    name: "chess",
+    quotes: NumberLong("1"),
+    slug: "chess",
+    uri: "/topics/chess",
+    "created_at": ISODate("2021-04-05T03:03:13.38Z"),
+    "updated_at": ISODate("2021-04-05T03:03:13.38Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e99"),
+    name: "游戏引擎",
+    quotes: NumberLong("1"),
+    slug: "you-xi-yin-qing",
+    uri: "/topics/you-xi-yin-qing",
+    "created_at": ISODate("2021-04-05T03:03:13.381Z"),
+    "updated_at": ISODate("2021-04-05T03:03:13.381Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9a"),
+    name: "game-engine",
+    quotes: NumberLong("1"),
+    slug: "game-engine",
+    uri: "/topics/game-engine",
+    "created_at": ISODate("2021-04-05T03:03:13.381Z"),
+    "updated_at": ISODate("2021-04-05T03:03:13.381Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea1"),
+    name: "虚拟化",
+    quotes: NumberLong("1"),
+    slug: "xu-ni-hua",
+    uri: "/topics/xu-ni-hua",
+    "created_at": ISODate("2021-04-07T03:19:00.298Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.298Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea2"),
+    name: "unikernel",
+    quotes: NumberLong("1"),
+    slug: "unikernel",
+    uri: "/topics/unikernel",
+    "created_at": ISODate("2021-04-07T03:19:00.299Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.299Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea3"),
+    name: "rustyhermit",
+    quotes: NumberLong("1"),
+    slug: "rustyhermit",
+    uri: "/topics/rustyhermit",
+    "created_at": ISODate("2021-04-07T03:19:00.299Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.299Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea4"),
+    name: "linux",
+    quotes: NumberLong("1"),
+    slug: "linux",
+    uri: "/topics/linux",
+    "created_at": ISODate("2021-04-07T03:19:00.3Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.3Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea5"),
+    name: "virtualization",
+    quotes: NumberLong("1"),
+    slug: "virtualization",
+    uri: "/topics/virtualization",
+    "created_at": ISODate("2021-04-07T03:19:00.301Z"),
+    "updated_at": ISODate("2021-04-07T03:19:00.301Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606e76380034b56e00ac1ead"),
+    name: "android",
+    quotes: NumberLong("3"),
+    slug: "android",
+    uri: "/topics/android",
+    "created_at": ISODate("2021-04-08T03:19:20.896Z"),
+    "updated_at": ISODate("2021-04-08T03:19:20.896Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606e76380034b56e00ac1eae"),
+    name: "sandboxing",
+    quotes: NumberLong("1"),
+    slug: "sandboxing",
+    uri: "/topics/sandboxing",
+    "created_at": ISODate("2021-04-08T03:19:20.897Z"),
+    "updated_at": ISODate("2021-04-08T03:19:20.897Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606e76380034b56e00ac1eaf"),
+    name: "沙箱技术",
+    quotes: NumberLong("1"),
+    slug: "sha-xiang-ji-shu",
+    uri: "/topics/sha-xiang-ji-shu",
+    "created_at": ISODate("2021-04-08T03:19:20.898Z"),
+    "updated_at": ISODate("2021-04-08T03:19:20.898Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ebb"),
+    name: "数据采集",
+    quotes: NumberLong("1"),
+    slug: "shu-ju-cai-ji",
+    uri: "/topics/shu-ju-cai-ji",
+    "created_at": ISODate("2021-04-09T04:49:57.222Z"),
+    "updated_at": ISODate("2021-04-09T04:49:57.222Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ebc"),
+    name: "异步数据采集",
+    quotes: NumberLong("1"),
+    slug: "yi-bu-shu-ju-cai-ji",
+    uri: "/topics/yi-bu-shu-ju-cai-ji",
+    "created_at": ISODate("2021-04-09T04:49:57.223Z"),
+    "updated_at": ISODate("2021-04-09T04:49:57.223Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ece"),
+    name: "docker",
+    quotes: NumberLong("1"),
+    slug: "docker",
+    uri: "/topics/docker",
+    "created_at": ISODate("2021-04-10T12:12:15.165Z"),
+    "updated_at": ISODate("2021-04-10T12:12:15.165Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ecf"),
+    name: "镜像",
+    quotes: NumberLong("1"),
+    slug: "jing-xiang",
+    uri: "/topics/jing-xiang",
+    "created_at": ISODate("2021-04-10T12:12:15.165Z"),
+    "updated_at": ISODate("2021-04-10T12:12:15.165Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed4"),
+    name: "生产环境",
+    quotes: NumberLong("1"),
+    slug: "sheng-chan-huan-jing",
+    uri: "/topics/sheng-chan-huan-jing",
+    "created_at": ISODate("2021-04-11T03:27:44.652Z"),
+    "updated_at": ISODate("2021-04-11T03:27:44.652Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed5"),
+    name: "rust-评价",
+    quotes: NumberLong("1"),
+    slug: "rust-ping-jia",
+    uri: "/topics/rust-ping-jia",
+    "created_at": ISODate("2021-04-11T03:27:44.653Z"),
+    "updated_at": ISODate("2021-04-11T03:27:44.653Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6073c19638700000b8003103"),
+    name: "rust-官方博客",
+    quotes: NumberLong("6"),
+    "created_at": ISODate("2021-04-11T03:27:44.653Z"),
+    "updated_at": ISODate("2021-04-11T03:27:44.653Z"),
+    slug: "rust-guan-fang-bo-ke",
+    uri: "/topics/rust-guan-fang-bo-ke"
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1eda"),
+    name: "rust-2021-edition",
+    quotes: NumberLong("1"),
+    slug: "rust-2021-edition",
+    uri: "/topics/rust-2021-edition",
+    "created_at": ISODate("2021-04-12T07:51:49.724Z"),
+    "updated_at": ISODate("2021-04-12T07:51:49.724Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1edb"),
+    name: "rust-2021-版本",
+    quotes: NumberLong("1"),
+    slug: "rust-2021-ban-ben",
+    uri: "/topics/rust-2021-ban-ben",
+    "created_at": ISODate("2021-04-12T07:51:49.724Z"),
+    "updated_at": ISODate("2021-04-12T07:51:49.724Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee1"),
+    name: "actix-web",
+    quotes: NumberLong("4"),
+    slug: "actix-web",
+    uri: "/topics/actix-web",
+    "created_at": ISODate("2021-04-13T15:48:29.407Z"),
+    "updated_at": ISODate("2021-04-13T15:48:29.407Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee2"),
+    name: "rbatis",
+    quotes: NumberLong("5"),
+    slug: "rbatis",
+    uri: "/topics/rbatis",
+    "created_at": ISODate("2021-04-13T15:48:29.408Z"),
+    "updated_at": ISODate("2021-04-13T15:48:29.408Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eea"),
+    name: "graphql-查询",
+    quotes: NumberLong("1"),
+    slug: "graphql-cha-xun",
+    uri: "/topics/graphql-cha-xun",
+    "created_at": ISODate("2021-04-14T14:22:17.517Z"),
+    "updated_at": ISODate("2021-04-14T14:22:17.517Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef3"),
+    name: "vision-doc",
+    quotes: NumberLong("1"),
+    slug: "vision-doc",
+    uri: "/topics/vision-doc",
+    "created_at": ISODate("2021-04-15T05:45:17.733Z"),
+    "updated_at": ISODate("2021-04-15T05:45:17.733Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef4"),
+    name: "愿景文档",
+    quotes: NumberLong("1"),
+    slug: "yuan-jing-wen-dang",
+    uri: "/topics/yuan-jing-wen-dang",
+    "created_at": ISODate("2021-04-15T05:45:17.733Z"),
+    "updated_at": ISODate("2021-04-15T05:45:17.733Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1ef9"),
+    name: "代码重构",
+    quotes: NumberLong("1"),
+    slug: "dai-ma-zhong-gou",
+    uri: "/topics/dai-ma-zhong-gou",
+    "created_at": ISODate("2021-04-15T10:48:36.454Z"),
+    "updated_at": ISODate("2021-04-15T10:48:36.454Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f09"),
+    name: "rust-compiler",
+    quotes: NumberLong("2"),
+    slug: "rust-compiler",
+    uri: "/topics/rust-compiler",
+    "created_at": ISODate("2021-04-15T23:30:42.891Z"),
+    "updated_at": ISODate("2021-04-15T23:30:42.891Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f0a"),
+    name: "steering-cycle",
+    quotes: NumberLong("1"),
+    slug: "steering-cycle",
+    uri: "/topics/steering-cycle",
+    "created_at": ISODate("2021-04-15T23:30:42.892Z"),
+    "updated_at": ISODate("2021-04-15T23:30:42.892Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f0b"),
+    name: "方向周期",
+    quotes: NumberLong("1"),
+    slug: "fang-xiang-zhou-qi",
+    uri: "/topics/fang-xiang-zhou-qi",
+    "created_at": ISODate("2021-04-15T23:30:42.892Z"),
+    "updated_at": ISODate("2021-04-15T23:30:42.892Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("607919450034b56e00ac1f11"),
+    name: "this-week-in-rust",
+    quotes: NumberLong("4"),
+    slug: "this-week-in-rust",
+    uri: "/topics/this-week-in-rust",
+    "created_at": ISODate("2021-04-16T04:57:41.458Z"),
+    "updated_at": ISODate("2021-04-16T04:57:41.458Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f16"),
+    name: "rust-基金会",
+    quotes: NumberLong("2"),
+    slug: "rust-ji-jin-hui",
+    uri: "/topics/rust-ji-jin-hui",
+    "created_at": ISODate("2021-04-18T01:17:01.554Z"),
+    "updated_at": ISODate("2021-04-18T01:17:01.554Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f17"),
+    name: "rust-foundation",
+    quotes: NumberLong("2"),
+    slug: "rust-foundation",
+    uri: "/topics/rust-foundation",
+    "created_at": ISODate("2021-04-18T01:17:01.555Z"),
+    "updated_at": ISODate("2021-04-18T01:17:01.555Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f18"),
+    name: "隐私声明",
+    quotes: NumberLong("1"),
+    slug: "yin-si-sheng-ming",
+    uri: "/topics/yin-si-sheng-ming",
+    "created_at": ISODate("2021-04-18T01:17:01.556Z"),
+    "updated_at": ISODate("2021-04-18T01:17:01.556Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f1e"),
+    name: "机器人",
+    quotes: NumberLong("1"),
+    slug: "ji-qi-ren",
+    uri: "/topics/ji-qi-ren",
+    "created_at": ISODate("2021-04-27T03:56:54.445Z"),
+    "updated_at": ISODate("2021-04-27T03:56:54.445Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f1f"),
+    name: "robotics",
+    quotes: NumberLong("1"),
+    slug: "robotics",
+    uri: "/topics/robotics",
+    "created_at": ISODate("2021-04-27T03:56:54.447Z"),
+    "updated_at": ISODate("2021-04-27T03:56:54.447Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60879b130034b56e00ac1f26"),
+    name: "rustdoc",
+    quotes: NumberLong("1"),
+    slug: "rustdoc",
+    uri: "/topics/rustdoc",
+    "created_at": ISODate("2021-04-27T05:03:15.38Z"),
+    "updated_at": ISODate("2021-04-27T05:03:15.38Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("60879bc00034b56e00ac1f2a"),
+    name: "rust-编译器",
+    quotes: NumberLong("1"),
+    slug: "rust-bian-yi-qi",
+    uri: "/topics/rust-bian-yi-qi",
+    "created_at": ISODate("2021-04-27T05:06:08.214Z"),
+    "updated_at": ISODate("2021-04-27T05:06:08.214Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f2f"),
+    name: "实时音频",
+    quotes: NumberLong("1"),
+    slug: "shi-shi-yin-pin",
+    uri: "/topics/shi-shi-yin-pin",
+    "created_at": ISODate("2021-04-27T09:19:48.175Z"),
+    "updated_at": ISODate("2021-04-27T09:19:48.175Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f30"),
+    name: "real-time-audio",
+    quotes: NumberLong("1"),
+    slug: "real-time-audio",
+    uri: "/topics/real-time-audio",
+    "created_at": ISODate("2021-04-27T09:19:48.176Z"),
+    "updated_at": ISODate("2021-04-27T09:19:48.176Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f35"),
+    name: "rustup",
+    quotes: NumberLong("2"),
+    slug: "rustup",
+    uri: "/topics/rustup",
+    "created_at": ISODate("2021-04-28T02:51:32.228Z"),
+    "updated_at": ISODate("2021-04-28T02:51:32.228Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f36"),
+    name: "rust-toolchain",
+    quotes: NumberLong("2"),
+    slug: "rust-toolchain",
+    uri: "/topics/rust-toolchain",
+    "created_at": ISODate("2021-04-28T02:51:32.229Z"),
+    "updated_at": ISODate("2021-04-28T02:51:32.229Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f37"),
+    name: "rust-工具链",
+    quotes: NumberLong("2"),
+    slug: "rust-gong-ju-lian",
+    uri: "/topics/rust-gong-ju-lian",
+    "created_at": ISODate("2021-04-28T02:51:32.229Z"),
+    "updated_at": ISODate("2021-04-28T02:51:32.229Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f3d"),
+    name: "变更服务",
+    quotes: NumberLong("1"),
+    slug: "bian-geng-fu-wu",
+    uri: "/topics/bian-geng-fu-wu",
+    "created_at": ISODate("2021-04-28T12:46:14.442Z"),
+    "updated_at": ISODate("2021-04-28T12:46:14.442Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f3e"),
+    name: "mutation",
+    quotes: NumberLong("1"),
+    slug: "mutation",
+    uri: "/topics/mutation",
+    "created_at": ISODate("2021-04-28T12:46:14.443Z"),
+    "updated_at": ISODate("2021-04-28T12:46:14.443Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f3f"),
+    name: "查询服务",
+    quotes: NumberLong("1"),
+    slug: "cha-xun-fu-wu",
+    uri: "/topics/cha-xun-fu-wu",
+    "created_at": ISODate("2021-04-28T12:46:14.444Z"),
+    "updated_at": ISODate("2021-04-28T12:46:14.444Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f40"),
+    name: "query",
+    quotes: NumberLong("1"),
+    slug: "query",
+    uri: "/topics/query",
+    "created_at": ISODate("2021-04-28T12:46:14.444Z"),
+    "updated_at": ISODate("2021-04-28T12:46:14.444Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f5b"),
+    name: "rust-贡献者",
+    quotes: NumberLong("1"),
+    slug: "rust-gong-xian-zhe",
+    uri: "/topics/rust-gong-xian-zhe",
+    "created_at": ISODate("2021-05-03T03:37:24.716Z"),
+    "updated_at": ISODate("2021-05-03T03:37:24.716Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f5c"),
+    name: "rust-轶事",
+    quotes: NumberLong("1"),
+    slug: "rust-yi-shi",
+    uri: "/topics/rust-yi-shi",
+    "created_at": ISODate("2021-05-03T03:37:24.717Z"),
+    "updated_at": ISODate("2021-05-03T03:37:24.717Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f61"),
+    name: "rust-稳定版",
+    quotes: NumberLong("1"),
+    slug: "rust-wen-ding-ban",
+    uri: "/topics/rust-wen-ding-ban",
+    "created_at": ISODate("2021-05-04T23:46:59.472Z"),
+    "updated_at": ISODate("2021-05-04T23:46:59.472Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f62"),
+    name: "rust-预发布",
+    quotes: NumberLong("1"),
+    slug: "rust-yu-fa-bu",
+    uri: "/topics/rust-yu-fa-bu",
+    "created_at": ISODate("2021-05-04T23:46:59.473Z"),
+    "updated_at": ISODate("2021-05-04T23:46:59.473Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f63"),
+    name: "rust-测试",
+    quotes: NumberLong("1"),
+    slug: "rust-ce-shi",
+    uri: "/topics/rust-ce-shi",
+    "created_at": ISODate("2021-05-04T23:46:59.474Z"),
+    "updated_at": ISODate("2021-05-04T23:46:59.474Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f78"),
+    name: "安全编程",
+    quotes: NumberLong("1"),
+    slug: "an-quan-bian-cheng",
+    uri: "/topics/an-quan-bian-cheng",
+    "created_at": ISODate("2021-05-07T04:15:47.726Z"),
+    "updated_at": ISODate("2021-05-07T04:15:47.726Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f79"),
+    name: "可信计算",
+    quotes: NumberLong("1"),
+    slug: "ke-xin-ji-suan",
+    uri: "/topics/ke-xin-ji-suan",
+    "created_at": ISODate("2021-05-07T04:15:47.727Z"),
+    "updated_at": ISODate("2021-05-07T04:15:47.727Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7a"),
+    name: "安全代码",
+    quotes: NumberLong("1"),
+    slug: "an-quan-dai-ma",
+    uri: "/topics/an-quan-dai-ma",
+    "created_at": ISODate("2021-05-07T04:15:47.727Z"),
+    "updated_at": ISODate("2021-05-07T04:15:47.727Z")
+} ]);
+db.getCollection("topics").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7b"),
+    name: "secure-code",
+    quotes: NumberLong("1"),
+    slug: "secure-code",
+    uri: "/topics/secure-code",
+    "created_at": ISODate("2021-05-07T04:15:47.728Z"),
+    "updated_at": ISODate("2021-05-07T04:15:47.728Z")
+} ]);
+
+// ----------------------------
+// Collection structure for topics_articles
+// ----------------------------
+db.getCollection("topics_articles").drop();
+db.createCollection("topics_articles");
+
+// ----------------------------
+// Documents of topics_articles
+// ----------------------------
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6052e2a79528000070004cfc"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6052dc1500b6b760000838d9"),
+    "topic_id": ObjectId("6052e20d9528000070004cf8")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6052e3989528000070004cfd"),
+    "article_id": ObjectId("6052dc1500b6b760000838d9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "topic_id": ObjectId("6052e2259528000070004cf9")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6052e39a9528000070004cfe"),
+    "article_id": ObjectId("6052dc1500b6b760000838d9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6052e39c9528000070004cff"),
+    "article_id": ObjectId("6052dc1500b6b760000838d9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "topic_id": ObjectId("6052e2629528000070004cfb")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605313f59528000070004d08"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f5c99528000070004d07"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605313f79528000070004d09"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f5c79528000070004d06"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605313fb9528000070004d0a"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f5bb9528000070004d05"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605313fd9528000070004d0b"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f51e9528000070004d04"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6053140f9528000070004d0c"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f5059528000070004d03"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605314379528000070004d0d"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052f5029528000070004d02"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605315239528000070004d0e"),
+    "article_id": ObjectId("6053138400b6b760000838da"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537af242210000ea003922"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537af342210000ea003923"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052f5029528000070004d02")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537af542210000ea003924"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537af742210000ea003925"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537af842210000ea003926"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052f5bb9528000070004d05")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537afa42210000ea003927"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "topic_id": ObjectId("6052f5c79528000070004d06")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60537b7842210000ea003928"),
+    "topic_id": ObjectId("6052f5c99528000070004d07"),
+    "article_id": ObjectId("60537a0500592e3a00e71d16"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fcfe750000002003462"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd0e750000002003463"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f5029528000070004d02"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd2e750000002003464"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f5059528000070004d03"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd3e750000002003465"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f51e9528000070004d04"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd5e750000002003466"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f5bb9528000070004d05"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd6e750000002003467"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f5c79528000070004d06"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60558fd8e750000002003468"),
+    "article_id": ObjectId("60558b6e005b0a5500ddf9d8"),
+    "topic_id": ObjectId("6052f5c99528000070004d07"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6056a788bb7d0000a9007c12"),
+    "article_id": ObjectId("6056a3c20003da4b00968ba8"),
+    "topic_id": ObjectId("6056a7adbb7d0000a9007c14"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6056a78abb7d0000a9007c13"),
+    "article_id": ObjectId("6056a3c20003da4b00968ba8"),
+    "topic_id": ObjectId("6056a7afbb7d0000a9007c15"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605973ec75550000ac001564"),
+    "article_id": ObjectId("60597336001032c400b67a8d"),
+    "topic_id": ObjectId("6059738375550000ac001562"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605973ef75550000ac001565"),
+    "article_id": ObjectId("60597336001032c400b67a8d"),
+    "topic_id": ObjectId("605973af75550000ac001563"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6059746a75550000ac001566"),
+    "article_id": ObjectId("60597336001032c400b67a8d"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605ab74f964000002e005982"),
+    "article_id": ObjectId("605ab48a001032c400b67a8e"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605aee06964000002e005984"),
+    "article_id": ObjectId("605aecde00674dfb00640341"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605aee08964000002e005985"),
+    "article_id": ObjectId("605aecde00674dfb00640341"),
+    "topic_id": ObjectId("605ac8db964000002e005983"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605c66f9063f0000bd002085"),
+    "article_id": ObjectId("605c642e0086af3400b33826"),
+    "topic_id": ObjectId("605c666a063f0000bd002084"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605c66fb063f0000bd002086"),
+    "article_id": ObjectId("605c642e0086af3400b33826"),
+    "topic_id": ObjectId("605c6667063f0000bd002083"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605c66fc063f0000bd002087"),
+    "article_id": ObjectId("605c642e0086af3400b33826"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605ceca688290000d20071e3"),
+    "article_id": ObjectId("605ce8520086af3400b33827"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("605ceca988290000d20071e4"),
+    "article_id": ObjectId("605ce8520086af3400b33827"),
+    "topic_id": ObjectId("605cec6788290000d20071e2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60607e1bae050000eb0018a7"),
+    "article_id": ObjectId("60606bc8004dbacc002d3713"),
+    "topic_id": ObjectId("60607d90ae050000eb0018a4"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60607e1cae050000eb0018a8"),
+    "article_id": ObjectId("60606bc8004dbacc002d3713"),
+    "topic_id": ObjectId("60607d91ae050000eb0018a5"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60607e1eae050000eb0018a9"),
+    "article_id": ObjectId("60606bc8004dbacc002d3713"),
+    "topic_id": ObjectId("60607d93ae050000eb0018a6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6061540e1d78000032003b52"),
+    "article_id": ObjectId("60615107004dbacc002d3714"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606154301d78000032003b53"),
+    "article_id": ObjectId("60615107004dbacc002d3714"),
+    "topic_id": ObjectId("6061544f1d78000032003b54"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6061d52a2e4b000060006642"),
+    "article_id": ObjectId("6061e9a4004dbacc002d3717"),
+    "topic_id": ObjectId("6052e2449528000070004cfa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6061d52c2e4b000060006643"),
+    "article_id": ObjectId("6061e9a4004dbacc002d3717"),
+    "topic_id": ObjectId("6061544f1d78000032003b54"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062c02f38350000d8000696"),
+    "article_id": ObjectId("6062beb0004dbacc002d3718"),
+    "topic_id": ObjectId("6062bedb38350000d8000693"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062c03238350000d8000697"),
+    "article_id": ObjectId("6062beb0004dbacc002d3718"),
+    "topic_id": ObjectId("6062bedd38350000d8000694"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062c03438350000d8000698"),
+    "article_id": ObjectId("6062beb0004dbacc002d3718"),
+    "topic_id": ObjectId("6062beef38350000d8000695"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062c0bb38350000d8000699"),
+    "article_id": ObjectId("6062beb0004dbacc002d3718"),
+    "topic_id": ObjectId("6062a36438350000d8000692"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062c13c38350000d800069a"),
+    "article_id": ObjectId("6056a3c20003da4b00968ba8"),
+    "topic_id": ObjectId("6062a36438350000d8000692"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062db1d38350000d800069d"),
+    "article_id": ObjectId("6062d797004dbacc002d3719"),
+    "topic_id": ObjectId("6056a7adbb7d0000a9007c14"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062db1f38350000d800069e"),
+    "article_id": ObjectId("6062d797004dbacc002d3719"),
+    "topic_id": ObjectId("6062c16d38350000d800069b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062db2038350000d800069f"),
+    "article_id": ObjectId("6062d797004dbacc002d3719"),
+    "topic_id": ObjectId("6062c16e38350000d800069c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6062dc4438350000d80006a0"),
+    "article_id": ObjectId("6062d797004dbacc002d3719"),
+    "topic_id": ObjectId("6062a36438350000d8000692"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6800472b6800425055"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6800472b6800425056"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b680042504e")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6800472b6800425057"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b680042504f")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6900472b6800425058"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b6800425050")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6900472b6800425059"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b6800425051")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6900472b680042505a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b6800425052")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60673d6900472b680042505b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60673d6800472b6800425054"),
+    "topic_id": ObjectId("60673d6800472b6800425053")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728c0034b56e00ac1e6e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728d0034b56e00ac1e6f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728d0034b56e00ac1e70"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e69")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728d0034b56e00ac1e71"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e6a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728d0034b56e00ac1e72"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e6b")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6067728d0034b56e00ac1e73"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6067728c0034b56e00ac1e6d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e6c")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("606806110034b56e00ac1e74")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("606806110034b56e00ac1e75")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("606806110034b56e00ac1e76")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("606806110034b56e00ac1e77")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606806110034b56e00ac1e7f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606806110034b56e00ac1e79"),
+    "topic_id": ObjectId("606806110034b56e00ac1e78")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e84"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60687abe0034b56e00ac1e83"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e85"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60687abe0034b56e00ac1e83"),
+    "topic_id": ObjectId("60687abe0034b56e00ac1e80")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e86"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60687abe0034b56e00ac1e83"),
+    "topic_id": ObjectId("60687abe0034b56e00ac1e81")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60687abe0034b56e00ac1e87"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60687abe0034b56e00ac1e83"),
+    "topic_id": ObjectId("60687abe0034b56e00ac1e82")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e8c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6068a3d10034b56e00ac1e8b"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e8d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6068a3d10034b56e00ac1e8b"),
+    "topic_id": ObjectId("6062bedb38350000d8000693")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6068a3d10034b56e00ac1e8e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6068a3d10034b56e00ac1e8b"),
+    "topic_id": ObjectId("6068a3d10034b56e00ac1e88")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6068a3d20034b56e00ac1e8f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6068a3d10034b56e00ac1e8b"),
+    "topic_id": ObjectId("6068a3d10034b56e00ac1e89")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6068a3d20034b56e00ac1e90"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6068a3d10034b56e00ac1e8b"),
+    "topic_id": ObjectId("6068a3d10034b56e00ac1e8a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e94"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60693d100034b56e00ac1e93"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e95"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60693d100034b56e00ac1e93"),
+    "topic_id": ObjectId("60693d100034b56e00ac1e91")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60693d100034b56e00ac1e96"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60693d100034b56e00ac1e93"),
+    "topic_id": ObjectId("60693d100034b56e00ac1e92")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606a7df10034b56e00ac1e9b"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606a7df10034b56e00ac1e9b"),
+    "topic_id": ObjectId("606a7df10034b56e00ac1e97")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606a7df10034b56e00ac1e9b"),
+    "topic_id": ObjectId("606a7df10034b56e00ac1e98")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1e9f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606a7df10034b56e00ac1e9b"),
+    "topic_id": ObjectId("606a7df10034b56e00ac1e99")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606a7df10034b56e00ac1ea0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606a7df10034b56e00ac1e9b"),
+    "topic_id": ObjectId("606a7df10034b56e00ac1e9a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("606d24a40034b56e00ac1ea1")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1ea9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("606d24a40034b56e00ac1ea2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1eaa"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("606d24a40034b56e00ac1ea3")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1eab"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("606d24a40034b56e00ac1ea4")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606d24a40034b56e00ac1eac"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606d24a40034b56e00ac1ea6"),
+    "topic_id": ObjectId("606d24a40034b56e00ac1ea5")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e76380034b56e00ac1eb1"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e76380034b56e00ac1eb0"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e76390034b56e00ac1eb2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e76380034b56e00ac1eb0"),
+    "topic_id": ObjectId("606e76380034b56e00ac1ead")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e76390034b56e00ac1eb3"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e76380034b56e00ac1eb0"),
+    "topic_id": ObjectId("606e76380034b56e00ac1eae")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e76390034b56e00ac1eb4"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e76380034b56e00ac1eb0"),
+    "topic_id": ObjectId("606e76380034b56e00ac1eaf")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e7ebd0034b56e00ac1eb6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e7ebd0034b56e00ac1eb5"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e7ebd0034b56e00ac1eb7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e7ebd0034b56e00ac1eb5"),
+    "topic_id": ObjectId("606e76380034b56e00ac1ead")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e840c0034b56e00ac1eb9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e840c0034b56e00ac1eb8"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606e840c0034b56e00ac1eba"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606e840c0034b56e00ac1eb8"),
+    "topic_id": ObjectId("606e76380034b56e00ac1ead")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ebe"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606fdcf50034b56e00ac1ebd"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ebf"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606fdcf50034b56e00ac1ebd"),
+    "topic_id": ObjectId("606fdcf50034b56e00ac1ebb")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("606fdcf50034b56e00ac1ec0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("606fdcf50034b56e00ac1ebd"),
+    "topic_id": ObjectId("606fdcf50034b56e00ac1ebc")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607119810034b56e00ac1ec2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607119810034b56e00ac1ec1"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607119810034b56e00ac1ec3"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607119810034b56e00ac1ec1"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ed1"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6071961f0034b56e00ac1ed0"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ed2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6071961f0034b56e00ac1ed0"),
+    "topic_id": ObjectId("6071961f0034b56e00ac1ece")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6071961f0034b56e00ac1ed3"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6071961f0034b56e00ac1ed0"),
+    "topic_id": ObjectId("6071961f0034b56e00ac1ecf")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60726cb00034b56e00ac1ed6"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60726cb00034b56e00ac1ed6"),
+    "topic_id": ObjectId("60726cb00034b56e00ac1ed4")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60726cb00034b56e00ac1ed9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60726cb00034b56e00ac1ed6"),
+    "topic_id": ObjectId("60726cb00034b56e00ac1ed5")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073c20538700000b8003104"),
+    "article_id": ObjectId("605ab48a001032c400b67a8e"),
+    "topic_id": ObjectId("6073c19638700000b8003103"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073c20738700000b8003105"),
+    "article_id": ObjectId("60687abe0034b56e00ac1e83"),
+    "topic_id": ObjectId("6073c19638700000b8003103"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073c20938700000b8003106"),
+    "article_id": ObjectId("605ce8520086af3400b33827"),
+    "topic_id": ObjectId("6073c19638700000b8003103"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073c4d438700000b8003107"),
+    "article_id": ObjectId("605c642e0086af3400b33826"),
+    "topic_id": ObjectId("6073c19638700000b8003103"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1edd"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6073fc150034b56e00ac1edc"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1ede"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6073fc150034b56e00ac1edc"),
+    "topic_id": ObjectId("6073fc150034b56e00ac1eda")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1edf"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6073fc150034b56e00ac1edc"),
+    "topic_id": ObjectId("6073fc150034b56e00ac1edb")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6073fc150034b56e00ac1ee0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6073fc150034b56e00ac1edc"),
+    "topic_id": ObjectId("6073c19638700000b8003103")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee4"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee5"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee1")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6064b45e006135f6004c319a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6075bd4d0034b56e00ac1ee9"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6075bd4d0034b56e00ac1ee3"),
+    "topic_id": ObjectId("6064b812001bd8c10024ceba")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eec"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eed"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eee"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee1")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1eef"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1ef0"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6064b45e006135f6004c319a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1ef1"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6076fa990034b56e00ac1ef2"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6076fa990034b56e00ac1eeb"),
+    "topic_id": ObjectId("6076fa990034b56e00ac1eea")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6077d2ed0034b56e00ac1ef5"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6077d2ed0034b56e00ac1ef5"),
+    "topic_id": ObjectId("6077d2ed0034b56e00ac1ef3")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6077d2ed0034b56e00ac1ef8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6077d2ed0034b56e00ac1ef5"),
+    "topic_id": ObjectId("6077d2ed0034b56e00ac1ef4")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1efb"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1efc"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee1")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1efd"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1efe"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1eff"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("60781a040034b56e00ac1ef9")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1f00"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6064b45e006135f6004c319a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781a040034b56e00ac1f01"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781a040034b56e00ac1efa"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f03"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f04"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f05"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f06"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee1")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5b0034b56e00ac1f07"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60781d5c0034b56e00ac1f08"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60781d5b0034b56e00ac1f02"),
+    "topic_id": ObjectId("6064b45e006135f6004c319a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f0d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6078cca20034b56e00ac1f0c"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6078cca20034b56e00ac1f0e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6078cca20034b56e00ac1f0c"),
+    "topic_id": ObjectId("6078cca20034b56e00ac1f09")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6078cca30034b56e00ac1f0f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6078cca20034b56e00ac1f0c"),
+    "topic_id": ObjectId("6078cca20034b56e00ac1f0a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6078cca30034b56e00ac1f10"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6078cca20034b56e00ac1f0c"),
+    "topic_id": ObjectId("6078cca20034b56e00ac1f0b")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607919450034b56e00ac1f13"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607919450034b56e00ac1f12"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607919450034b56e00ac1f14"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607919450034b56e00ac1f12"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607919450034b56e00ac1f15"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607919450034b56e00ac1f12"),
+    "topic_id": ObjectId("607919450034b56e00ac1f11")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f1a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607b888d0034b56e00ac1f19"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f1b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607b888d0034b56e00ac1f19"),
+    "topic_id": ObjectId("607b888d0034b56e00ac1f16")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f1c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607b888d0034b56e00ac1f19"),
+    "topic_id": ObjectId("607b888d0034b56e00ac1f17")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("607b888d0034b56e00ac1f1d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("607b888d0034b56e00ac1f19"),
+    "topic_id": ObjectId("607b888d0034b56e00ac1f18")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f21"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60878b860034b56e00ac1f20"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f22"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60878b860034b56e00ac1f20"),
+    "topic_id": ObjectId("60878b860034b56e00ac1f1e")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f23"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60878b860034b56e00ac1f20"),
+    "topic_id": ObjectId("6062c16e38350000d800069c")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f24"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60878b860034b56e00ac1f20"),
+    "topic_id": ObjectId("6062c16d38350000d800069b")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60878b860034b56e00ac1f25"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60878b860034b56e00ac1f20"),
+    "topic_id": ObjectId("60878b860034b56e00ac1f1f")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60879b130034b56e00ac1f28"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60879b130034b56e00ac1f27"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60879b130034b56e00ac1f29"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60879b130034b56e00ac1f27"),
+    "topic_id": ObjectId("60879b130034b56e00ac1f26")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60879bc00034b56e00ac1f2c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60879bc00034b56e00ac1f2b"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60879bc00034b56e00ac1f2d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60879bc00034b56e00ac1f2b"),
+    "topic_id": ObjectId("6078cca20034b56e00ac1f09")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60879bc00034b56e00ac1f2e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60879bc00034b56e00ac1f2b"),
+    "topic_id": ObjectId("60879bc00034b56e00ac1f2a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f32"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6087d7340034b56e00ac1f31"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f33"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6087d7340034b56e00ac1f31"),
+    "topic_id": ObjectId("6087d7340034b56e00ac1f2f")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6087d7340034b56e00ac1f34"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6087d7340034b56e00ac1f31"),
+    "topic_id": ObjectId("6087d7340034b56e00ac1f30")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f39"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6088cdb40034b56e00ac1f38"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f3a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6088cdb40034b56e00ac1f38"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f35")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f3b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6088cdb40034b56e00ac1f38"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f36")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6088cdb40034b56e00ac1f3c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6088cdb40034b56e00ac1f38"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f37")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f42"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f43"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f44"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("608959160034b56e00ac1f3d")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f45"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("608959160034b56e00ac1f3e")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f46"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("608959160034b56e00ac1f3f")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f47"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("608959160034b56e00ac1f40")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608959160034b56e00ac1f48"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608959160034b56e00ac1f41"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60899dc20034b56e00ac1f4a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60899dc20034b56e00ac1f49"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60899dc20034b56e00ac1f4b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60899dc20034b56e00ac1f49"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("60899dc20034b56e00ac1f4c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("60899dc20034b56e00ac1f49"),
+    "topic_id": ObjectId("607919450034b56e00ac1f11")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608b70bc0034b56e00ac1f4e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608b70bc0034b56e00ac1f4d"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608b70bc0034b56e00ac1f4f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608b70bc0034b56e00ac1f4d"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608b70bc0034b56e00ac1f50"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608b70bc0034b56e00ac1f4d"),
+    "topic_id": ObjectId("607919450034b56e00ac1f11")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608ba5dd0034b56e00ac1f52"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608ba5dd0034b56e00ac1f51"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608ba5de0034b56e00ac1f53"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608ba5dd0034b56e00ac1f51"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f35")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608ba5de0034b56e00ac1f54"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608ba5dd0034b56e00ac1f51"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f37")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608ba5de0034b56e00ac1f55"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608ba5dd0034b56e00ac1f51"),
+    "topic_id": ObjectId("6088cdb40034b56e00ac1f36")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608bafc70034b56e00ac1f57"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608bafc70034b56e00ac1f56"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608bafc70034b56e00ac1f58"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608bafc70034b56e00ac1f56"),
+    "topic_id": ObjectId("607b888d0034b56e00ac1f16")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608bafc70034b56e00ac1f59"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608bafc70034b56e00ac1f56"),
+    "topic_id": ObjectId("607b888d0034b56e00ac1f17")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f5e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608f6ff40034b56e00ac1f5d"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f5f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608f6ff40034b56e00ac1f5d"),
+    "topic_id": ObjectId("608f6ff40034b56e00ac1f5b")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("608f6ff40034b56e00ac1f60"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("608f6ff40034b56e00ac1f5d"),
+    "topic_id": ObjectId("608f6ff40034b56e00ac1f5c")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f65"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6091dcf30034b56e00ac1f64"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f66"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6091dcf30034b56e00ac1f64"),
+    "topic_id": ObjectId("6091dcf30034b56e00ac1f61")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f67"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6091dcf30034b56e00ac1f64"),
+    "topic_id": ObjectId("6091dcf30034b56e00ac1f62")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6091dcf30034b56e00ac1f68"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6091dcf30034b56e00ac1f64"),
+    "topic_id": ObjectId("6091dcf30034b56e00ac1f63")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6093887f0034b56e00ac1f6a"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6093887f0034b56e00ac1f6b"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6052f51e9528000070004d04")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("609388800034b56e00ac1f6c"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6075bd4d0034b56e00ac1ee2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("609388800034b56e00ac1f6d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6052f5059528000070004d03")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("609388800034b56e00ac1f6e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6064b45e006135f6004c319a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("609388800034b56e00ac1f6f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093887f0034b56e00ac1f69"),
+    "topic_id": ObjectId("6064b812001bd8c10024ceba")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6093ce650034b56e00ac1f71"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093ce650034b56e00ac1f70"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6093ce650034b56e00ac1f72"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093ce650034b56e00ac1f70"),
+    "topic_id": ObjectId("6067728c0034b56e00ac1e68")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6093ce650034b56e00ac1f73"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6093ce650034b56e00ac1f70"),
+    "topic_id": ObjectId("607919450034b56e00ac1f11")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094857a0034b56e00ac1f75"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094857a0034b56e00ac1f74"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094857a0034b56e00ac1f76"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094857a0034b56e00ac1f74"),
+    "topic_id": ObjectId("6073c19638700000b8003103")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094857a0034b56e00ac1f77"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094857a0034b56e00ac1f74"),
+    "topic_id": ObjectId("605cec6788290000d20071e2")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7d"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094bef30034b56e00ac1f7c"),
+    "topic_id": ObjectId("6052e2449528000070004cfa")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7e"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094bef30034b56e00ac1f7c"),
+    "topic_id": ObjectId("6094bef30034b56e00ac1f78")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f7f"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094bef30034b56e00ac1f7c"),
+    "topic_id": ObjectId("6094bef30034b56e00ac1f79")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f80"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094bef30034b56e00ac1f7c"),
+    "topic_id": ObjectId("6094bef30034b56e00ac1f7a")
+} ]);
+db.getCollection("topics_articles").insert([ {
+    _id: ObjectId("6094bef30034b56e00ac1f81"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "article_id": ObjectId("6094bef30034b56e00ac1f7c"),
+    "topic_id": ObjectId("6094bef30034b56e00ac1f7b")
+} ]);
+
+// ----------------------------
+// Collection structure for users
+// ----------------------------
+db.getCollection("users").drop();
+db.createCollection("users");
+
+// ----------------------------
+// Documents of users
+// ----------------------------
+db.getCollection("users").insert([ {
+    _id: ObjectId("6052ce560060b98a001e50be"),
+    email: "linshi@budshome.com",
+    username: "budshome",
+    nickname: "budshome",
+    picture: "/static/favicon.png",
+    cred: "d9ENSmO7E3V14RBbjFJEolfuInXiabjkv0+vorMDx4w=",
+    "blog_name": "芽之家",
+    website: "https://budshome.com",
+    introduction: "芽之家主要目标为 IT 行业新技术的教育、分享、实践，以及布道。包括：\r\n1、新技术和教育趋势的大数据分析；\r\n2、原创、翻译的开源新技术书籍、资料分享站点；\r\n3、新技术的应用实践、开源；新技术布道。\r\n",
+    "created_at": ISODate("2021-03-18T03:51:50.227Z"),
+    "updated_at": ISODate("2021-03-18T03:51:50.227Z"),
+    banned: false
+} ]);
+db.getCollection("users").insert([ {
+    _id: ObjectId("608d7da20034b56e00ac1f5a"),
+    email: "axccjqh@qq.com",
+    username: "dawnmagnet",
+    nickname: "曙光磁铁",
+    picture: "/static/favicon.png",
+    cred: "pBQUbiP+s7di+tuIAaV1014b2Dhm2xvk15cg6mqZlgo=",
+    "blog_name": "DawnMagnet",
+    website: "http://blog.leanote.com/dawnmagnet/",
+    introduction: "Hello!",
+    banned: false,
+    "created_at": ISODate("2021-05-01T16:11:14.715Z"),
+    "updated_at": ISODate("2021-05-01T16:11:14.715Z")
+} ]);
+
+// ----------------------------
+// Collection structure for wishes
+// ----------------------------
+db.getCollection("wishes").drop();
+db.createCollection("wishes");
+
+// ----------------------------
+// Documents of wishes
+// ----------------------------
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b689300a0885e00d8e4c4"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "生活赋予我们的一种巨大的和无限高贵的礼品，这就是青春：充满着力量，充满着期待、志愿，充满着求知和斗争的志向，充满着希望、信心的青春。 ",
+    author: "保尔·柯察金",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b68a80055017200d8e4c5"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "不崇拜任何一个伟人，不蔑视任何一位凡人！",
+    author: "佚名",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b68d0003d646300d8e4c6"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "“人要学会走路，也要学会摔跤，而且只有经过摔跤，才能学会走路。”  对于一个人来说，这正是磨练。给生活添点料，经过千锤百炼的人生，更加耐人寻味。",
+    author: "佚名",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b68e600cc8ba400d8e4c7"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "失败只有一个原因，把做产品看作实现自己梦想的方式。但产品本质是帮他人解决问题，别人需要什么你就要做什么，而不是我只做我喜欢的。你的产品做到了你心中的最好，被你视若珍宝，但对别人没有任何特殊之处。",
+    author: "佚名",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b68f300c019ab00d8e4c8"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "为何天意总让年轻人承载悲痛？我不知道。但我想年龄会加深所有的情感，包括悲痛。",
+    author: "电影《利刃出鞘》",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("601b809c52600000dd007382"),
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    aphorism: "问题的复杂性不在于问题本身，而是找到问题后，你如何去处理。",
+    author: "佚名",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true,
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z")
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("6052d3579528000070004cf7"),
+    aphorism: "任何没有创新思路的求变与激进，都只不过是一场苍白无力的存生挣扎。",
+    "user_id": ObjectId("6052ce560060b98a001e50be"),
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true,
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    author: "佚名"
+} ]);
+db.getCollection("wishes").insert([ {
+    _id: ObjectId("60577c1bf05b0000430058e2"),
+    aphorism: "The pen is mightier than the sword.",
+    author: "佚名",
+    "created_at": ISODate("2021-01-26T07:38:57.035Z"),
+    published: true,
+    "updated_at": ISODate("2021-01-26T07:38:57.035Z"),
+    "user_id": ObjectId("6052ce560060b98a001e50be")
+} ]);

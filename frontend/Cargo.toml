@@ -16,7 +16,7 @@ serde_json = "1.0.64"
 
 surf = "2.2.0"
 graphql_client = "0.9.0"
-handlebars = { version = "3.5.4", features = ["script_helper"] }
+handlebars = { version = "3.5.5", features = ["script_helper"] }
 
 [dev-dependencies]
-rhai = "0.20.0"
+rhai = "0.20.1"
