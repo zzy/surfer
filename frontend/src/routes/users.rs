@@ -4,7 +4,7 @@ use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use serde_json::json;
 
 use crate::State;
-use crate::util::common::{gql_uri, Tpl};
+use crate::util::common::{gql_uri, Tpl, get_username_from_cookies};
 
 type ObjectId = String;
 
@@ -31,8 +31,10 @@ pub async fn user_index(req: Request<State>) -> tide::Result {
     let mut user_index_tpl: Tpl = Tpl::new("users/index").await;
     let mut data: BTreeMap<&str, serde_json::Value> = BTreeMap::new();
 
-    let user = resp_data["userByUsername"].clone();
-    data.insert("user", user);
+    if get_username_from_cookies(req).is_some() {
+        let user = resp_data["userByUsername"].clone();
+        data.insert("user", user);
+    }
 
     let categories = resp_data["categoriesByUsername"].clone();
     data.insert("categories", categories);

@@ -1,0 +1,10 @@
+query UserIndexData($username: String!) {
+  userByUsername(username: $username) {
+    username
+    nickname
+    blogName
+    website
+    introduction
+    picture
+  }
+}
