@@ -220,3 +220,18 @@ impl<'tpl> Tpl<'tpl> {
             .unwrap();
     }
 }
+
+pub fn get_username_from_cookies(req: tide::Request<crate::State>) -> Option<String> {
+    let mut username = String::new();
+    if let Some(cookie) = req.cookie("username") {
+        username.push_str(cookie.value());
+    } else {
+        username.push_str("-");
+    }
+
+    if "".ne(username.trim()) && "-".ne(username.trim()) {
+        Some(username)
+    } else {
+        None
+    }
+}

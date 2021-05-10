@@ -4,7 +4,7 @@ use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use serde_json::json;
 
 use crate::State;
-use crate::util::common::{gql_uri, Tpl};
+use crate::util::common::{gql_uri, Tpl, get_username_from_cookies};
 
 type ObjectId = String;
 
@@ -14,6 +14,13 @@ type ObjectId = String;
     query_path = "./graphql/article_index.graphql"
 )]
 struct ArticleIndexData;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "./graphql/schema.graphql",
+    query_path = "./graphql/user_info.graphql"
+)]
+struct UserIndexData;
 
 pub async fn article_index(req: Request<State>) -> tide::Result {
     let username = req.param("username").unwrap();
@@ -37,8 +44,26 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     let categories = resp_data["categoriesByUsername"].clone();
     data.insert("categories", categories);
 
-    let user = resp_data["articleBySlug"]["user"].clone();
-    data.insert("user", user);
+    if let Some(username) = get_username_from_cookies(req) {
+        let mut user = resp_data["articleBySlug"]["user"].clone();
+        if user["username"] != username {
+            let build_query =
+                UserIndexData::build_query(user_index_data::Variables {
+                    username: username.to_string(),
+                });
+            let query = json!(build_query);
+
+            let resp_body: GqlResponse<serde_json::Value> =
+                surf::post(&gql_uri().await)
+                    .body(query)
+                    .recv_json()
+                    .await
+                    .unwrap();
+            let resp_data = resp_body.data.expect("missing response data");
+            user = resp_data["userByUsername"].clone();
+        }
+        data.insert("user", user);
+    }
 
     let article = resp_data["articleBySlug"].clone();
     data.insert("article", article);
