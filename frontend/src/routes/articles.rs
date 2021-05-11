@@ -20,7 +20,7 @@ struct ArticleIndexData;
     schema_path = "./graphql/schema.graphql",
     query_path = "./graphql/user_info.graphql"
 )]
-struct UserIndexData;
+struct UserInfoData;
 
 pub async fn article_index(req: Request<State>) -> tide::Result {
     let username = req.param("username").unwrap();
@@ -48,7 +48,7 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         let mut user = resp_data["articleBySlug"]["user"].clone();
         if user["username"] != username {
             let build_query =
-                UserIndexData::build_query(user_index_data::Variables {
+            UserInfoData::build_query(user_info_data::Variables {
                     username: username.to_string(),
                 });
             let query = json!(build_query);
