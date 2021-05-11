@@ -221,17 +221,15 @@ impl<'tpl> Tpl<'tpl> {
     }
 }
 
-pub fn get_username_from_cookies(req: tide::Request<crate::State>) -> Option<String> {
-    let mut username = String::new();
+pub fn get_username_from_cookies(
+    req: tide::Request<crate::State>,
+) -> Option<String> {
+    let mut username: Option<String> = None;
     if let Some(cookie) = req.cookie("username") {
-        username.push_str(cookie.value());
-    } else {
-        username.push_str("-");
+        let target = cookie.value().trim();
+        if "".ne(target) && "-".ne(target) {
+            username = Some(String::from(target));
+        }
     }
-
-    if "".ne(username.trim()) && "-".ne(username.trim()) {
-        Some(username)
-    } else {
-        None
-    }
+    username
 }
