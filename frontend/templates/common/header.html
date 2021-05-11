@@ -43,7 +43,7 @@
                 </ul>
 
                 {{#if user }}
-                    <li class="nav-item dropdown">
+                    <li class="nav-item dropdown no-marker">
                         <span class="nav-link dropdown-toggle btn btn-sm btn-outline-warning" id="dropdown-user"
                             data-bs-toggle="dropdown" aria-expanded="false">
                             {{ user.nickname }}
@@ -73,10 +73,10 @@
                         </ul>
                     </li>
                 {{ else }}
-                    <li class="nav-item">
+                    <li class="nav-item no-marker">
                         <a class="nav-link btn btn-sm btn-outline-primary m-2" href="/sign-in">Sign in</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item no-marker">
                         <a class="nav-link btn btn-sm btn-outline-info m-2" href="/register">Register</a>
                     </li>
                 {{/if}}

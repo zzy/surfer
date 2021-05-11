@@ -1,4 +1,4 @@
-query UserIndexData($username: String!) {
+query UserInfoData($username: String!) {
   userByUsername(username: $username) {
     username
     nickname
