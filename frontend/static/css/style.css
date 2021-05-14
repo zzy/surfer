@@ -16,6 +16,11 @@ blockquote {
   font-size: .95rem;
 }
 
+article img {
+  display: block; 
+  margin: 0 auto;
+}
+
 table, 
 thead, 
 tr, 
