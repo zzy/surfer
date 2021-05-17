@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use tide::{Request, Response, Redirect, http::Method};
 use graphql_client::{GraphQLQuery, Response as GqlResponse};
 use serde_json::json;
+use serde::{Serialize, Deserialize};
 
 use crate::State;
 use crate::util::common::{gql_uri, Tpl, get_username_from_cookies};
@@ -21,6 +22,13 @@ struct ArticleIndexData;
     query_path = "./graphql/user_info.graphql"
 )]
 struct UserInfoData;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Topic {
+    name: String,
+    quotes: usize,
+    uri: String,
+}
 
 pub async fn article_index(req: Request<State>) -> tide::Result {
     let username = req.param("username").unwrap();
@@ -48,7 +56,7 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
         let mut user = resp_data["articleBySlug"]["user"].clone();
         if user["username"] != username {
             let build_query =
-            UserInfoData::build_query(user_info_data::Variables {
+                UserInfoData::build_query(user_info_data::Variables {
                     username: username.to_string(),
                 });
             let query = json!(build_query);
@@ -72,7 +80,14 @@ pub async fn article_index(req: Request<State>) -> tide::Result {
     data.insert("wish", wish);
 
     let topics = resp_data["topicsByUsername"].clone();
-    data.insert("topics", topics);
+    let mut res = topics
+        .as_array()
+        .unwrap()
+        .into_iter()
+        .map(|x| serde_json::from_value(x.clone()).unwrap())
+        .collect::<Vec<Topic>>();
+    res.sort_by(|a, b| b.quotes.cmp(&a.quotes));
+    data.insert("topics", json!(res));
 
     let articles = resp_data["articlesByUsername"].clone();
     data.insert("articles", articles);
