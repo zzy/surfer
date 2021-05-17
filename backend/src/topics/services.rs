@@ -259,6 +259,7 @@ pub async fn topics_by_user_id(
     }
 
     let mut topic_ids = topic_ids_dup.clone();
+    topic_ids.sort();
     topic_ids.dedup();
 
     let mut topics: Vec<Topic> = vec![];
