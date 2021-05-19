@@ -24,19 +24,6 @@ lazy_static! {
             dotenv::var("PORT").expect("Expected PORT to be set in env!"),
         );
 
-        // map.insert(
-        //     "WEB_PROT",
-        //     dotenv::var("WEB_PROT").expect("Expected WEB_PROT to be set in env!"),
-        // );
-        // map.insert(
-        //     "WEB_ADDR",
-        //     dotenv::var("WEB_ADDR").expect("Expected WEB_ADDR to be set in env!"),
-        // );
-        // map.insert(
-        //     "WEB_PORT",
-        //     dotenv::var("WEB_PORT").expect("Expected WEB_PORT to be set in env!"),
-        // );
-
         map.insert(
             "SITE_KEY",
             dotenv::var("SITE_KEY").expect("Expected SITE_KEY to be set in env!"),

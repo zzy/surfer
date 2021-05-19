@@ -20,7 +20,7 @@ Rename file `.env.example` to `.env`, or put the environment variables into a `.
 
 ```
 ADDR=127.0.0.1
-PORT=8080
+PORT=8000
 
 SITE_KEY=NALnvA++OlmRAiO2h..... # Replace with your SITE_KEY
 CLAIM_EXP=10000000000
@@ -39,7 +39,7 @@ Build & Run:
 cargo run
 ```
 
-GraphiQL: connect to http://127.0.0.1:8080/gql/v1i with browser.
+GraphiQL: connect to http://127.0.0.1:8000/gql/v1i with browser.
 
 ![Graphql Image](../data/graphql.jpg)
 
