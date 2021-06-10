@@ -1,0 +1,19 @@
+.logo-title {
+    line-height: 40px;
+    display:flex;
+    align-items: center;
+}
+
+.nav {
+    line-height: 30px;
+    display:flex;
+    align-items: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+$projects-color: green;
+
+.projects {
+    background-color: $projects-color;
+}

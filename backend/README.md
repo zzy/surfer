@@ -33,7 +33,7 @@ MONGODB_URI=mongodb://mongo:mongo@127.0.0.1:27017
 MONGODB_BLOG=blog
 ```
 
-Build & Run:
+Then, build & run:
 
 ``` Bash
 cargo run
@@ -41,7 +41,7 @@ cargo run
 
 GraphiQL: connect to http://127.0.0.1:8000/gql/v1i with browser.
 
-![Graphql Image](../data/graphql.jpg)
+![Graphql Image](../data/graphiql.jpg)
 
 ## Queries
 

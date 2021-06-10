@@ -7,7 +7,7 @@ git clone https://github.com/zzy/surfer.git
 cd surfer
 cargo build
 
-cd frontend
+cd frontend-handlebars
 ```
 
 Rename file `.env.example` to `.env`, or put the environment variables into a `.env` file:
@@ -31,11 +31,11 @@ cargo run
 ```
 Then connect to http://127.0.0.1:3000 with browser.
 
-![Client Image](../data/client.jpg)
+![Client Image](../data/handlebars.jpg)
 
 ## How to Test & Run `rhai scripts`
 
-You could use `rhai-repl` to test your rhai code, and use `rhai-run` to run it. `rhai-repl.rs` and `rhai-run.rs` are in the folder `frontend/scripts`, please copy them into `frontend/examples` folder, then test or run rhai code with command:
+You could use `rhai-repl` to test your rhai code, and use `rhai-run` to run it. `rhai-repl.rs` and `rhai-run.rs` are in the folder `frontend-handlebars/scripts`, please copy them into `frontend-handlebars/examples` folder, then test or run rhai code with command:
 
 ``` bash 
 cargo run --example <rhai-repl>/<rhai-run ./scripts/script_to_run.rhai>

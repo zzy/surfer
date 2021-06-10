@@ -1,9 +1,13 @@
 [workspace]
-members = [
-  "./backend",
-  "./frontend",
-]
+members = ["./backend", "./frontend-yew", "./frontend-handlebars"]
+
 resolver = "2"
 
 [profile.dev]
 split-debuginfo = "unpacked"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+opt-level = "z"
+lto = true

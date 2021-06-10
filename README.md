@@ -4,11 +4,13 @@ The **Blog** built on *pure Rust stack*.
 
 Backend for graphql services using tide, async-graphql, jsonwebtoken, mongodb and so on. 
 
-Frontend for web application using tide, rhai, surf, graphql_client, handlebars-rust, cookie and so on.
+There are two options for web frontend:
+- Frontend-yew for web application using yew, graphql_client, cookie and so on.
+- Frontend-handlebars for web application using tide, yew, rhai, surf, graphql_client, handlebars-rust, cookie and so on.
 
 ## Features
 
-Demo site: [https://blog.budshome.com](https://blog.budshome.com)
+Demo site: [https://blog.budshome.com](https://blog.budshome.com) with frontend-handlebars.
 
 ## MongoDB data
 
@@ -33,28 +35,9 @@ If you need mongodb cloud count, email to me or wechat(微信): yupen-com, pleas
 
 Please read:
 
-- [**Frontend: web application server**](./frontend/README.md)
 - [**Backend: graphql servies server**](./backend/README.md)
-
-## How to Test & Run `rhai scripts`
-
-You could use `rhai-repl` to test your rhai code, and use `rhai-run` to run it. `rhai-repl.rs` and `rhai-run.rs` are in the folder `frontend/scripts`, please copy them into `frontend/examples` folder, then test or run rhai code with command:
-
-``` bash 
-cargo run --example <rhai-repl>/<rhai-run ./scripts/script_to_run.rhai>
-``` 
-
-If you would want to install the rhai tool, use the command 
-
-``` bash
-cargo install --path . --example <rhai-repl>/<rhai-run>
-```
-
-then test rhai code using `rhai-repl`, and run scripts using the `rhai-run`:
-
-``` bash
-rhai-run ./scripts/script_to_run.rhai
-```
+- [**Frontend-yew: web application server**](./frontend-yew/README.md)
+- [**Frontend-handlebars: web application server**](./frontend-handlebars/README.md)
 
 ## Contributing
 

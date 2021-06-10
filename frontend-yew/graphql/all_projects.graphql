@@ -1,0 +1,8 @@
+query AllProjects {
+  allProjects {
+    id
+    userId
+    subject
+    website
+  }
+}
