@@ -4,16 +4,28 @@
 
 See also: https://github.com/zzy/tide-async-graphql-mongodb/tree/main/frontend-yew
 
-# Build & Run
+# Web Application Server - yew
 
-## home
+``` Bash
+git clone https://github.com/zzy/surfer.git
+cd surfer
+cargo build
 
-``` bash
-trunk build --release --public-url="/" dist="../dist"
+cd frontend-yew
 ```
 
-## article
+## Build & Run:
 
-``` bash
-trunk build --release --public-url="/article" dist="../dist/article"
+``` Bash
+cargo install trunk wasm-bindgen-cli
+
+trunk build
+trunk serve --release
 ```
+Then connect to http://127.0.0.1:3001 with browser.
+
+![Client Image](../data/yew.jpg)
+
+## Contributing
+
+You are welcome in contributing to this project.

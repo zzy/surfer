@@ -10,7 +10,9 @@ There are two options for web frontend:
 
 ## Features
 
-Demo site: [https://blog.budshome.com](https://blog.budshome.com) with frontend-handlebars.
+Demo site:
+- [https://blog.rusthub.top](https://blog.rusthub.top) with frontend-yew.
+- [https://blog.budshome.com](https://blog.budshome.com) with frontend-handlebars.
 
 ## MongoDB data
 

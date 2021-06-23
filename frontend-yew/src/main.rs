@@ -1,6 +1,12 @@
+#![recursion_limit = "1024"]
+
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 mod util;
 mod pages;
 
+use console_error_panic_hook::set_once as set_panic_hook;
 use yew::prelude::*;
 use yew_router::prelude::*;
 use yew_router::components::RouterAnchor;
@@ -82,5 +88,7 @@ impl Component for App {
 }
 
 fn main() {
+    set_panic_hook();
+
     yew::start_app::<App>();
 }

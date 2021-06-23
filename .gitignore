@@ -4,8 +4,8 @@
 
 # Cargo.lock
 target
-**/*.rs.bk
+*.rs.bk
 
 .env
 examples
-**/dist/
+dist
