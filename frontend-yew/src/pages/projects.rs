@@ -6,6 +6,8 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use yew::web_sys::{Request, RequestInit, RequestMode, Response};
 use yew::{html, Component, ComponentLink, Html, ShouldRender};
 
+use crate::util::common::gql_uri;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FetchError {
     err: JsValue,
@@ -35,8 +37,7 @@ async fn fetch_projects() -> Result<Vec<Value>, FetchError> {
     opts.body(Some(&JsValue::from_str(&query.to_string())));
     opts.mode(RequestMode::Cors); // 可以不写，默认为 Cors
 
-    let gql_uri = "http://127.0.0.1:8000/graphql";
-    let request = Request::new_with_str_and_init(gql_uri, &opts)?;
+    let request = Request::new_with_str_and_init(&gql_uri().await, &opts)?;
 
     let window = yew::utils::window();
     let resp_value =

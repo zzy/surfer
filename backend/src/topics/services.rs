@@ -1,8 +1,10 @@
 use futures::stream::StreamExt;
-use mongodb::{Database, options::FindOptions};
-use bson::{Bson, doc, from_bson, oid::ObjectId};
+use mongodb::{
+    Database,
+    options::FindOptions,
+    bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
+};
 use async_graphql::{Error, ErrorExtensions};
-use chrono::Utc;
 
 use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
@@ -37,7 +39,7 @@ pub async fn topic_new(
     db: Database,
     mut topic_new: TopicNew,
 ) -> GqlResult<Topic> {
-    let coll = db.collection("topics");
+    let coll = db.collection::<Document>("topics");
 
     topic_new.name = topic_new.name.to_lowercase();
 
@@ -57,12 +59,12 @@ pub async fn topic_new(
         topic_new.slug = slug;
         topic_new.uri = uri;
 
-        let topic_new_bson = bson::to_bson(&topic_new).unwrap();
+        let topic_new_bson = to_bson(&topic_new).unwrap();
 
         if let Bson::Document(mut document) = topic_new_bson {
-            let now = Utc::now();
-            document.insert("created_at", Bson::DateTime(now));
-            document.insert("updated_at", Bson::DateTime(now));
+            let now = DateTime::now();
+            document.insert("created_at", now);
+            document.insert("updated_at", now);
 
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
@@ -90,7 +92,7 @@ pub async fn topic_article_new(
     db: Database,
     topic_article_new: TopicArticleNew,
 ) -> GqlResult<TopicArticle> {
-    let coll = db.collection("topics_articles");
+    let coll = db.collection::<Document>("topics_articles");
 
     let exist_document = coll
         .find_one(doc! {"topic_id": &topic_article_new.topic_id, "article_id": &topic_article_new.article_id}, None)
@@ -99,7 +101,7 @@ pub async fn topic_article_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let topic_article_new_bson = bson::to_bson(&topic_article_new).unwrap();
+        let topic_article_new_bson = to_bson(&topic_article_new).unwrap();
 
         if let Bson::Document(document) = topic_article_new_bson {
             // Insert into a MongoDB collection
@@ -126,7 +128,7 @@ pub async fn topic_article_new(
 
 // get all topics
 pub async fn topics(db: Database) -> GqlResult<Vec<Topic>> {
-    let coll = db.collection("topics");
+    let coll = db.collection::<Document>("topics");
 
     let find_options = FindOptions::builder().sort(doc! {"quotes": -1}).build();
     let mut cursor = coll.find(None, find_options).await.unwrap();
@@ -154,7 +156,7 @@ pub async fn topics(db: Database) -> GqlResult<Vec<Topic>> {
 
 // get topic info by id
 pub async fn topic_by_id(db: Database, id: &ObjectId) -> GqlResult<Topic> {
-    let coll = db.collection("topics");
+    let coll = db.collection::<Document>("topics");
 
     let topic_document = coll
         .find_one(doc! {"_id": id}, None)
@@ -168,7 +170,7 @@ pub async fn topic_by_id(db: Database, id: &ObjectId) -> GqlResult<Topic> {
 
 // get topic info by name
 pub async fn topic_by_name(db: Database, name: &str) -> GqlResult<Topic> {
-    let coll = db.collection("topics");
+    let coll = db.collection::<Document>("topics");
 
     let topic_document = coll
         .find_one(doc! {"name": name.to_lowercase()}, None)
@@ -197,7 +199,7 @@ pub async fn topics_by_article_id(
         topic_ids.push(topic_article.topic_id);
     }
 
-    let coll = db.collection("topics");
+    let coll = db.collection::<Document>("topics");
     let mut cursor = coll.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
 
     let mut topics: Vec<Topic> = vec![];
@@ -221,7 +223,7 @@ async fn topics_articles_by_article_id(
     db: Database,
     article_id: &ObjectId,
 ) -> Vec<TopicArticle> {
-    let coll_topics_articles = db.collection("topics_articles");
+    let coll_topics_articles = db.collection::<Document>("topics_articles");
     let mut cursor_topics_articles = coll_topics_articles
         .find(doc! {"article_id": article_id}, None)
         .await
@@ -279,7 +281,7 @@ async fn topics_articles_by_user_id(
     db: Database,
     user_id: &ObjectId,
 ) -> Vec<TopicArticle> {
-    let coll_topics_articles = db.collection("topics_articles");
+    let coll_topics_articles = db.collection::<Document>("topics_articles");
     let mut cursor_topics_articles = coll_topics_articles
         .find(doc! {"user_id": user_id}, None)
         .await

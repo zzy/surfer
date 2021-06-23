@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use bson::{oid::ObjectId, DateTime};
+use mongodb::bson::{oid::ObjectId, DateTime};
 use chrono::FixedOffset;
 
 use crate::util::constant::{GqlResult, DT_F};
@@ -46,6 +46,7 @@ impl Category {
 
     pub async fn created_at(&self) -> String {
         self.created_at
+            .to_chrono()
             .with_timezone(&FixedOffset::east(8 * 3600))
             .format(DT_F)
             .to_string()
@@ -53,6 +54,7 @@ impl Category {
 
     pub async fn updated_at(&self) -> String {
         self.updated_at
+            .to_chrono()
             .with_timezone(&FixedOffset::east(8 * 3600))
             .format(DT_F)
             .to_string()

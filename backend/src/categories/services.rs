@@ -1,8 +1,9 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
-use mongodb::Database;
-use bson::{Bson, doc, from_bson, oid::ObjectId};
-use chrono::Utc;
+use mongodb::{
+    Database,
+    bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
+};
 
 use crate::util::{constant::GqlResult, common::slugify};
 
@@ -13,7 +14,7 @@ pub async fn category_new(
     db: Database,
     mut category_new: CategoryNew,
 ) -> GqlResult<Category> {
-    let coll = db.collection("categories");
+    let coll = db.collection::<Document>("categories");
 
     let exist_document =
         coll.find_one(doc! {"name": &category_new.name}, None).await?;
@@ -26,12 +27,12 @@ pub async fn category_new(
         category_new.slug = slug;
         category_new.uri = uri;
 
-        let category_new_bson = bson::to_bson(&category_new).unwrap();
+        let category_new_bson = to_bson(&category_new).unwrap();
 
         if let Bson::Document(mut document) = category_new_bson {
-            let now = Utc::now();
-            document.insert("created_at", Bson::DateTime(now));
-            document.insert("updated_at", Bson::DateTime(now));
+            let now = DateTime::now();
+            document.insert("created_at", now);
+            document.insert("updated_at", now);
 
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
@@ -60,7 +61,7 @@ pub async fn category_user_new(
     db: Database,
     category_user_new: CategoryUserNew,
 ) -> GqlResult<CategoryUser> {
-    let coll = db.collection("categories_users");
+    let coll = db.collection::<Document>("categories_users");
 
     let exist_document = coll
         .find_one(doc! {"user_id": &category_user_new.user_id, "category_id": &category_user_new.category_id}, None)
@@ -69,7 +70,7 @@ pub async fn category_user_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let category_user_new_bson = bson::to_bson(&category_user_new).unwrap();
+        let category_user_new_bson = to_bson(&category_user_new).unwrap();
 
         if let Bson::Document(document) = category_user_new_bson {
             // Insert into a MongoDB collection
@@ -96,7 +97,7 @@ pub async fn category_user_new(
 
 // get all categories
 pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
-    let coll = db.collection("categories");
+    let coll = db.collection::<Document>("categories");
 
     let mut categories: Vec<Category> = vec![];
 
@@ -137,7 +138,7 @@ pub async fn categories_by_user_id(
         category_ids.push(category_user.category_id);
     }
 
-    let coll_categories = db.collection("categories");
+    let coll_categories = db.collection::<Document>("categories");
     let mut cursor_categories =
         coll_categories.find(doc! {"_id": {"$in": category_ids}}, None).await?;
 
@@ -172,7 +173,7 @@ pub async fn category_by_id(
     db: Database,
     id: &ObjectId,
 ) -> GqlResult<Category> {
-    let coll = db.collection("categories");
+    let coll = db.collection::<Document>("categories");
 
     let category_document = coll
         .find_one(doc! {"_id": id}, None)
@@ -187,7 +188,7 @@ pub async fn category_by_id(
 
 // get category by its slug
 pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
-    let coll = db.collection("categories");
+    let coll = db.collection::<Document>("categories");
 
     let category_document = coll
         .find_one(doc! {"slug": slug}, None)
@@ -205,7 +206,7 @@ async fn categories_users_by_user_id(
     db: Database,
     user_id: &ObjectId,
 ) -> Vec<CategoryUser> {
-    let coll_categories_users = db.collection("categories_users");
+    let coll_categories_users = db.collection::<Document>("categories_users");
     let mut cursor_categories_users = coll_categories_users
         .find(doc! {"user_id": user_id}, None)
         .await

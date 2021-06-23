@@ -1,3 +1,4 @@
+mod util;
 mod pages;
 
 use yew::prelude::*;
@@ -57,7 +58,7 @@ impl Component for App {
             <>
             <div class="logo-title">
                 <img src="imgs/budshome.png" />
-                { "tide-async-graphql-mongodb / frontend-yew" }
+                <strong>{ "frontend-yew / tide-async-graphql-mongodb" }</strong>
             </div>
             <div class=home_cls>
                 <Anchor route=Route::Users>

@@ -1,8 +1,9 @@
 use futures::stream::StreamExt;
-use mongodb::Database;
-use bson::{Document, Bson, doc, from_bson, oid::ObjectId};
+use mongodb::{
+    Database,
+    bson::{oid::ObjectId, Bson, Document, DateTime, doc, to_bson, from_bson},
+};
 use async_graphql::{Error, ErrorExtensions};
-use chrono::Utc;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use regex::Regex;
 
@@ -15,7 +16,7 @@ use super::models::{User, UserNew, SignInfo, Wish, WishNew};
 
 // get user info by id
 pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
-    let coll = db.collection("users");
+    let coll = db.collection::<Document>("users");
 
     let user_document = coll
         .find_one(doc! {"_id": id}, None)
@@ -29,7 +30,7 @@ pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
 
 // get user info by email
 pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
-    let coll = db.collection("users");
+    let coll = db.collection::<Document>("users");
 
     let exist_document = coll.find_one(doc! {"email": email}, None).await;
 
@@ -49,7 +50,7 @@ pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
 
 // get user info by username
 pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
-    let coll = db.collection("users");
+    let coll = db.collection::<Document>("users");
 
     let exist_document = coll.find_one(doc! {"username": username}, None).await;
 
@@ -71,7 +72,7 @@ pub async fn user_register(
     db: Database,
     mut user_new: UserNew,
 ) -> GqlResult<User> {
-    let coll = db.collection("users");
+    let coll = db.collection::<Document>("users");
 
     user_new.email.make_ascii_lowercase();
     user_new.username.make_ascii_lowercase();
@@ -89,12 +90,12 @@ pub async fn user_register(
         user_new.cred = cred_encode(&user_new.username, &user_new.cred).await;
         user_new.banned = false;
 
-        let user_new_bson = bson::to_bson(&user_new).unwrap();
+        let user_new_bson = to_bson(&user_new).unwrap();
 
         if let Bson::Document(mut document) = user_new_bson {
-            let now = Utc::now();
-            document.insert("created_at", Bson::DateTime(now));
-            document.insert("updated_at", Bson::DateTime(now));
+            let now = DateTime::now();
+            document.insert("created_at", now);
+            document.insert("updated_at", now);
 
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
@@ -181,7 +182,7 @@ pub async fn user_sign_in(
 pub async fn users(db: Database, token: &str) -> GqlResult<Vec<User>> {
     let token_data = token_data(token).await;
     if token_data.is_ok() {
-        let coll = db.collection("users");
+        let coll = db.collection::<Document>("users");
 
         let mut users: Vec<User> = vec![];
 
@@ -235,7 +236,7 @@ pub async fn user_change_password(
             if cred_verify(&user.username, pwd_cur, &user.cred).await {
                 user.cred = cred_encode(&user.username, pwd_new).await;
 
-                let coll = db.collection("users");
+                let coll = db.collection::<Document>("users");
                 coll.update_one(
                     doc! {"_id": &user._id},
                     doc! {"$set": {"cred": &user.cred}},
@@ -272,12 +273,12 @@ pub async fn user_update_profile(
         let email = data.claims.email;
         let user_res = self::user_by_email(db.clone(), &email).await;
         if let Ok(mut user) = user_res {
-            let coll = db.collection("users");
+            let coll = db.collection::<Document>("users");
 
             user.email = user_new.email.to_lowercase();
             user.username = user_new.username.to_lowercase();
 
-            let user_bson = bson::to_bson(&user).unwrap();
+            let user_bson = to_bson(&user).unwrap();
             let user_doc = user_bson.as_document().unwrap().to_owned();
 
             coll.find_one_and_replace(doc! {"_id": &user._id}, user_doc, None)
@@ -298,7 +299,7 @@ pub async fn user_update_profile(
 
 // Create new wish
 pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
-    let coll = db.collection("wishes");
+    let coll = db.collection::<Document>("wishes");
 
     let exist_document = coll
         .find_one(
@@ -309,12 +310,12 @@ pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let wish_new_bson = bson::to_bson(&wish_new)?;
+        let wish_new_bson = to_bson(&wish_new)?;
 
         if let Bson::Document(mut document) = wish_new_bson {
-            let now = Utc::now();
-            document.insert("created_at", Bson::DateTime(now));
-            document.insert("updated_at", Bson::DateTime(now));
+            let now = DateTime::now();
+            document.insert("created_at", now);
+            document.insert("updated_at", now);
 
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
@@ -348,7 +349,7 @@ pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
     } else if published < &0 {
         find_doc.insert("published", false);
     }
-    let coll = db.collection("wishes");
+    let coll = db.collection::<Document>("wishes");
     let mut cursor = coll.find(find_doc, None).await?;
 
     let mut wishes: Vec<Wish> = vec![];
@@ -390,7 +391,7 @@ pub async fn random_wish(db: Database, username: &str) -> GqlResult<Wish> {
 }
 
 async fn one_wish(db: Database, match_doc: Document) -> GqlResult<Wish> {
-    let coll = db.collection("wishes");
+    let coll = db.collection::<Document>("wishes");
     let mut cursor = coll
         .aggregate(vec![doc! {"$sample": {"size": 1}}, match_doc], None)
         .await?;

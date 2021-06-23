@@ -1,8 +1,10 @@
 use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
-use mongodb::{Database, options::FindOptions};
-use bson::{Bson, doc, from_bson, oid::ObjectId};
-use chrono::Utc;
+use mongodb::{
+    Database,
+    options::FindOptions,
+    bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
+};
 
 use crate::util::{constant::GqlResult, common::slugify};
 use crate::users;
@@ -13,7 +15,7 @@ pub async fn article_new(
     db: Database,
     mut article_new: ArticleNew,
 ) -> GqlResult<Article> {
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let exist_document = coll
         .find_one(
@@ -38,12 +40,12 @@ pub async fn article_new(
         article_new.top = true; // false;
         article_new.recommended = true; // false;
 
-        let article_new_bson = bson::to_bson(&article_new).unwrap();
+        let article_new_bson = to_bson(&article_new).unwrap();
 
         if let Bson::Document(mut document) = article_new_bson {
-            let now = Utc::now();
-            document.insert("created_at", Bson::DateTime(now));
-            document.insert("updated_at", Bson::DateTime(now));
+            let now = DateTime::now();
+            document.insert("created_at", now);
+            document.insert("updated_at", now);
 
             // Insert into a MongoDB collection
             coll.insert_one(document, None)
@@ -79,7 +81,7 @@ pub async fn articles(
     } else if published < &0 {
         find_doc.insert("published", false);
     }
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let find_options =
         FindOptions::builder().sort(doc! {"updated_at": -1}).build();
@@ -117,7 +119,7 @@ pub async fn articles_by_user_id(
     } else if published < &0 {
         find_doc.insert("published", false);
     }
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let find_options =
         FindOptions::builder().sort(doc! {"updated_at": -1}).build();
@@ -159,7 +161,7 @@ pub async fn articles_by_category_id(
     } else if published < &0 {
         find_doc.insert("published", false);
     }
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let find_options =
         FindOptions::builder().sort(doc! {"updated_at": -1}).build();
@@ -186,7 +188,7 @@ pub async fn article_by_slug(
     username: &str,
     slug: &str,
 ) -> GqlResult<Article> {
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let user = users::services::user_by_username(db.clone(), username).await?;
     let article_document = coll
@@ -218,7 +220,7 @@ pub async fn articles_in_position(
         find_doc.insert("recommended", true);
     }
 
-    let coll = db.collection("articles");
+    let coll = db.collection::<Document>("articles");
 
     let find_options = FindOptions::builder()
         .sort(doc! {"updated_at": -1})

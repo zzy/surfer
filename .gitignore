@@ -8,3 +8,4 @@ target
 
 .env
 examples
+**/dist/

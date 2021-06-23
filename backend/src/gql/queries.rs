@@ -1,5 +1,5 @@
 use async_graphql::Context;
-use bson::oid::ObjectId;
+use mongodb::bson::oid::ObjectId;
 
 use crate::dbs::mongo::DataSource;
 use crate::util::constant::GqlResult;
