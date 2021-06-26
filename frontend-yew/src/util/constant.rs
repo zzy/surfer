@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use toml::from_str;
-use serde::Deserialize;
 use lazy_static::lazy_static;
+
+use super::models::*;
 
 lazy_static! {
     // CFG variables defined in cfg.toml file
@@ -11,22 +12,21 @@ lazy_static! {
 
         let mut map = HashMap::new();
 
-        map.insert("addr", config.gql.addr);
-        map.insert("port", config.gql.port.to_string());
-        map.insert("path",config.gql.path);
+        map.insert("gql.addr", config.gql.addr);
+        map.insert("gql.port", config.gql.port.to_string());
+        map.insert("gql.path",config.gql.path);
+
+        map.insert("theme_mode.title", config.theme_mode.title);
+        map.insert("theme_mode.svg", config.theme_mode.svg);
+
+        map.insert("i18n.title", config.i18n.title);
+        map.insert("i18n.href", config.i18n.href);
+        map.insert("i18n.svg",config.i18n.svg);
+
+        map.insert("github.title", config.github.title);
+        map.insert("github.href", config.github.href);
+        map.insert("github.svg",config.github.svg);
 
         map
     };
-}
-
-#[derive(Deserialize)]
-struct Config {
-    gql: Gql,
-}
-
-#[derive(Deserialize)]
-struct Gql {
-    addr: String,
-    port: u16,
-    path: String,
 }

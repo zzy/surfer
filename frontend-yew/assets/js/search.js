@@ -1,10 +1,4 @@
 $(document).ready(function() {
-    docsearch({
-        apiKey: '09d35fa9def5c025244d5b217778a652',
-        indexName: 'stackoverflow_design',
-        inputSelector: '#searchbox'
-    });
-
     // Show or hide search
     var searchBar = $(".js-stacks-search-bar");
     var searchContainer = $(".js-search");

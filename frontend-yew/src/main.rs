@@ -4,38 +4,17 @@
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 mod util;
-mod pages;
+mod components;
+mod router;
+mod show;
+mod manage;
 
 use console_error_panic_hook::set_once as set_panic_hook;
 use yew::prelude::*;
 use yew_router::prelude::*;
-use yew_router::components::RouterAnchor;
 
-use pages::{home::Home, users::Users, projects::Projects};
-
-#[derive(Switch, Debug, Clone, PartialEq)]
-pub enum Route {
-    #[to = "/users"]
-    Users,
-    #[to = "/projects"]
-    Projects,
-    #[to = "/"]
-    Home,
-}
-
-fn switch(switch: Route) -> Html {
-    match switch {
-        Route::Users => {
-            html! { <Users/> }
-        }
-        Route::Projects => {
-            html! { <Projects/> }
-        }
-        Route::Home => {
-            html! { <Home /> }
-        }
-    }
-}
+use crate::router::nav_routes::{NavRoutes, switch};
+use crate::components::{header::*, footer::*};
 
 struct App;
 
@@ -56,32 +35,19 @@ impl Component for App {
     }
 
     fn view(&self) -> Html {
-        type Anchor = RouterAnchor<Route>;
-
-        let home_cls = "nav";
-
         html! {
             <>
-            <div class="logo-title">
-                <img src="imgs/budshome.png" />
-                <strong>{ "frontend-yew / tide-async-graphql-mongodb" }</strong>
-            </div>
-            <div class=home_cls>
-                <Anchor route=Route::Users>
-                    { "用户列表" }
-                </Anchor>
-                <span class="placeholder">{ " - " }</span>
-                <Anchor route=Route::Projects>
-                    { "项目列表" }
-                </Anchor>
-                <span class="placeholder">{ " - " }</span>
-                <Anchor route=Route::Home>
-                    { "主页" }
-                </Anchor>
-            </div>
-            <main>
-                <Router<Route> render=Router::render(switch) />
-            </main>
+                <Header />
+
+                <main id="content" class="grid fl1 ps-relative t64 py24 pl48 pr16 md:pl24 sm:pl16 sm:pr16">
+                    <div class="grid--cell fl1 ws1">
+                        <Router<NavRoutes> render=Router::render(switch) />
+                    </div>
+                </main>
+
+                <Copyright />
+
+                <LoadJs />
             </>
         }
     }
