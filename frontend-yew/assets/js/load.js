@@ -1,3 +1,5 @@
+"use strict";
+
 sequential("/js/library.jquery.js",
     function () {
         random("/js/theme.js?132689068675031052");
@@ -6,6 +8,7 @@ sequential("/js/library.jquery.js",
         random("/js/search.js?132689068675031052");
         random("/js/stacks.min.js?132689068675031052");
         random("/js/feature.darkmode.js?132689068675031052");
+        // These can be removed
         random("//static.budshome.com/js/bdtj-bh.js");
         random("//static.budshome.com/js/bdts.js");
     }

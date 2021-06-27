@@ -14,7 +14,7 @@ pub fn copyright() -> Html {
                 { "~ 版权所有（" }
                 <a href="mailto:linshi@budshome.com">{ "linshi@budshome.com" }</a>
                 { "）~" }<br />
-                { "~" }
+                { "~ " }
                 <a href="//rusthub.top" target="_blank">{ "锈毂 - RustHub.top" }</a>
                 { " ~"}
             </p>
