@@ -15,10 +15,12 @@ pub fn copyright() -> Html {
                 <a href="mailto:linshi@budshome.com">{ "linshi@budshome.com" }</a>
                 { "）~" }<br />
                 { "~" }
-                <a href="//budshome.com" target="_blank">{ "芽之家 - budshome.com" }</a>
+                <a href="//rusthub.top" target="_blank">{ "锈毂 - RustHub.top" }</a>
                 { " ~"}
             </p>
-            <p><a href="#">{ "Back to top" }</a></p>
+            <p>
+                <a href="#">{ "Back to top" }</a>
+            </p>
         </footer>
     }
 }
