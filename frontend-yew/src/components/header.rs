@@ -20,7 +20,8 @@ pub fn header() -> Html {
 fn nav_global() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes=classes!("s-navigation--item", "is-selected")
+            // TODO: "s-navigation--item", "is-selected"
+            <Link<NavRoutes> classes=classes!("s-navigation--item")
                 route=NavRoutes::Articles>
                 { "Articles" }
             </Link<NavRoutes>>

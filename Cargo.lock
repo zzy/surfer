@@ -194,9 +194,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fb8eb6e6daf83bbba00d062ad416322c37861094ab155ccdf27cc70c343d4ee"
+checksum = "4f6e1d7cb0df1fe28d860c390132958af2d92c7b7a8a056f0f89d491da725a4b"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -211,7 +211,7 @@ dependencies = [
  "indexmap",
  "multer",
  "once_cell",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "regex",
  "serde",
  "serde_json",
@@ -222,9 +222,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2a5fd43eb48a604f23bae02bd6dd00a73a871b80766a821aeed465f657578d5"
+checksum = "91057b17678b6880ab414526b943ebd59f150904a6f897bdf3df205b432eb242"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -238,9 +238,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3241d9ebd71264f89df47fef8ac705cccd94f53fb8590949991618af43865b99"
+checksum = "0e02b9ad18fdba9f2d7b770105935377da11f6f9b6fbe843e6809c3f506d2823"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -251,9 +251,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "2.9.4"
+version = "2.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7ad19d4f8fb91afc63360ce00f51f746c65347c89e0d790c48dd3a518b302d2"
+checksum = "791f12291b49cff73c95dfaa7f05abadae1a5d19a73d5396cf3e4640791de486"
 dependencies = [
  "serde",
  "serde_json",
@@ -390,7 +390,7 @@ dependencies = [
  "memchr",
  "num_cpus",
  "once_cell",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "pin-utils",
  "slab",
  "wasm-bindgen-futures",
@@ -1167,6 +1167,7 @@ dependencies = [
  "yew",
  "yew-functional",
  "yew-router",
+ "yew-services",
 ]
 
 [[package]]
@@ -1228,7 +1229,7 @@ dependencies = [
  "futures-io",
  "memchr",
  "parking",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "waker-fn",
 ]
 
@@ -1271,7 +1272,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1577,7 +1578,7 @@ dependencies = [
  "cookie",
  "futures-lite",
  "infer",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "rand 0.7.3",
  "serde",
  "serde_json",
@@ -2170,9 +2171,9 @@ checksum = "257b64915a082f7811703966789728173279bdebb956b143dbcd23f6f970a777"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc0e1f259c92177c30a4c9d177246edd0a3568b25756a977d0632cf8fa37e905"
+checksum = "8d31d11c69a6b52a174b42bdc0c30e5e11670f90788b2c471c31c1d17d449443"
 
 [[package]]
 name = "pin-utils"
@@ -2889,7 +2890,7 @@ dependencies = [
  "log",
  "mime_guess",
  "once_cell",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "serde",
  "serde_json",
  "web-sys",
@@ -2981,7 +2982,7 @@ dependencies = [
  "http-types",
  "kv-log-macro",
  "log",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "route-recognizer 0.2.0",
  "serde",
  "serde_json",
@@ -3063,7 +3064,7 @@ dependencies = [
  "memchr",
  "mio",
  "num_cpus",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "tokio-macros",
  "winapi",
 ]
@@ -3101,7 +3102,7 @@ dependencies = [
  "futures-io",
  "futures-sink",
  "log",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "tokio",
 ]
 
@@ -3122,7 +3123,7 @@ checksum = "09adeb8c97449311ccd28a427f96fb563e7fd31aabf994189879d9da2394b89d"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
- "pin-project-lite 0.2.6",
+ "pin-project-lite 0.2.7",
  "tracing-attributes",
  "tracing-core",
 ]
@@ -3628,4 +3629,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "yew-services"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gloo",
+ "http",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "yew",
 ]

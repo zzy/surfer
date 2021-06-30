@@ -18,6 +18,13 @@ function random(src) {
     let script = document.createElement("script");
     script.src = src;
 
+    script.onload = script.onreadystatechange = function () {
+        if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") {
+            this.onload = this.onreadystatechange = null;
+            this.parentNode.removeChild(this);
+        }
+    }
+
     document.body.appendChild(script);
 };
 
@@ -27,7 +34,6 @@ function sequential(src, success) {
 
     success = success || function () { };
     script.onload = script.onreadystatechange = function () {
-        // onreadystatechange 和 readyState 针对 ie
         if (!this.readyState || this.readyState === "loaded" || this.readyState === "complete") {
             success();
 

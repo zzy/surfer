@@ -10,9 +10,10 @@ wasm-bindgen-futures = "0.4.24"
 wee_alloc = "0.4.5"
 console_error_panic_hook = "0.1.6"
 
-yew = { path = "../../../tmp/yew/packages/yew" }
-yew-router = { path = "../../../tmp/yew/packages/yew-router" }
-yew-functional =  { path = "../../../tmp/yew/packages/yew-functional" }
+yew = { path="../../../tmp/yew/packages/yew" }
+yew-router = { path="../../../tmp/yew/packages/yew-router" }
+yew-functional = { path="../../../tmp/yew/packages/yew-functional" }
+yew-services = { path="../../../tmp/yew/packages/yew-services" }
 
 graphql_client = "0.9.0"
 serde = { version="1.0.126", features=["derive"] }
