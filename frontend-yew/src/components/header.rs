@@ -20,15 +20,16 @@ pub fn header() -> Html {
 fn nav_global() -> Html {
     html! {
         <>
-            // TODO: "s-navigation--item", "is-selected"
-            <Link<NavRoutes> classes=classes!("s-navigation--item")
+            <Link<NavRoutes> classes=classes!("nav-global-articles", "s-navigation--item")
                 route=NavRoutes::Articles>
                 { "Articles" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("s-navigation--item") route=NavRoutes::Categories>
+            <Link<NavRoutes> classes=classes!("nav-global-categories", "s-navigation--item")
+                route=NavRoutes::Categories>
                 { "Categories" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("s-navigation--item") route=NavRoutes::Topics>
+            <Link<NavRoutes> classes=classes!("nav-global-topics", "s-navigation--item")
+                route=NavRoutes::Topics>
                 { "Topics" }
             </Link<NavRoutes>>
             <a class="s-navigation--item" href="//budshome.com/books.html"

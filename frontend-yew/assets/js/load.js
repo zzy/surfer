@@ -5,6 +5,7 @@ sequential("/js/library.jquery.js",
         random("/js/theme.js?132689068675031052");
         random("/js/hamburger.js?132689068675031052");
         random("/js/navigation.js?132689068675031052");
+        random("/js/nav.global.js?132689068675031052");
         random("/js/search.js?132689068675031052");
         random("/js/stacks.min.js?132689068675031052");
         random("/js/feature.darkmode.js?132689068675031052");
