@@ -2,14 +2,18 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::show::{
-    home::Home, articles::Articles, categories::Categories, topics::Topics,
-    explore::Explore,
+    home::Home, sign_in::SignIn, register::Register, articles::Articles,
+    categories::Categories, topics::Topics, explore::Explore,
 };
 
 #[derive(Routable, PartialEq, Clone, Debug)]
 pub enum NavRoutes {
     #[at("/")]
     Home,
+    #[at("/sign-in")]
+    SignIn,
+    #[at("/register")]
+    Register,
     #[at("/articles")]
     Articles,
     #[at("/categories")]
@@ -24,6 +28,12 @@ pub fn switch(goal: &NavRoutes) -> Html {
     match goal {
         NavRoutes::Home => {
             html! { <Home /> }
+        }
+        NavRoutes::SignIn => {
+            html! { <SignIn /> }
+        }
+        NavRoutes::Register => {
+            html! { <Register /> }
         }
         NavRoutes::Articles => {
             html! { <Articles /> }

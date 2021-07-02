@@ -40,6 +40,22 @@ fn nav_global() -> Html {
     }
 }
 
+#[function_component(Sign)]
+fn sign() -> Html {
+    html! {
+        <>
+            <Link<NavRoutes> classes=classes!("nav-sign-signin", "s-btn")
+                route=NavRoutes::SignIn>
+                { "Sign in" }
+            </Link<NavRoutes>>
+            <Link<NavRoutes> classes=classes!("nav-sign-register", "s-btn")
+                route=NavRoutes::Register>
+                { "Register" }
+            </Link<NavRoutes>>
+        </>
+    }
+}
+
 #[function_component(Nav)]
 fn nav() -> Html {
     html! {
@@ -127,6 +143,10 @@ fn nav() -> Html {
                 </svg>
             </a>
 
+            <div class="grid--cell fc-black-300 ml12 sm:d-none">
+                <Sign />
+            </div>
+
         </div>
     }
 }
@@ -172,6 +192,10 @@ fn nav_over() -> Html {
                                     <path d={ CFG.get("github.svg").unwrap().to_owned() } />
                                 </svg>
                             </a>
+
+                            <div class="grid--cell fc-black-300">
+                                <Sign />
+                            </div>
 
                         </div>
 

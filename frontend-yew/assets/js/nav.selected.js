@@ -4,13 +4,15 @@ $(document).ready(function () {
     var navGlobalArticles = $(".nav-global-articles");
     var navGlobalCategories = $(".nav-global-categories");
     var navGlobalTopics = $(".nav-global-topics");
+    var navSignSignin = $(".nav-sign-signin");
+    var navSignRegister = $(".nav-sign-register");
     var logo = $(".js-logo");
 
     navGlobalArticles.click(function (e) {
         e.preventDefault();
         e.stopPropagation();
 
-        navGlobalClean();
+        navSelectedClean();
         navGlobalArticles.toggleClass(isSelected, true);
     });
 
@@ -18,7 +20,7 @@ $(document).ready(function () {
         e.preventDefault();
         e.stopPropagation();
 
-        navGlobalClean();
+        navSelectedClean();
         navGlobalCategories.toggleClass(isSelected, true);
     });
 
@@ -26,20 +28,38 @@ $(document).ready(function () {
         e.preventDefault();
         e.stopPropagation();
 
-        navGlobalClean();
+        navSelectedClean();
         navGlobalTopics.toggleClass(isSelected, true);
+    });
+
+    navSignSignin.click(function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        navSelectedClean();
+        navSignSignin.toggleClass(isSelected, true);
+    });
+
+    navSignRegister.click(function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        navSelectedClean();
+        navSignRegister.toggleClass(isSelected, true);
     });
 
     logo.click(function (e) {
         e.preventDefault();
         e.stopPropagation();
 
-        navGlobalClean();
+        navSelectedClean();
     });
 
-    function navGlobalClean() {
+    function navSelectedClean() {
         navGlobalArticles.toggleClass(isSelected, false);
         navGlobalCategories.toggleClass(isSelected, false);
         navGlobalTopics.toggleClass(isSelected, false);
+        navSignSignin.toggleClass(isSelected, false);
+        navSignRegister.toggleClass(isSelected, false);
     }
 });
