@@ -44,11 +44,11 @@ fn nav_global() -> Html {
 fn sign() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes=classes!("nav-sign-signin", "s-btn")
+            <Link<NavRoutes> classes=classes!("nav-sign-signin", "s-btn", "p6")
                 route=NavRoutes::SignIn>
                 { "Sign in" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("nav-sign-register", "s-btn")
+            <Link<NavRoutes> classes=classes!("nav-sign-register", "s-btn", "p6")
                 route=NavRoutes::Register>
                 { "Register" }
             </Link<NavRoutes>>
