@@ -6,45 +6,106 @@ schema {
 # Directs the executor to query only when the field exists.
 directive @ifdef on FIELD
 
-type MutationRoot {
-  userRegister(newUser: NewUser!): User!
-  userChangePassword(
-    curPassword: String!
-    newPassword: String!
-    token: String!
-  ): User!
-  userUpdateProfile(newUser: NewUser!, token: String!): User!
-  addProject(newProject: NewProject!): Project!
-}
-
-input NewProject {
+type Article {
+  id: ObjectId!
   userId: ObjectId!
   subject: String!
-  website: String!
+  categoryId: ObjectId!
+  summary: String!
+  slug: String!
+  uri: String!
+  content: String!
+  contentHtml: String!
+  published: Boolean!
+  top: Boolean!
+  recommended: Boolean!
+  createdAt: String!
+  updatedAt: String!
+  user: User!
+  category: Category!
+  topics: [Topic!]!
 }
 
-input NewUser {
-  email: String!
-  username: String!
-  cred: String!
+input ArticleNew {
+  userId: ObjectId!
+  subject: String!
+  categoryId: ObjectId!
+  summary: String!
+  content: String!
+}
+
+type Category {
+  id: ObjectId!
+  name: String!
+  description: String!
+  quotes: Int!
+  slug: String!
+  uri: String!
+  createdAt: String!
+  updatedAt: String!
+  articles: [Article!]!
+}
+
+input CategoryNew {
+  name: String!
+  description: String!
+}
+
+type CategoryUser {
+  id: ObjectId!
+  userId: ObjectId!
+  categoryId: ObjectId!
+}
+
+input CategoryUserNew {
+  userId: ObjectId!
+  categoryId: ObjectId!
+}
+
+type MutationRoot {
+  userRegister(userNew: UserNew!): User!
+  userChangePassword(pwdCur: String!, pwdNew: String!, token: String!): User!
+  userUpdateProfile(userNew: UserNew!, token: String!): User!
+  articleNew(articleNew: ArticleNew!): Article!
+  categoryNew(categoryNew: CategoryNew!): Category!
+  categoryUserNew(categoryUserNew: CategoryUserNew!): CategoryUser!
+  topicsNew(topicNames: String!): [Topic!]!
+  topicNew(topicNew: TopicNew!): Topic!
+  topicArticleNew(topicArticleNew: TopicArticleNew!): TopicArticle!
+  wishNew(wishNew: WishNew!): Wish!
 }
 
 scalar ObjectId
 
-type Project {
-  id: ObjectId!
-  userId: ObjectId!
-  subject: String!
-  website: String!
-}
-
 type QueryRoot {
-  getUserByEmail(email: String!): User!
-  getUserByUsername(username: String!): User!
-  userSignIn(unknownUser: NewUser!): SignInfo!
-  allUsers(token: String!): [User!]!
-  allProjects: [Project!]!
-  allProjectsByUser(userId: ObjectId!): [Project!]!
+  userById(id: ObjectId!): User!
+  userByEmail(email: String!): User!
+  userByUsername(username: String!): User!
+  userSignIn(signature: String!, password: String!): SignInfo!
+  users(token: String!): [User!]!
+  articles(published: Int!): [Article!]!
+  articlesInPosition(
+    username: String!
+    position: String!
+    limit: Int!
+  ): [Article!]!
+  articlesByUserId(userId: ObjectId!, published: Int!): [Article!]!
+  articlesByUsername(username: String!, published: Int!): [Article!]!
+  articlesByCategoryId(categoryId: ObjectId!, published: Int!): [Article!]!
+  articleBySlug(username: String!, slug: String!): Article!
+  categories: [Category!]!
+  categoriesByUserId(userId: ObjectId!): [Category!]!
+  categoriesByUsername(username: String!): [Category!]!
+  categoryById(id: ObjectId!): Category!
+  categoryBySlug(slug: String!): Category!
+  topics: [Topic!]!
+  topicById(id: ObjectId!): Topic!
+  topicByName(name: String!): Topic!
+  topicsByArticleId(articleId: ObjectId!): [Topic!]!
+  topicsByUserId(userId: ObjectId!): [Topic!]!
+  topicsByUsername(username: String!): [Topic!]!
+  wishes(published: Int!): [Wish!]!
+  randomWish(username: String!): Wish!
 }
 
 type SignInfo {
@@ -53,9 +114,72 @@ type SignInfo {
   token: String!
 }
 
+type Topic {
+  id: ObjectId!
+  name: String!
+  quotes: Int!
+  slug: String!
+  uri: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type TopicArticle {
+  id: ObjectId!
+  userId: ObjectId!
+  articleId: ObjectId!
+  topicId: ObjectId!
+}
+
+input TopicArticleNew {
+  userId: ObjectId!
+  articleId: ObjectId!
+  topicId: ObjectId!
+}
+
+input TopicNew {
+  name: String!
+}
+
 type User {
   id: ObjectId!
   email: String!
   username: String!
-  projects: [Project!]!
+  nickname: String!
+  picture: String!
+  blogName: String!
+  website: String!
+  introduction: String!
+  createdAt: String!
+  updatedAt: String!
+  banned: Boolean!
+  articles(published: Int!): [Article!]!
+}
+
+input UserNew {
+  email: String!
+  username: String!
+  nickname: String!
+  picture: String!
+  cred: String!
+  blogName: String!
+  website: String!
+  introduction: String!
+}
+
+type Wish {
+  id: ObjectId!
+  userId: ObjectId!
+  aphorism: String!
+  author: String!
+  published: Boolean!
+  createdAt: String!
+  updatedAt: String!
+  user: User!
+}
+
+input WishNew {
+  userId: ObjectId!
+  aphorism: String!
+  author: String!
 }

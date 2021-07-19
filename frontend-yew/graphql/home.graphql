@@ -1,0 +1,62 @@
+query HomeData {
+  randomWish(
+    username: "-"
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  topArticles: articlesInPosition(
+    username: "-"
+    position: "top"
+    limit: 2
+  ) {
+    subject
+    category {
+      name
+      uri
+    }
+    summary
+    uri
+    updatedAt
+    topics {
+      name
+      uri
+    }
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  recommendedArticles: articlesInPosition(
+    username: "-"
+    position: "recommended"
+    limit: 4
+  ) {
+    subject
+    category {
+      name
+      uri
+    }
+    summary
+    uri
+    updatedAt
+    topics {
+      name
+      uri
+    }
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+}

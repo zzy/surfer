@@ -59,9 +59,9 @@ fn sign() -> Html {
 #[function_component(Nav)]
 fn nav() -> Html {
     html! {
-        <div class="grid ai-center px16 h100 mx-auto wmx12 sm:jc-space-between">
+        <div class="d-flex ai-center px16 h100 mx-auto wmx12 sm:jc-space-between">
 
-            <a class="grid grid__center p8 mr8 s-link s-link__muted d-none md:d-block js-hamburger-btn"
+            <a class="d-flex flex__center p8 mr8 s-link s-link__muted d-none md:d-block js-hamburger-btn"
                 href="#">
                 <svg aria-hidden="true" class="svg-icon iconHamburger js-hamburger-icon"
                     width="18" height="18" viewBox="0 0 18 18">
@@ -75,7 +75,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <Link<NavRoutes> classes=classes!("grid--cell", "js-logo") route=NavRoutes::Home>
+            <Link<NavRoutes> classes=classes!("flex--item", "js-logo") route=NavRoutes::Home>
                 <span class="fs-title fw-bold">
                     <span class="ff-sans">{ "锈毂" }</span>
                     <img class="va-sub" src="/imgs/logos/rusthub.png"
@@ -89,7 +89,7 @@ fn nav() -> Html {
                 <NavGlobal />
             </nav>
 
-            <button class="s-btn__unset c-pointer grid--cell fc-black-300 ml12 sm:d-none
+            <button class="s-btn__unset c-pointer flex--item fc-black-300 ml12 sm:d-none
                 js-darkmode-btn ml-auto"
                 title={ CFG.get("theme_mode.title").unwrap().to_owned() }>
                 <svg aria-hidden="true" class="svg-icon iconTheme"
@@ -98,7 +98,7 @@ fn nav() -> Html {
                 </svg>
             </button>
 
-            <a class="grid--cell fc-black-300 ml12 sm:d-none"
+            <a class="flex--item fc-black-300 ml12 sm:d-none"
                 title={ CFG.get("i18n.title").unwrap().to_owned() }
                 href={ CFG.get("i18n.href").unwrap().to_owned() }>
                 <svg aria-hidden="true" class="svg-icon iconInternational"
@@ -107,7 +107,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <a class="grid--cell fc-black-300 ml12 sm:d-none"
+            <a class="flex--item fc-black-300 ml12 sm:d-none"
                 title={ CFG.get("github.title").unwrap().to_owned() }
                 href={ CFG.get("github.href").unwrap().to_owned() } target="_blank">
                 <svg aria-hidden="true" class="svg-icon iconGitHub"
@@ -116,7 +116,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <div class="grid--cell ps-relative ml16 w100 wmx3 sm:wmx-initial sm:ml0 sm:d-none js-search">
+            <div class="flex--item ps-relative ml16 w100 wmx3 sm:wmx-initial sm:ml0 sm:d-none js-search">
                 <input id="searchbox" class="s-input s-input__search bar-md js-stacks-search-bar"
                     type="text" placeholder={ "Search RustHub …" } />
                 <svg aria-hidden="true" class="svg-icon iconSearch s-input-icon s-input-icon__search"
@@ -127,7 +127,7 @@ fn nav() -> Html {
                 </svg>
             </div>
 
-            <a class="grid grid__center p8 ml8 s-link s-link__muted d-none sm:d-block js-search-btn"
+            <a class="d-flex flex__center p8 ml8 s-link s-link__muted d-none sm:d-block js-search-btn"
                 href="#">
                 <svg aria-hidden="true" class="svg-icon iconSearch js-search-icon"
                     width="18" height="18" viewBox="0 0 18 18">
@@ -143,7 +143,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <div class="grid--cell fc-black-300 ml12 sm:d-none">
+            <div class="flex--item fc-black-300 ml12 sm:d-none">
                 <Sign />
             </div>
 
@@ -158,16 +158,16 @@ fn nav_over() -> Html {
             <div class="overflow-y-hidden overflow-x-hidden bg-white z-nav py8">
 
                 <div class="d-none sm:d-block">
-                    <div class="grid fd-column ai-center">
+                    <div class="d-flex fd-column ai-center">
 
                         <nav class="s-navigation s-navigation__wrap mx8 mb12 jc-center"
                             aria-label="Global navigation">
                             <NavGlobal />
                         </nav>
 
-                        <div class="grid gs16 ai-center fw-wrap mx8">
+                        <div class="d-flex gs16 ai-center fw-wrap mx8">
 
-                            <button class="s-btn__unset c-pointer grid--cell fc-black-300 js-darkmode-btn"
+                            <button class="s-btn__unset c-pointer flex--item fc-black-300 js-darkmode-btn"
                                 title={ CFG.get("theme_mode.title").unwrap().to_owned() }>
                                 <svg aria-hidden="true" class="svg-icon iconTheme"
                                     width="24" height="24" viewBox="0 0 18 18">
@@ -175,7 +175,7 @@ fn nav_over() -> Html {
                                 </svg>
                             </button>
 
-                            <a class="grid--cell fc-black-300"
+                            <a class="flex--item fc-black-300"
                                 title={ CFG.get("i18n.title").unwrap().to_owned() }
                                 href={ CFG.get("i18n.href").unwrap().to_owned() }>
                                 <svg aria-hidden="true" class="svg-icon iconInternational"
@@ -184,7 +184,7 @@ fn nav_over() -> Html {
                                 </svg>
                             </a>
 
-                            <a class="grid--cell fc-black-300"
+                            <a class="flex--item fc-black-300"
                                 title={ CFG.get("github.title").unwrap().to_owned() }
                                 href={ CFG.get("github.href").unwrap().to_owned() } target="_blank">
                                 <svg aria-hidden="true" class="svg-icon iconGitHub"
@@ -193,7 +193,7 @@ fn nav_over() -> Html {
                                 </svg>
                             </a>
 
-                            <div class="grid--cell fc-black-300">
+                            <div class="flex--item fc-black-300">
                                 <Sign />
                             </div>
 

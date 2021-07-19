@@ -39,10 +39,8 @@ impl Component for App {
             <>
                 <Header />
 
-                <main id="content" class="grid fl1 ps-relative t64 py24 pl48 pr16 md:pl24 sm:pl16 sm:pr16">
-                    <div class="grid--cell fl1 ws1">
-                        <Router<NavRoutes> render=Router::render(switch) />
-                    </div>
+                <main class="ps-relative t64">
+                    <Router<NavRoutes> render=Router::render(switch) />
                 </main>
 
                 <Copyright />

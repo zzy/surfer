@@ -1,0 +1,27 @@
+mutation RegisterData(
+  $email: String!
+  $username: String!
+  $nickname: String!
+  $picture: String!
+  $cred: String!
+  $blogName: String!
+  $website: String!
+  $introduction: String!
+) {
+  userRegister(
+    userNew: {
+      email: $email
+      username: $username
+      nickname: $nickname
+      picture: $picture
+      cred: $cred
+      blogName: $blogName
+      website: $website
+      introduction: $introduction
+    }
+  ) {
+    email
+    username
+    nickname
+  }
+}

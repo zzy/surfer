@@ -1,9 +1,0 @@
-query AllUsers($token: String!) {
-  allUsers(
-    token: $token
-  ) {
-    id
-    email
-    username
-  }
-}

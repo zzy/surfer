@@ -1,5 +1,5 @@
 [gql]
-addr = "127.0.0.1"
+addr = "api.budshome.com" # "127.0.0.1" for local test
 port = 8000
 path = "gql/v1"
 

@@ -5,18 +5,18 @@ authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version="1.9.0", features=["attributes"] }
+async-std = { version = "1.9.0", features = ["attributes"] }
 tide = "0.16.0"
 
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
 
-serde = { version="1.0.126", features=["derive"] }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
 
 surf = "2.2.0"
 graphql_client = "0.10.0"
-handlebars = { version="4.1.0", features=["script_helper"] }
+handlebars = { version = "4.1.0", features = ["script_helper"] }
 
 [dev-dependencies]
-rhai = "0.20.3"
+rhai = "1.0.0"

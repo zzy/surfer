@@ -103,9 +103,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.41"
+version = "1.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15af2628f6890fe2609a3b91bef4c83450512802e59489f9c1cb1fa5df064a61"
+checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
 
 [[package]]
 name = "anymap"
@@ -194,9 +194,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.9.7"
+version = "2.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97ebc8c1665a8fa25b00089468f910cb691a189df4aa8b00b15dd32655d3d344"
+checksum = "a8d07226ea0121d5f90190689c49926381f60e82b68d528464f2e732a63415fa"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -222,9 +222,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.9.7"
+version = "2.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69d77bf9ec082d38b243efb24863f8ac52990ba601d631c3eebeeb8ea89ccbf8"
+checksum = "f10359ae16070580459ce72c6acba41e73a5af1492e0a5f8a88dc3d079a2f9f1"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -238,9 +238,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "2.9.7"
+version = "2.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "438b8f763c79c99c50294a232128bc7031f53a49c36f5427c88aaf7f0650f073"
+checksum = "8254a76c90332fed8623f0ec8f20e22a91e43737e6dfb5db39d01620666c408b"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -251,9 +251,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "2.9.7"
+version = "2.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d402454fcdd6bd55765220b02e22e272db54daabe017bc3f4745a76fbbe932e"
+checksum = "45be1a2f994560acf7648fff3c290c71565a575bef2d805e94d9c05506d1d7d5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1138,7 +1138,7 @@ dependencies = [
  "graphql_client",
  "handlebars",
  "lazy_static",
- "rhai",
+ "rhai 1.0.0",
  "serde",
  "serde_json",
  "surf",
@@ -1157,7 +1157,6 @@ dependencies = [
  "serde_json",
  "toml",
  "wasm-bindgen",
- "wasm-bindgen-futures",
  "wee_alloc",
  "yew",
  "yew-functional",
@@ -1455,7 +1454,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "quick-error 2.0.1",
- "rhai",
+ "rhai 0.20.3",
  "serde",
  "serde_json",
 ]
@@ -2409,6 +2408,20 @@ dependencies = [
  "num-traits",
  "rhai_codegen",
  "serde",
+ "smallvec",
+ "smartstring",
+]
+
+[[package]]
+name = "rhai"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "378357360ecb73c9fe845edda6fd23f79cefdd86530051065e2e95370c9e5f41"
+dependencies = [
+ "ahash",
+ "instant",
+ "num-traits",
+ "rhai_codegen",
  "smallvec",
  "smartstring",
 ]
