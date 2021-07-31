@@ -1,5 +1,4 @@
 use yew::prelude::*;
-use yew_functional::*;
 use yew_router::prelude::*;
 
 use crate::util::constant::CFG;
@@ -20,16 +19,16 @@ pub fn header() -> Html {
 fn nav_global() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes=classes!("nav-global-articles", "s-navigation--item")
-                route=NavRoutes::Articles>
+            <Link<NavRoutes> classes={ classes!("nav-global-articles", "s-navigation--item") }
+                route={ NavRoutes::Articles }>
                 { "Articles" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("nav-global-categories", "s-navigation--item")
-                route=NavRoutes::Categories>
+            <Link<NavRoutes> classes={ classes!("nav-global-categories", "s-navigation--item") }
+                route={ NavRoutes::Categories }>
                 { "Categories" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("nav-global-topics", "s-navigation--item")
-                route=NavRoutes::Topics>
+            <Link<NavRoutes> classes={ classes!("nav-global-topics", "s-navigation--item") }
+                route={ NavRoutes::Topics }>
                 { "Topics" }
             </Link<NavRoutes>>
             <a class="s-navigation--item" href="//budshome.com/books.html"
@@ -44,12 +43,12 @@ fn nav_global() -> Html {
 fn sign() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes=classes!("nav-sign-signin", "s-btn", "p6")
-                route=NavRoutes::SignIn>
+            <Link<NavRoutes> classes={ classes!("nav-sign-signin", "s-btn", "p6") }
+                route={ NavRoutes::SignIn }>
                 { "Sign in" }
             </Link<NavRoutes>>
-            <Link<NavRoutes> classes=classes!("nav-sign-register", "s-btn", "p6")
-                route=NavRoutes::Register>
+            <Link<NavRoutes> classes={ classes!("nav-sign-register", "s-btn", "p6") }
+                route={ NavRoutes::Register }>
                 { "Register" }
             </Link<NavRoutes>>
         </>
@@ -75,7 +74,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <Link<NavRoutes> classes=classes!("flex--item", "js-logo") route=NavRoutes::Home>
+            <Link<NavRoutes> classes={ classes!("flex--item", "js-logo") } route={ NavRoutes::Home }>
                 <span class="fs-title fw-bold">
                     <span class="ff-sans">{ "锈毂" }</span>
                     <img class="va-sub" src="/imgs/logos/rusthub.png"

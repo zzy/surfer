@@ -1,5 +1,4 @@
 use yew::prelude::*;
-use yew_functional::*;
 
 #[function_component(Copyright)]
 pub fn copyright() -> Html {

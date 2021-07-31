@@ -40,7 +40,7 @@ impl Component for App {
                 <Header />
 
                 <main class="ps-relative t64">
-                    <Router<NavRoutes> render=Router::render(switch) />
+                    <Router<NavRoutes> render={ Router::render(switch) } />
                 </main>
 
                 <Copyright />
