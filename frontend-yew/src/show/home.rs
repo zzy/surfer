@@ -85,7 +85,7 @@ impl Component for Home {
 fn view_home(home_data: &Value) -> Html {
     let wish_val = &home_data["randomWish"];
     let random_wish = html! {
-        <div class="ta-center mt16 mx32">
+        <div class="ta-center mt16 mx64">
             <b>
                 <a href={ format!("/{}", wish_val["user"]["username"].as_str().unwrap()) }
                     target="_blank">
@@ -158,7 +158,7 @@ fn view_home(home_data: &Value) -> Html {
         });
 
         html! {
-            <div class="s-card mx24 my6 sm:mx16">
+            <div class="s-card mx24 my6">
                 <h2 class="mb6">
                     <a class="s-tag mr6"
                         href={ recommended_article["category"]["uri"].as_str().unwrap().to_owned() }
@@ -191,7 +191,7 @@ fn view_home(home_data: &Value) -> Html {
     html! {
         <>
             { random_wish }
-            <div class="d-flex gs32 fw-wrap p32 sm:p24">
+            <div class="d-flex gsx fw-wrap m16">
                 { for top_articles }
             </div>
             { for recommended_articles }
