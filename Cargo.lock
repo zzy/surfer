@@ -1143,7 +1143,7 @@ dependencies = [
  "graphql_client",
  "handlebars",
  "lazy_static",
- "rhai 1.0.0",
+ "rhai",
  "serde",
  "serde_json",
  "surf",
@@ -1512,15 +1512,15 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "4.1.0"
+version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72a0ffab8c36d0436114310c7e10b59b3307e650ddfabf6d006028e29a70c6e6"
+checksum = "259c65b04c7f45d8cb793c29dae7e4ed0022a70779f33bc8957950b33fc700d7"
 dependencies = [
  "log",
  "pest",
  "pest_derive",
  "quick-error 2.0.1",
- "rhai 0.20.3",
+ "rhai",
  "serde",
  "serde_json",
 ]
@@ -2465,21 +2465,6 @@ dependencies = [
 
 [[package]]
 name = "rhai"
-version = "0.20.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e23c09a050ef3dda3e5c79a73b73659561e2c2907ec4812c1e1391564dd360"
-dependencies = [
- "ahash",
- "instant",
- "num-traits",
- "rhai_codegen",
- "serde",
- "smallvec",
- "smartstring",
-]
-
-[[package]]
-name = "rhai"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "378357360ecb73c9fe845edda6fd23f79cefdd86530051065e2e95370c9e5f41"
@@ -2488,6 +2473,7 @@ dependencies = [
  "instant",
  "num-traits",
  "rhai_codegen",
+ "serde",
  "smallvec",
  "smartstring",
 ]
@@ -2646,18 +2632,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.126"
+version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec7505abeacaec74ae4778d9d9328fe5a5d04253220a85c4ee022239fc996d03"
+checksum = "f03b9878abf6d14e6779d3f24f07b2cfa90352cfec4acc5aab8f1ac7f146fae8"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.126"
+version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "963a7dbc9895aeac7ac90e74f34a5d5261828f79df35cbed41e10189d3804d43"
+checksum = "a024926d3432516606328597e0f224a51355a493b49fdd67e9209187cbe55ecc"
 dependencies = [
  "proc-macro2",
  "quote",

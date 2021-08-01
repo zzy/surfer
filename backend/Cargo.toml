@@ -18,7 +18,7 @@ mongodb = { version = "2.0.0-beta.2", default-features = false, features = [
   "async-std-runtime",
 ] }
 
-serde = { version = "1.0.126", features = ["derive"] }
+serde = { version = "1.0.127", features = ["derive"] }
 chrono = "0.4.19"
 jsonwebtoken = "7.2.0"
 ring = "0.16.20"

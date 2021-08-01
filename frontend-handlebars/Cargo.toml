@@ -11,12 +11,12 @@ tide = "0.16.0"
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
 
-serde = { version = "1.0.126", features = ["derive"] }
+serde = { version = "1.0.127", features = ["derive"] }
 serde_json = "1.0.66"
 
 surf = "2.2.0"
 graphql_client = "0.10.0"
-handlebars = { version = "4.1.0", features = ["script_helper"] }
+handlebars = { version = "4.1.1", features = ["script_helper"] }
 
 [dev-dependencies]
 rhai = "1.0.0"
