@@ -17,9 +17,6 @@ pub fn copyright() -> Html {
                 <a href="//rusthub.top" target="_blank">{ "锈毂 - RustHub.top" }</a>
                 { " ~"}
             </p>
-            <p>
-                <a href="#">{ "Back to top" }</a>
-            </p>
         </footer>
     }
 }

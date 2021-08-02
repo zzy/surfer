@@ -40,7 +40,7 @@ impl Component for Articles {
         match &self.data {
             FetchState::NotFetching => html! { "NotFetching" },
             FetchState::Fetching => html! { "Fetching" },
-            FetchState::Success(home_data) => view_home(home_data),
+            FetchState::Success(articles_data) => view_articles(articles_data),
             FetchState::Failed(err) => html! { err },
         }
     }
@@ -80,8 +80,8 @@ impl Component for Articles {
     }
 }
 
-fn view_home(home_data: &Value) -> Html {
-    let wish_val = &home_data["randomWish"];
+fn view_articles(articles_data: &Value) -> Html {
+    let wish_val = &articles_data["randomWish"];
     let random_wish = html! {
         <div class="ta-center mt16 mx64">
             <b>
@@ -99,7 +99,7 @@ fn view_home(home_data: &Value) -> Html {
         </div>
     };
 
-    let articles_vec = home_data["articles"].as_array().unwrap();
+    let articles_vec = articles_data["articles"].as_array().unwrap();
     let articles = articles_vec.iter().map(|article| {
         let article_topics_vec = article["topics"].as_array().unwrap();
         let article_topics = article_topics_vec.iter().map(|topic| {
