@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use yew::prelude::*;
 use graphql_client::GraphQLQuery;
 use serde_json::{Value, json};
@@ -8,8 +7,7 @@ use crate::util::common::{FetchState, fetch_gql_data};
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "./graphql/schema.graphql",
-    query_path = "./graphql/home.graphql",
-    response_derives = "Debug"
+    query_path = "./graphql/home.graphql"
 )]
 struct HomeData;
 
