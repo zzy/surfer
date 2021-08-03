@@ -1,0 +1,35 @@
+query CategoriesData {
+  randomWish(
+    username: "-"
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  categories {
+    name
+    uri
+    quotes
+    articles {
+      subject
+      summary
+      uri
+      updatedAt
+      topics {
+        name
+        uri
+      }
+      user {
+        username
+        nickname
+        blogName
+      }
+    }
+  }
+}
