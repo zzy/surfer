@@ -1,0 +1,20 @@
+query TopicsData {
+  randomWish(
+    username: "-"
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  topics {
+    name
+    uri
+    quotes
+  }
+}
