@@ -22,7 +22,7 @@ pub async fn category_new(
         println!("MongoDB document is exist!");
     } else {
         let slug = slugify(&category_new.name).await;
-        let uri = format!("/categories/{}", &slug);
+        let uri = format!("/category/{}", &slug);
 
         category_new.slug = slug;
         category_new.uri = uri;

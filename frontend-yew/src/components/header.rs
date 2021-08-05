@@ -1,8 +1,7 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::util::constant::CFG;
-use crate::router::nav_routes::NavRoutes;
+use crate::util::{constant::CFG, routes::Routes};
 
 #[function_component(Header)]
 pub fn header() -> Html {
@@ -19,18 +18,18 @@ pub fn header() -> Html {
 fn nav_global() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes={ classes!("nav-global-articles", "s-navigation--item") }
-                route={ NavRoutes::Articles }>
+            <Link<Routes> classes={ classes!("nav-global-articles", "s-navigation--item") }
+                route={ Routes::Articles }>
                 { "Articles" }
-            </Link<NavRoutes>>
-            <Link<NavRoutes> classes={ classes!("nav-global-categories", "s-navigation--item") }
-                route={ NavRoutes::Categories }>
+            </Link<Routes>>
+            <Link<Routes> classes={ classes!("nav-global-categories", "s-navigation--item") }
+                route={ Routes::Categories }>
                 { "Categories" }
-            </Link<NavRoutes>>
-            <Link<NavRoutes> classes={ classes!("nav-global-topics", "s-navigation--item") }
-                route={ NavRoutes::Topics }>
+            </Link<Routes>>
+            <Link<Routes> classes={ classes!("nav-global-topics", "s-navigation--item") }
+                route={ Routes::Topics }>
                 { "Topics" }
-            </Link<NavRoutes>>
+            </Link<Routes>>
             <a class="s-navigation--item" href="//budshome.com/books.html"
                 target="_blank">
                 { "Explore" }
@@ -43,14 +42,14 @@ fn nav_global() -> Html {
 fn sign() -> Html {
     html! {
         <>
-            <Link<NavRoutes> classes={ classes!("nav-sign-signin", "s-btn", "p6") }
-                route={ NavRoutes::SignIn }>
+            <Link<Routes> classes={ classes!("nav-sign-signin", "s-btn", "p6") }
+                route={ Routes::SignIn }>
                 { "Sign in" }
-            </Link<NavRoutes>>
-            <Link<NavRoutes> classes={ classes!("nav-sign-register", "s-btn", "p6") }
-                route={ NavRoutes::Register }>
+            </Link<Routes>>
+            <Link<Routes> classes={ classes!("nav-sign-register", "s-btn", "p6") }
+                route={ Routes::Register }>
                 { "Register" }
-            </Link<NavRoutes>>
+            </Link<Routes>>
         </>
     }
 }
@@ -74,7 +73,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <Link<NavRoutes> classes={ classes!("flex--item", "js-logo") } route={ NavRoutes::Home }>
+            <Link<Routes> classes={ classes!("flex--item", "js-logo") } route={ Routes::Home }>
                 <span class="fs-title fw-bold">
                     <span class="ff-sans">{ "锈毂" }</span>
                     <img class="va-sub" src="/imgs/logos/rusthub.png"
@@ -82,7 +81,7 @@ fn nav() -> Html {
                         aria-label={ "RustHub - 锈毂" } />
                     <span class="ff-serif">{ "RustHub" }</span>
                 </span>
-            </Link<NavRoutes>>
+            </Link<Routes>>
 
             <nav class="s-navigation mx16 fw-nowrap sm:d-none" aria-label="Global navigation">
                 <NavGlobal />
@@ -90,7 +89,7 @@ fn nav() -> Html {
 
             <button class="s-btn__unset c-pointer flex--item fc-black-300 ml12 sm:d-none
                 js-darkmode-btn ml-auto"
-                title={ CFG.get("theme_mode.title").unwrap().to_owned() }>
+                title={ CFG.get("theme_mode.title").unwrap().clone() }>
                 <svg aria-hidden="true" class="svg-icon iconTheme"
                     width="24" height="24" viewBox="0 0 18 18">
                     <path d={ CFG.get("theme_mode.svg").unwrap().to_owned() } />

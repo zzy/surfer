@@ -2,3 +2,22 @@
   background-color: var(--white);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cg fill='%23e4e6e8' fill-opacity='0.4'%3E%3Cpath fill-rule='evenodd' d='M0 0h4v4H0V0zm4 4h4v4H4V4z'/%3E%3C/g%3E%3C/svg%3E");
 }
+
+blockquote {
+  margin: 10px 5px 10px 25px;
+  padding: 10px 10px 5px 15px;
+  background-color:#f1f1f1;
+  border-left: 3px solid lightblue;
+  font-size: .95rem;
+}
+
+article img {
+  display: block;
+  margin: 0 auto;
+}
+
+code {
+  font-size:.875em;
+  color:#d63384;
+  word-wrap:break-word
+}

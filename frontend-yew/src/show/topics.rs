@@ -102,7 +102,7 @@ fn view_topics(topics_data: &Value) -> Html {
     let topics_vec = topics_data["topics"].as_array().unwrap();
     let topics = topics_vec.iter().map(|topic| {
         let topic_quotes = topic["quotes"].as_i64().unwrap();
-        let tag_size = 
+        let tag_size =
             if topic_quotes >= 100 {
                 "s-tag__lg fw-bold"
             }

@@ -5,7 +5,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 mod util;
 mod components;
-mod router;
 mod show;
 mod manage;
 
@@ -13,7 +12,7 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::router::nav_routes::{NavRoutes, switch};
+use crate::util::routes::{Routes, switch};
 use crate::components::{header::*, footer::*};
 
 struct App;
@@ -40,7 +39,7 @@ impl Component for App {
                 <Header />
 
                 <main class="ps-relative t64">
-                    <Router<NavRoutes> render={ Router::render(switch) } />
+                    <Router<Routes> render={ Router::render(switch) } />
                 </main>
 
                 <Copyright />

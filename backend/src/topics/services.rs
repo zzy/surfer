@@ -54,7 +54,7 @@ pub async fn topic_new(
         .expect("Failed to update a MongoDB collection!");
     } else {
         let slug = slugify(&topic_new.name).await;
-        let uri = format!("/topics/{}", &slug);
+        let uri = format!("/topic/{}", &slug);
 
         topic_new.slug = slug;
         topic_new.uri = uri;

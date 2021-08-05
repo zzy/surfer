@@ -1,7 +1,11 @@
 pub mod home;
 pub mod sign_in;
 pub mod register;
+pub mod author;
 pub mod articles;
 pub mod categories;
 pub mod topics;
+pub mod article;
+pub mod category;
+pub mod topic;
 pub mod explore;

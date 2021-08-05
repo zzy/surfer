@@ -1,0 +1,44 @@
+query ArticleData(
+  $username: String!, 
+  $slug: String!
+) {
+  randomWish(
+    username: $username
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  articleBySlug(
+    username: $username, 
+    slug: $slug
+  ) {
+    subject
+    summary
+    uri
+    contentHtml
+    updatedAt
+
+    user {
+      username
+      nickname
+      blogName
+    }
+
+    category {
+      name
+      uri
+    }
+
+    topics {
+      name
+      uri
+    }
+  }
+}
