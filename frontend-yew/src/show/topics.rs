@@ -81,6 +81,9 @@ impl Component for Topics {
 }
 
 fn view_topics(topics_data: &Value) -> Html {
+    let document = yew::utils::document();
+    document.set_title(&format!("{} - {}", "Topics", document.title()));
+
     let wish_val = &topics_data["randomWish"];
     let random_wish = html! {
         <div class="ta-center mt16 mx64">

@@ -84,6 +84,9 @@ impl Component for Categories {
 }
 
 fn view_categories(categories_data: &Value) -> Html {
+    let document = yew::utils::document();
+    document.set_title(&format!("{} - {}", "Categories", document.title()));
+
     let wish_val = &categories_data["randomWish"];
     let random_wish = html! {
         <div class="ta-center mt16 mx64">

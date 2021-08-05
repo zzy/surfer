@@ -113,6 +113,9 @@ fn view_article(article_data: &Value) -> Html {
     };
 
     let article = &article_data["articleBySlug"];
+    let subject = article["subject"].as_str().unwrap();
+    let document = yew::utils::document();
+    document.set_title(&format!("{} - {}", subject, document.title()));
 
     let article_topics_vec = article["topics"].as_array().unwrap();
     let article_topics = article_topics_vec.iter().map(|topic| {
@@ -142,7 +145,7 @@ fn view_article(article_data: &Value) -> Html {
                         { article["category"]["name"].as_str().unwrap() }
                     </a>
                     <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
-                        { article["subject"].as_str().unwrap() }
+                        { subject }
                     </a>
                 </h2>
                 <p class="fs-caption my6">
@@ -159,7 +162,7 @@ fn view_article(article_data: &Value) -> Html {
                     <b class="mr2">{ "Topics:" }</b>
                     { for article_topics }
                 </p>
-                <p class="fs-body1 my6 bg-gold-lighter">
+                <p class="fs-body1 my6 py4 bg-gold-lighter">
                     <b class="mr2">{ "Summary:" }</b>
                     { article["summary"].as_str().unwrap() }
                 </p>

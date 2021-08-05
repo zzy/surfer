@@ -81,6 +81,9 @@ impl Component for Articles {
 }
 
 fn view_articles(articles_data: &Value) -> Html {
+    let document = yew::utils::document();
+    document.set_title(&format!("{} - {}", "Articles", document.title()));
+
     let wish_val = &articles_data["randomWish"];
     let random_wish = html! {
         <div class="ta-center mt16 mx64">

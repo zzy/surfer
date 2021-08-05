@@ -81,6 +81,9 @@ impl Component for Home {
 }
 
 fn view_home(home_data: &Value) -> Html {
+    let document = yew::utils::document();
+    document.set_title(&format!("{} - {}", "Home", document.title()));
+
     let wish_val = &home_data["randomWish"];
     let random_wish = html! {
         <div class="ta-center mt16 mx64">
