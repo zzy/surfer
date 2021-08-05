@@ -13,7 +13,7 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.5.4"
 
-async-graphql = { version = "2.9.9", features = ["bson", "chrono"] }
+async-graphql = { version = "2.9.10", features = ["bson", "chrono"] }
 mongodb = { version = "2.0.0-beta.2", default-features = false, features = [
   "async-std-runtime",
 ] }

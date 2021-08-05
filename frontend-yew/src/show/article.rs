@@ -2,7 +2,10 @@ use yew::prelude::*;
 use graphql_client::GraphQLQuery;
 use serde_json::{Value, json};
 
-use crate::util::common::{FetchState, fetch_gql_data};
+use crate::util::{
+    constant::CFG,
+    common::{FetchState, fetch_gql_data},
+};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -115,7 +118,11 @@ fn view_article(article_data: &Value) -> Html {
     let article = &article_data["articleBySlug"];
     let subject = article["subject"].as_str().unwrap();
     let document = yew::utils::document();
-    document.set_title(&format!("{} - {}", subject, document.title()));
+    document.set_title(&format!(
+        "{} - {}",
+        subject,
+        CFG.get("site.title").unwrap()
+    ));
 
     let article_topics_vec = article["topics"].as_array().unwrap();
     let article_topics = article_topics_vec.iter().map(|topic| {
@@ -162,7 +169,7 @@ fn view_article(article_data: &Value) -> Html {
                     <b class="mr2">{ "Topics:" }</b>
                     { for article_topics }
                 </p>
-                <p class="fs-body1 my6 py4 bg-gold-lighter">
+                <p class="fs-body1 my6 p4 bg-gold-lighter">
                     <b class="mr2">{ "Summary:" }</b>
                     { article["summary"].as_str().unwrap() }
                 </p>

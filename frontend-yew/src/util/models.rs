@@ -2,10 +2,16 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Config {
+    pub site: Site,
     pub gql: Gql,
     pub theme_mode: ThemeMode,
     pub i18n: I18n,
     pub github: Github,
+}
+
+#[derive(Deserialize)]
+pub struct Site {
+    pub title: String,
 }
 
 #[derive(Deserialize)]

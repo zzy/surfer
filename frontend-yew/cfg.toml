@@ -1,3 +1,6 @@
+[site]
+title = "锈毂 - RustHub - blog.rusthub.top"
+
 [gql]
 addr = "api.budshome.com" # "127.0.0.1" for local test
 port = 8000

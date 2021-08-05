@@ -6,8 +6,8 @@
 article blockquote {
   margin: 10px 5px 10px 25px;
   padding: 10px 10px 5px 15px;
-  background-color: var(--blue-200);
-  border-left: 3px solid var(--blue-400);
+  background-color: var(--blue-050);
+  border-left: 3px solid var(--blue-600);
   font-size: 13px;
 }
 

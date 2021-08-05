@@ -2,7 +2,10 @@ use yew::prelude::*;
 use graphql_client::GraphQLQuery;
 use serde_json::{Value, json};
 
-use crate::util::common::{FetchState, fetch_gql_data};
+use crate::util::{
+    constant::CFG,
+    common::{FetchState, fetch_gql_data},
+};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -82,7 +85,11 @@ impl Component for Articles {
 
 fn view_articles(articles_data: &Value) -> Html {
     let document = yew::utils::document();
-    document.set_title(&format!("{} - {}", "Articles", document.title()));
+    document.set_title(&format!(
+        "{} - {}",
+        "Articles",
+        CFG.get("site.title").unwrap()
+    ));
 
     let wish_val = &articles_data["randomWish"];
     let random_wish = html! {
