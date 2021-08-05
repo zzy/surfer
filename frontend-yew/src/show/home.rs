@@ -105,7 +105,7 @@ fn view_home(home_data: &Value) -> Html {
         let article_topics = article_topics_vec.iter().map(|topic| {
             html! {
                 <a class="s-badge s-badge__sm ml4 mb2"
-                    href={ topic["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
                     { topic["name"].as_str().unwrap() }
                 </a>
             }
@@ -115,11 +115,11 @@ fn view_home(home_data: &Value) -> Html {
             <div class="s-card flex--item fl-equal wmn3 m6">
                 <h2 class="mb6">
                     <a class="s-tag mr6"
-                        href={ top_article["category"]["uri"].as_str().unwrap().to_owned() }
+                        href={ top_article["category"]["uri"].as_str().unwrap().to_string() }
                         target="_blank">
                         { top_article["category"]["name"].as_str().unwrap() }
                     </a>
-                    <a href={ top_article["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    <a href={ top_article["uri"].as_str().unwrap().to_string() } target="_blank">
                         { top_article["subject"].as_str().unwrap() }
                     </a>
                 </h2>
@@ -149,7 +149,7 @@ fn view_home(home_data: &Value) -> Html {
         let article_topics = article_topics_vec.iter().map(|topic| {
             html! {
                 <a class="s-badge s-badge__sm ml4 mb2"
-                    href={ topic["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
                     { topic["name"].as_str().unwrap() }
                 </a>
             }
@@ -159,11 +159,11 @@ fn view_home(home_data: &Value) -> Html {
             <div class="s-card mx24 my6">
                 <h2 class="mb6">
                     <a class="s-tag mr6"
-                        href={ recommended_article["category"]["uri"].as_str().unwrap().to_owned() }
+                        href={ recommended_article["category"]["uri"].as_str().unwrap().to_string() }
                         target="_blank">
                         { recommended_article["category"]["name"].as_str().unwrap() }
                     </a>
-                    <a href={ recommended_article["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    <a href={ recommended_article["uri"].as_str().unwrap().to_string() } target="_blank">
                         { recommended_article["subject"].as_str().unwrap() }
                     </a>
                 </h2>

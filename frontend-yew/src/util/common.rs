@@ -52,7 +52,7 @@ pub async fn fetch_gql_data(query: &str) -> Result<Value, FetchError> {
     let data_str = resp_text.as_string().unwrap();
     let data_value: Value = from_str(&data_str).unwrap();
 
-    Ok(data_value["data"].to_owned())
+    Ok(data_value["data"].clone())
 }
 
 pub async fn gql_uri() -> String {

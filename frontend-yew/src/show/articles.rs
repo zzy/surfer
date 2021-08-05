@@ -105,7 +105,7 @@ fn view_articles(articles_data: &Value) -> Html {
         let article_topics = article_topics_vec.iter().map(|topic| {
             html! {
                 <a class="s-badge s-badge__sm ml4 mb2"
-                    href={ topic["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
                     { topic["name"].as_str().unwrap() }
                 </a>
             }
@@ -115,11 +115,11 @@ fn view_articles(articles_data: &Value) -> Html {
             <div class="s-card mx24 my12">
                 <h2 class="mb6">
                     <a class="s-tag mr6"
-                        href={ article["category"]["uri"].as_str().unwrap().to_owned() }
+                        href={ article["category"]["uri"].as_str().unwrap().to_string() }
                         target="_blank">
                         { article["category"]["name"].as_str().unwrap() }
                     </a>
-                    <a href={ article["uri"].as_str().unwrap().to_owned() } target="_blank">
+                    <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
                         { article["subject"].as_str().unwrap() }
                     </a>
                 </h2>

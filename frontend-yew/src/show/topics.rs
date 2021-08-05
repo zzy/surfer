@@ -121,7 +121,7 @@ fn view_topics(topics_data: &Value) -> Html {
 
         html! {
             <a class={ classes!("s-tag", tag_size, "m8") } 
-                href={ topic["uri"].as_str().unwrap().to_owned() } target="_blank">
+                href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
                 { topic["name"].as_str().unwrap() }
                 { "（" }
                 { topic_quotes }

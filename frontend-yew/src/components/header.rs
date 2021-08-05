@@ -92,25 +92,25 @@ fn nav() -> Html {
                 title={ CFG.get("theme_mode.title").unwrap().clone() }>
                 <svg aria-hidden="true" class="svg-icon iconTheme"
                     width="24" height="24" viewBox="0 0 18 18">
-                    <path d={ CFG.get("theme_mode.svg").unwrap().to_owned() } />
+                    <path d={ CFG.get("theme_mode.svg").unwrap().clone() } />
                 </svg>
             </button>
 
             <a class="flex--item fc-black-300 ml12 sm:d-none"
-                title={ CFG.get("i18n.title").unwrap().to_owned() }
-                href={ CFG.get("i18n.href").unwrap().to_owned() }>
+                title={ CFG.get("i18n.title").unwrap().clone() }
+                href={ CFG.get("i18n.href").unwrap().clone() }>
                 <svg aria-hidden="true" class="svg-icon iconInternational"
                     width="24" height="24" viewBox="0 0 24 24">
-                    <path d={ CFG.get("i18n.svg").unwrap().to_owned() } />
+                    <path d={ CFG.get("i18n.svg").unwrap().clone() } />
                 </svg>
             </a>
 
             <a class="flex--item fc-black-300 ml12 sm:d-none"
-                title={ CFG.get("github.title").unwrap().to_owned() }
-                href={ CFG.get("github.href").unwrap().to_owned() } target="_blank">
+                title={ CFG.get("github.title").unwrap().clone() }
+                href={ CFG.get("github.href").unwrap().clone() } target="_blank">
                 <svg aria-hidden="true" class="svg-icon iconGitHub"
                     width="24" height="24" viewBox="0 0 18 18">
-                    <path d={ CFG.get("github.svg").unwrap().to_owned() } />
+                    <path d={ CFG.get("github.svg").unwrap().clone() } />
                 </svg>
             </a>
 
@@ -166,28 +166,28 @@ fn nav_over() -> Html {
                         <div class="d-flex gs16 ai-center fw-wrap mx8">
 
                             <button class="s-btn__unset c-pointer flex--item fc-black-300 js-darkmode-btn"
-                                title={ CFG.get("theme_mode.title").unwrap().to_owned() }>
+                                title={ CFG.get("theme_mode.title").unwrap().clone() }>
                                 <svg aria-hidden="true" class="svg-icon iconTheme"
                                     width="24" height="24" viewBox="0 0 18 18">
-                                    <path d={ CFG.get("theme_mode.svg").unwrap().to_owned() } />
+                                    <path d={ CFG.get("theme_mode.svg").unwrap().clone() } />
                                 </svg>
                             </button>
 
                             <a class="flex--item fc-black-300"
-                                title={ CFG.get("i18n.title").unwrap().to_owned() }
-                                href={ CFG.get("i18n.href").unwrap().to_owned() }>
+                                title={ CFG.get("i18n.title").unwrap().clone() }
+                                href={ CFG.get("i18n.href").unwrap().clone() }>
                                 <svg aria-hidden="true" class="svg-icon iconInternational"
                                     width="24" height="24" viewBox="0 0 24 24">
-                                    <path d={ CFG.get("i18n.svg").unwrap().to_owned() } />
+                                    <path d={ CFG.get("i18n.svg").unwrap().clone() } />
                                 </svg>
                             </a>
 
                             <a class="flex--item fc-black-300"
-                                title={ CFG.get("github.title").unwrap().to_owned() }
-                                href={ CFG.get("github.href").unwrap().to_owned() } target="_blank">
+                                title={ CFG.get("github.title").unwrap().clone() }
+                                href={ CFG.get("github.href").unwrap().clone() } target="_blank">
                                 <svg aria-hidden="true" class="svg-icon iconGitHub"
                                     width="24" height="24" viewBox="0 0 18 18">
-                                    <path d={ CFG.get("github.svg").unwrap().to_owned() } />
+                                    <path d={ CFG.get("github.svg").unwrap().clone() } />
                                 </svg>
                             </a>
 

@@ -110,7 +110,7 @@ fn view_categories(categories_data: &Value) -> Html {
             let article_topics = article_topics_vec.iter().map(|topic| {
                 html! {
                     <a class="s-badge s-badge__sm ml4 mb2"
-                        href={ topic["uri"].as_str().unwrap().to_owned() } target="_blank">
+                        href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
                         { topic["name"].as_str().unwrap() }
                     </a>
                 }
@@ -119,7 +119,7 @@ fn view_categories(categories_data: &Value) -> Html {
             html! {
                 <div class="s-card my6">
                     <h2 class="mb6">
-                        <a href={ article["uri"].as_str().unwrap().to_owned() } target="_blank">
+                        <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
                             { article["subject"].as_str().unwrap() }
                         </a>
                     </h2>
@@ -146,7 +146,7 @@ fn view_categories(categories_data: &Value) -> Html {
             <div class="m24">
                 <span class="s-badge s-badge__bronze fs-subheading fw-bold">
                     <span class="s-award-bling s-award-bling__bronze">
-                        <a href={ category["uri"].as_str().unwrap().to_owned() } target="_blank">
+                        <a href={ category["uri"].as_str().unwrap().to_string() } target="_blank">
                             { category["name"].as_str().unwrap() }
                             { " - 共 " }
                             { category["quotes"].as_i64().unwrap() }
