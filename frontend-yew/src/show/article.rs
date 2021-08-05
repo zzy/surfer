@@ -125,15 +125,16 @@ fn view_article(article_data: &Value) -> Html {
     });
 
     let content_html = article["contentHtml"].as_str().unwrap();
-    let content_html_p = yew::utils::document().create_element("p").unwrap();
-    content_html_p.set_class_name("fs-body2 mt24");
-    content_html_p.set_inner_html(content_html);
-    let content_html_node = Html::VRef(content_html_p.into());
+    let content_html_section =
+        yew::utils::document().create_element("section").unwrap();
+    content_html_section.set_class_name("fs-body2 mt24");
+    content_html_section.set_inner_html(content_html);
+    let content_html_node = Html::VRef(content_html_section.into());
 
     html! {
         <>
             { random_wish }
-            <div class="s-card mx24 my12">
+            <article class="s-card mx24 my12">
                 <h2 class="mb6">
                     <a class="s-tag mr6"
                         href={ article["category"]["uri"].as_str().unwrap().to_owned() }
@@ -164,10 +165,8 @@ fn view_article(article_data: &Value) -> Html {
                 </p>
                 <link href="/css/night-owl.min.css" rel="stylesheet" />
                 { content_html_node }
-                <script>{ "hljs.highlightAll();" }</script>
-                
-                
-            </div>
+                <script src="/js/hl.js?132689068675031052"></script>
+            </article>
         </>
     }
 }
