@@ -2,8 +2,7 @@
 title = "锈毂 - RustHub - blog.rusthub.top"
 
 [gql]
-addr = "api.budshome.com" # "127.0.0.1" for local test
-port = 8000
+addr = "https://api.budshome.com" # "http://127.0.0.1:8000" for local test
 path = "gql/v1"
 
 [theme_mode]

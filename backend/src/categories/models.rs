@@ -4,7 +4,10 @@ use chrono::FixedOffset;
 
 use crate::util::constant::{GqlResult, DT_F};
 use crate::dbs::mongo::DataSource;
-use crate::articles::{models::Article, services::articles_by_category_id};
+use crate::{
+    articles::{models::Article, services::articles_by_category_id},
+    topics::{models::Topic, services::topics_by_category_id},
+};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Category {
@@ -66,6 +69,14 @@ impl Category {
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
         articles_by_category_id(db, &self._id, &1).await
+    }
+
+    pub async fn topics(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<Vec<Topic>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        topics_by_category_id(db, &self._id, &1).await
     }
 }
 

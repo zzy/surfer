@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data},
+    common::{FetchState, fetch_gql_data, topic_tags_node},
 };
 
 #[derive(GraphQLQuery)]
@@ -114,48 +114,13 @@ fn view_categories(categories_data: &Value) -> Html {
 
     let categories_vec = categories_data["categories"].as_array().unwrap();
     let categories = categories_vec.iter().map(|category| {
-        let articles_vec = category["articles"].as_array().unwrap();
-        let articles = articles_vec.iter().map(|article| {
-            let article_topics_vec = article["topics"].as_array().unwrap();
-            let article_topics = article_topics_vec.iter().map(|topic| {
-                html! {
-                    <a class="s-badge s-badge__sm ml4 mb2"
-                        href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
-                        { topic["name"].as_str().unwrap() }
-                    </a>
-                }
-            });
-
-            html! {
-                <div class="s-card my6">
-                    <h2 class="mb6">
-                        <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
-                            { article["subject"].as_str().unwrap() }
-                        </a>
-                    </h2>
-                    <p class="fs-caption my6">
-                        { article["updatedAt"].as_str().unwrap() }
-                        { " by " }
-                        <a href={ format!("/{}", article["user"]["username"].as_str().unwrap()) }
-                            target="_blank">
-                            { article["user"]["nickname"].as_str().unwrap() }
-                            { "@" }
-                            { article["user"]["blogName"].as_str().unwrap() }
-                        </a>
-                    </p>
-                    <p class="my6">
-                        <b>{ "Topics:" }</b>
-                        { for article_topics }
-                    </p>
-                    <p class="fs-body1 v-truncate3 mt6">{ article["summary"].as_str().unwrap() }</p>
-                </div>
-            }
-        });
+        let topics_vec = category["topics"].as_array().unwrap();
+        let topics = topics_vec.iter().map(|topic| topic_tags_node(topic));
 
         html! {
-            <div class="m24">
-                <span class="s-badge s-badge__bronze fs-subheading fw-bold">
-                    <span class="s-award-bling s-award-bling__bronze">
+            <div class="ba bc-blue-100 m24">
+                <span class="s-badge fs-body3 fw-bold">
+                    <span class="s-award-bling s-award-bling__gold">
                         <a href={ category["uri"].as_str().unwrap().to_string() } target="_blank">
                             { category["name"].as_str().unwrap() }
                             { " - 共 " }
@@ -164,7 +129,9 @@ fn view_categories(categories_data: &Value) -> Html {
                         </a>
                     </span>
                 </span>
-                { for articles }
+                <div class="my6">
+                    { for topics }
+                </div>
             </div>
         }
     });

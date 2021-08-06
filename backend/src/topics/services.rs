@@ -214,6 +214,7 @@ pub async fn topics_by_article_id(
             }
         }
     }
+    topics.sort_by(|a, b| b.quotes.cmp(&a.quotes));
 
     Ok(topics)
 }
@@ -265,15 +266,35 @@ pub async fn topics_by_user_id(
     topic_ids.dedup();
 
     let mut topics: Vec<Topic> = vec![];
-    for topic_id in topic_ids {
-        let mut topic = self::topic_by_id(db.clone(), &topic_id).await?;
-        topic.quotes =
-            topic_ids_dup.iter().filter(|&id| *id == topic_id).count() as i64;
+    let coll = db.collection::<Document>("topics");
+    let mut cursor = coll.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
 
-        topics.push(topic);
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(document) => {
+                let mut topic: Topic = from_bson(Bson::Document(document))?;
+                topic.quotes =
+                    topic_ids_dup.iter().filter(|&id| *id == topic._id).count()
+                        as i64;
+                topics.push(topic);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
     }
+    topics.sort_by(|a, b| b.quotes.cmp(&a.quotes));
 
     Ok(topics)
+}
+
+// get topics by username
+pub async fn topics_by_username(
+    db: Database,
+    username: &str,
+) -> GqlResult<Vec<Topic>> {
+    let user = users::services::user_by_username(db.clone(), username).await?;
+    self::topics_by_user_id(db, &user._id).await
 }
 
 // get all TopicArticle list by user_id
@@ -305,11 +326,67 @@ async fn topics_articles_by_user_id(
     topics_articles
 }
 
-// get topics by username
-pub async fn topics_by_username(
+// get topics by category_id
+pub async fn topics_by_category_id(
     db: Database,
-    username: &str,
+    category_id: &ObjectId,
+    published: &i32,
 ) -> GqlResult<Vec<Topic>> {
-    let user = users::services::user_by_username(db.clone(), username).await?;
-    self::topics_by_user_id(db, &user._id).await
+    let articles = crate::articles::services::articles_by_category_id(
+        db.clone(),
+        category_id,
+        published,
+    )
+    .await?;
+
+    let mut article_ids = vec![];
+    for article in articles {
+        article_ids.push(article._id);
+    }
+
+    let mut topic_ids_dup = vec![];
+    let coll_topics_articles = db.collection::<Document>("topics_articles");
+    let mut cursor_topics_articles = coll_topics_articles
+        .find(doc! {"article_id": {"$in": article_ids}}, None)
+        .await?;
+
+    while let Some(result) = cursor_topics_articles.next().await {
+        match result {
+            Ok(document) => {
+                let topic_article: TopicArticle =
+                    from_bson(Bson::Document(document))?;
+                topic_ids_dup.push(topic_article.topic_id);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+
+    let mut topic_ids = topic_ids_dup.clone();
+    topic_ids.sort();
+    topic_ids.dedup();
+
+    let mut topics: Vec<Topic> = vec![];
+    let coll_topics = db.collection::<Document>("topics");
+    let mut cursor_topics =
+        coll_topics.find(doc! {"_id": {"$in": topic_ids}}, None).await?;
+
+    while let Some(result) = cursor_topics.next().await {
+        match result {
+            Ok(document) => {
+                let mut topic: Topic = from_bson(Bson::Document(document))?;
+                topic.quotes =
+                    topic_ids_dup.iter().filter(|&id| *id == topic._id).count()
+                        as i64;
+                topics.push(topic);
+            }
+            Err(error) => {
+                println!("Error to find doc: {}", error);
+            }
+        }
+    }
+    topics.sort_by(|a, b| b.quotes.cmp(&a.quotes));
+
+    Ok(topics)
 }

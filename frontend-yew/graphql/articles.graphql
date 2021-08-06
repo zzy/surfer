@@ -16,17 +16,20 @@ query ArticlesData {
     published: 1
   ) {
     subject
+    summary
+    uri
+    updatedAt
+
     category {
       name
       uri
     }
-    summary
-    uri
-    updatedAt
+
     topics {
       name
       uri
     }
+    
     user {
       username
       nickname

@@ -16,20 +16,11 @@ query CategoriesData {
     name
     uri
     quotes
-    articles {
-      subject
-      summary
+
+    topics {
+      name
       uri
-      updatedAt
-      topics {
-        name
-        uri
-      }
-      user {
-        username
-        nickname
-        blogName
-      }
+      quotes
     }
   }
 }

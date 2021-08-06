@@ -17,7 +17,6 @@ pub struct Site {
 #[derive(Deserialize)]
 pub struct Gql {
     pub addr: String,
-    pub port: u16,
     pub path: String,
 }
 

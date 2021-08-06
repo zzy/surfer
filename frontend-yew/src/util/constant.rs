@@ -17,7 +17,6 @@ lazy_static! {
         map.insert("site.title", config.site.title);
 
         map.insert("gql.addr", config.gql.addr);
-        map.insert("gql.port", config.gql.port.to_string());
         map.insert("gql.path",config.gql.path);
 
         map.insert("theme_mode.title", config.theme_mode.title);

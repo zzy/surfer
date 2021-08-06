@@ -44,6 +44,7 @@ type Category {
   createdAt: String!
   updatedAt: String!
   articles: [Article!]!
+  topics: [Topic!]!
 }
 
 input CategoryNew {
@@ -104,6 +105,7 @@ type QueryRoot {
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
   topicsByUserId(userId: ObjectId!): [Topic!]!
   topicsByUsername(username: String!): [Topic!]!
+  topicsByCategoryId(categoryId: ObjectId!, published: Int!): [Topic!]!
   wishes(published: Int!): [Wish!]!
   randomWish(username: String!): Wish!
 }

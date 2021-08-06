@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data},
+    common::{FetchState, fetch_gql_data, topic_tags_node},
 };
 
 #[derive(GraphQLQuery)]
@@ -110,35 +110,7 @@ fn view_topics(topics_data: &Value) -> Html {
     };
 
     let topics_vec = topics_data["topics"].as_array().unwrap();
-    let topics = topics_vec.iter().map(|topic| {
-        let topic_quotes = topic["quotes"].as_i64().unwrap();
-        let tag_size =
-            if topic_quotes >= 100 {
-                "s-tag__lg fw-bold"
-            }
-            else if topic_quotes < 100 && topic_quotes >= 60 {
-                "s-tag__md fw-bold"
-            }
-            else if topic_quotes < 60 && topic_quotes >= 30 {
-                "s-tag"
-            }
-            else if topic_quotes < 30 && topic_quotes >= 10 {
-                "s-tag__sm"
-            }
-            else {
-                "s-tag__xs"
-            };
-
-        html! {
-            <a class={ classes!("s-tag", tag_size, "m8") } 
-                href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
-                { topic["name"].as_str().unwrap() }
-                { "（" }
-                { topic_quotes }
-                { "）" }
-            </a>
-        }
-    });
+    let topics = topics_vec.iter().map(|topic| topic_tags_node(topic));
 
     html! {
         <>

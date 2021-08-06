@@ -2,6 +2,7 @@ use futures::stream::StreamExt;
 use async_graphql::{Error, ErrorExtensions};
 use mongodb::{
     Database,
+    options::FindOptions,
     bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
 };
 
@@ -99,12 +100,12 @@ pub async fn category_user_new(
 pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
     let coll = db.collection::<Document>("categories");
 
-    let mut categories: Vec<Category> = vec![];
-
     // Query all documents in the collection.
-    let mut cursor = coll.find(None, None).await.unwrap();
+    let find_options = FindOptions::builder().sort(doc! {"quotes": -1}).build();
+    let mut cursor = coll.find(None, find_options).await.unwrap();
 
     // Iterate over the results of the cursor.
+    let mut categories: Vec<Category> = vec![];
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {

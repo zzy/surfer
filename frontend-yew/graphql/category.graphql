@@ -1,0 +1,28 @@
+query CategoryData(
+  $slug: String!
+) {
+  categoryBySlug(
+    slug: $slug
+  ) {
+    name
+    quotes
+    
+    articles {
+      subject
+      summary
+      uri
+      updatedAt
+
+      topics {
+        name
+        uri
+      }
+
+      user {
+        username
+        nickname
+        blogName
+      }
+    }
+  }
+}
