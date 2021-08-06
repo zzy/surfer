@@ -1,8 +1,6 @@
 # Web Application Server - yew
 
-# Work In Progress ...
-
-See also: https://github.com/zzy/tide-async-graphql-mongodb/tree/main/frontend-yew
+Demo site: [https://blog.rusthub.top](https://blog.rusthub.top)
 
 # Web Application Server - yew
 
@@ -24,7 +22,9 @@ trunk serve --release
 ```
 Then connect to http://127.0.0.1:3001 with browser.
 
-![Client Image](../data/yew.jpg)
+![Client Image](../data/yew.png)
+
+See also: https://github.com/zzy/tide-async-graphql-mongodb/tree/main/frontend-yew
 
 ## Contributing
 

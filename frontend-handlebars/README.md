@@ -1,4 +1,6 @@
-# Web Application Server
+# Web Application Server - handlebars
+
+Demo site: [https://blog.budshome.com](https://blog.budshome.com)
 
 ## Build & run
 
@@ -31,7 +33,9 @@ cargo run
 ```
 Then connect to http://127.0.0.1:3000 with browser.
 
-![Client Image](../data/handlebars.jpg)
+![Client Image](../data/handlebars.png)
+
+See also: https://github.com/zzy/tide-async-graphql-mongodb/tree/main/frontend-handlebars
 
 ## How to Test & Run `rhai scripts`
 
