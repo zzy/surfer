@@ -154,7 +154,7 @@ fn view_category(category_data: &Value) -> Html {
             <div class="m24 mb8 p8 fs-subheading bg-blue-100 bg-confetti-animated">
                 <b class="fc-danger">{ category_name }</b>
                 { " 类目中，文章共 " }
-                { category["quotes"].as_i64().unwrap() }
+                <b class="fc-danger">{ category["quotes"].as_i64().unwrap() }</b>
                 { " 篇：" }
             </div>
             { for articles }

@@ -153,7 +153,7 @@ fn view_topic(topic_data: &Value) -> Html {
             <div class="m24 mb8 p8 fs-subheading bg-blue-100 bg-confetti-animated">
                 <b class="fc-danger">{ topic_name }</b>
                 { " 话题下，文章共 " }
-                { topic["quotes"].as_i64().unwrap() }
+                <b class="fc-danger">{ topic["quotes"].as_i64().unwrap() }</b>
                 { " 篇：" }
             </div>
             { for articles }

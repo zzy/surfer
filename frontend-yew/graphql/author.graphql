@@ -1,0 +1,43 @@
+query AuthorData(
+  $username: String!, 
+) {
+  randomWish(
+    username: "-"
+  ) {
+    aphorism
+    author
+
+    user {
+      username
+      nickname
+      blogName
+    }
+  }
+
+  userByUsername(
+    username: $username
+  ) {
+    username
+    nickname
+    blogName
+
+    articles(
+      published: 1
+    ) {
+      subject
+      summary
+      uri
+      updatedAt
+
+      category {
+        name
+        uri
+      }
+
+      topics {
+        name
+        uri
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ If you need mongodb cloud count, email to me or wechat(微信): yupen-com, pleas
 - [mongodb & mongo-rust-driver](https://crates.io/crates/mongodb)
 - [Surf](https://crates.io/crates/surf)
 - [graphql_client](https://crates.io/crates/graphql_client)
+- [yew](https://yew.budshome.com)
 - [handlebars-rust](https://crates.io/crates/handlebars)
 - [jsonwebtoken](https://crates.io/crates/jsonwebtoken)
 - [cookie-rs](https://crates.io/crates/cookie)

@@ -12,8 +12,9 @@ article blockquote {
 }
 
 article code {
-  color: var(--red-500);
-  word-wrap:break-word
+  color: var(--red);
+  word-wrap:break-word;
+  font-weight: bold;
 }
 
 article img {
