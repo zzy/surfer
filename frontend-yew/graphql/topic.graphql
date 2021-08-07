@@ -1,4 +1,4 @@
-query CategoryData(
+query TopicData(
   $slug: String!
 ) {
   randomWish(
@@ -14,11 +14,10 @@ query CategoryData(
     }
   }
   
-  categoryBySlug(
+  topicBySlug(
     slug: $slug
   ) {
     name
-    uri
     quotes
     
     articles {
@@ -26,6 +25,11 @@ query CategoryData(
       summary
       uri
       updatedAt
+
+      category {
+        name
+        uri
+      }
 
       topics {
         name

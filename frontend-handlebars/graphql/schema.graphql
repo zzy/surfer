@@ -84,6 +84,7 @@ type QueryRoot {
   userByUsername(username: String!): User!
   userSignIn(signature: String!, password: String!): SignInfo!
   users(token: String!): [User!]!
+  articleBySlug(username: String!, slug: String!): Article!
   articles(published: Int!): [Article!]!
   articlesInPosition(
     username: String!
@@ -93,7 +94,7 @@ type QueryRoot {
   articlesByUserId(userId: ObjectId!, published: Int!): [Article!]!
   articlesByUsername(username: String!, published: Int!): [Article!]!
   articlesByCategoryId(categoryId: ObjectId!, published: Int!): [Article!]!
-  articleBySlug(username: String!, slug: String!): Article!
+  articlesByTopicId(topicId: ObjectId!, published: Int!): [Article!]!
   categories: [Category!]!
   categoriesByUserId(userId: ObjectId!): [Category!]!
   categoriesByUsername(username: String!): [Category!]!
@@ -101,7 +102,7 @@ type QueryRoot {
   categoryBySlug(slug: String!): Category!
   topics: [Topic!]!
   topicById(id: ObjectId!): Topic!
-  topicByName(name: String!): Topic!
+  topicBySlug(slug: String!): Topic!
   topicsByArticleId(articleId: ObjectId!): [Topic!]!
   topicsByUserId(userId: ObjectId!): [Topic!]!
   topicsByUsername(username: String!): [Topic!]!
@@ -124,6 +125,7 @@ type Topic {
   uri: String!
   createdAt: String!
   updatedAt: String!
+  articles: [Article!]!
 }
 
 type TopicArticle {

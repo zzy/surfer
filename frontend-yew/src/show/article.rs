@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data},
+    common::{FetchState, fetch_gql_data, random_wish_node},
 };
 
 #[derive(GraphQLQuery)]
@@ -98,22 +98,7 @@ impl Component for Article {
 
 fn view_article(article_data: &Value) -> Html {
     let wish_val = &article_data["randomWish"];
-    let random_wish = html! {
-        <div class="ta-center mt16 mx64">
-            <b>
-                <a href={ format!("/{}", wish_val["user"]["username"].as_str().unwrap()) }
-                    target="_blank">
-                    { wish_val["user"]["nickname"].as_str().unwrap() }
-                    { "@" }
-                    { wish_val["user"]["blogName"].as_str().unwrap() }
-                </a>
-                { " shared the aphorism: " }
-            </b>
-            { wish_val["aphorism"].as_str().unwrap() }
-            { " -- " }
-            { wish_val["author"].as_str().unwrap() }
-        </div>
-    };
+    let random_wish = random_wish_node(wish_val);
 
     let article = &article_data["articleBySlug"];
     let subject = article["subject"].as_str().unwrap();

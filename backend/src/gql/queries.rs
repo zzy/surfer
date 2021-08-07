@@ -65,6 +65,17 @@ impl QueryRoot {
         users::services::users(db, &token).await
     }
 
+    // Get article by its slug
+    async fn article_by_slug(
+        &self,
+        ctx: &Context<'_>,
+        username: String,
+        slug: String,
+    ) -> GqlResult<Article> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        articles::services::article_by_slug(db, &username, &slug).await
+    }
+
     // Get all articles
     async fn articles(
         &self,
@@ -128,15 +139,16 @@ impl QueryRoot {
         .await
     }
 
-    // Get article by its slug
-    async fn article_by_slug(
+    // Get all articles by topic_id
+    async fn articles_by_topic_id(
         &self,
         ctx: &Context<'_>,
-        username: String,
-        slug: String,
-    ) -> GqlResult<Article> {
+        topic_id: ObjectId,
+        published: i32,
+    ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        articles::services::article_by_slug(db, &username, &slug).await
+        articles::services::articles_by_topic_id(db, &topic_id, &published)
+            .await
     }
 
     // Get all categories
@@ -201,14 +213,14 @@ impl QueryRoot {
         topics::services::topic_by_id(db, &id).await
     }
 
-    // get topic info by name
-    async fn topic_by_name(
+    // get topic info by slug
+    async fn topic_by_slug(
         &self,
         ctx: &Context<'_>,
-        name: String,
+        slug: String,
     ) -> GqlResult<Topic> {
         let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
-        topics::services::topic_by_name(db, &name).await
+        topics::services::topic_by_slug(db, &slug).await
     }
 
     // get topics by article_id

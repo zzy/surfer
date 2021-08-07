@@ -2,7 +2,9 @@ use serde::{Serialize, Deserialize};
 use mongodb::bson::{oid::ObjectId, DateTime};
 use chrono::FixedOffset;
 
-use crate::util::constant::DT_F;
+use crate::util::constant::{GqlResult, DT_F};
+use crate::dbs::mongo::DataSource;
+use crate::articles::{models::Article, services::articles_by_topic_id};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Topic {
@@ -51,6 +53,14 @@ impl Topic {
             .with_timezone(&FixedOffset::east(8 * 3600))
             .format(DT_F)
             .to_string()
+    }
+
+    pub async fn articles(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> GqlResult<Vec<Article>> {
+        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        articles_by_topic_id(db, &self._id, &1).await
     }
 }
 

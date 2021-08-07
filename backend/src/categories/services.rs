@@ -17,8 +17,9 @@ pub async fn category_new(
 ) -> GqlResult<Category> {
     let coll = db.collection::<Document>("categories");
 
-    let exist_document =
-        coll.find_one(doc! {"name": &category_new.name}, None).await?;
+    let exist_document = coll
+        .find_one(doc! {"name": &category_new.name.to_lowercase()}, None)
+        .await?;
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
@@ -192,7 +193,7 @@ pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
     let coll = db.collection::<Document>("categories");
 
     let category_document = coll
-        .find_one(doc! {"slug": slug}, None)
+        .find_one(doc! {"slug": slug.to_lowercase()}, None)
         .await
         .expect("Document not found")
         .unwrap();

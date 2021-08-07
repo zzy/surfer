@@ -7,5 +7,6 @@ target
 *.rs.bk
 
 .env
+.env.toml
 examples
 dist

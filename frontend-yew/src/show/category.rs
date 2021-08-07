@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data},
+    common::{FetchState, fetch_gql_data, random_wish_node},
 };
 
 #[derive(GraphQLQuery)]
@@ -93,6 +93,9 @@ impl Component for Category {
 }
 
 fn view_category(category_data: &Value) -> Html {
+    let wish_val = &category_data["randomWish"];
+    let random_wish = random_wish_node(wish_val);
+
     let category = &category_data["categoryBySlug"];
     let category_name = category["name"].as_str().unwrap();
     let document = yew::utils::document();
@@ -115,8 +118,13 @@ fn view_category(category_data: &Value) -> Html {
         });
 
         html! {
-            <div class="s-card my6">
+            <div class="s-card mx24 my12">
                 <h2 class="mb6">
+                    <a class="s-tag mr6"
+                        href={ category["uri"].as_str().unwrap().to_string() }
+                        target="_blank">
+                        { category_name }
+                    </a>
                     <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
                         { article["subject"].as_str().unwrap() }
                     </a>
@@ -142,7 +150,14 @@ fn view_category(category_data: &Value) -> Html {
 
     html! {
         <>
-           { for articles }
+            { random_wish }
+            <div class="m24 mb8 p8 fs-subheading bg-blue-100 bg-confetti-animated">
+                <b class="fc-danger">{ category_name }</b>
+                { " 类目中，文章共 " }
+                { category["quotes"].as_i64().unwrap() }
+                { " 篇：" }
+            </div>
+            { for articles }
         </>
     }
 }

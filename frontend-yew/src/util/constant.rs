@@ -9,7 +9,7 @@ pub type ObjectId = String;
 lazy_static! {
     // CFG variables defined in cfg.toml file
     pub static ref CFG: HashMap<&'static str, String> = {
-        let cfg_str = include_str!("../../cfg.toml");
+        let cfg_str = include_str!("../../.env.toml");
         let config: Config = from_str(cfg_str).unwrap();
 
         let mut map = HashMap::new();

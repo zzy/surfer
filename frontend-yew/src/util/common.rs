@@ -66,6 +66,25 @@ pub async fn gql_uri() -> String {
     format!("{}/{}", addr, path)
 }
 
+pub fn random_wish_node(wish_val: &Value) -> VNode {
+    html! {
+        <div class="ta-center mt16 mx64">
+            <b>
+                <a href={ format!("/{}", wish_val["user"]["username"].as_str().unwrap()) }
+                    target="_blank">
+                    { wish_val["user"]["nickname"].as_str().unwrap() }
+                    { "@" }
+                    { wish_val["user"]["blogName"].as_str().unwrap() }
+                </a>
+                { " shared the aphorism: " }
+            </b>
+            { wish_val["aphorism"].as_str().unwrap() }
+            { " -- " }
+            { wish_val["author"].as_str().unwrap() }
+        </div>
+    }
+}
+
 pub fn topic_tags_node(topic: &Value) -> VNode {
     let topic_quotes = topic["quotes"].as_i64().unwrap();
     let tag_size = if topic_quotes >= 100 {

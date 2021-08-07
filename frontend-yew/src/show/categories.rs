@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data, topic_tags_node},
+    common::{FetchState, fetch_gql_data, random_wish_node, topic_tags_node},
 };
 
 #[derive(GraphQLQuery)]
@@ -95,22 +95,7 @@ fn view_categories(categories_data: &Value) -> Html {
     ));
 
     let wish_val = &categories_data["randomWish"];
-    let random_wish = html! {
-        <div class="ta-center mt16 mx64">
-            <b>
-                <a href={ format!("/{}", wish_val["user"]["username"].as_str().unwrap()) }
-                    target="_blank">
-                    { wish_val["user"]["nickname"].as_str().unwrap() }
-                    { "@" }
-                    { wish_val["user"]["blogName"].as_str().unwrap() }
-                </a>
-                { " shared the aphorism: " }
-            </b>
-            { wish_val["aphorism"].as_str().unwrap() }
-            { " -- " }
-            { wish_val["author"].as_str().unwrap() }
-        </div>
-    };
+    let random_wish = random_wish_node(wish_val);
 
     let categories_vec = categories_data["categories"].as_array().unwrap();
     let categories = categories_vec.iter().map(|category| {
