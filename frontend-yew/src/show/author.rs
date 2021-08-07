@@ -4,8 +4,9 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data, random_wish_node},
+    common::{FetchState, fetch_gql_data},
 };
+use crate::components::nodes::{random_wish_node, article_card_node};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -100,55 +101,16 @@ fn view_author(author_data: &Value) -> Html {
     let blog_name = user["blogName"].as_str().unwrap();
     let document = yew::utils::document();
     document.set_title(&format!(
-        "{} - {} - {} - {}",
-        username,
+        "{} ({}) - {} - {}",
         nickname,
+        username,
         blog_name,
         CFG.get("site.title").unwrap()
     ));
 
     let articles_vec = user["articles"].as_array().unwrap();
-    let articles = articles_vec.iter().map(|article| {
-        let article_topics_vec = article["topics"].as_array().unwrap();
-        let article_topics = article_topics_vec.iter().map(|topic| {
-            html! {
-                <a class="s-badge s-badge__sm ml4 mb2"
-                    href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
-                    { topic["name"].as_str().unwrap() }
-                </a>
-            }
-        });
-
-        html! {
-            <div class="s-card mx24 my12">
-                <h2 class="mb6">
-                    <a class="s-tag mr6"
-                        href={ article["category"]["uri"].as_str().unwrap().to_string() }
-                        target="_blank">
-                        { article["category"]["name"].as_str().unwrap() }
-                    </a>
-                    <a href={ article["uri"].as_str().unwrap().to_string() } target="_blank">
-                        { article["subject"].as_str().unwrap() }
-                    </a>
-                </h2>
-                <p class="fs-caption my6">
-                    { article["updatedAt"].as_str().unwrap() }
-                    { " by " }
-                    <a href={ format!("/{}", username) }
-                        target="_blank">
-                        { nickname }
-                        { "@" }
-                        { blog_name }
-                    </a>
-                </p>
-                <p class="my6">
-                    <b>{ "Topics:" }</b>
-                    { for article_topics }
-                </p>
-                <p class="fs-body1 v-truncate3 mt6">{ article["summary"].as_str().unwrap() }</p>
-            </div>
-        }
-    });
+    let articles =
+        articles_vec.iter().map(|article| article_card_node(article));
 
     html! {
         <>

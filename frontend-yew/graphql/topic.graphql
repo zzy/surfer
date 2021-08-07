@@ -26,6 +26,12 @@ query TopicData(
       uri
       updatedAt
 
+      user {
+        username
+        nickname
+        blogName
+      }
+      
       category {
         name
         uri
@@ -34,12 +40,6 @@ query TopicData(
       topics {
         name
         uri
-      }
-
-      user {
-        username
-        nickname
-        blogName
       }
     }
   }

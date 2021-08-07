@@ -4,11 +4,7 @@ use std::{
 };
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
-use yew::{
-    prelude::*,
-    virtual_dom::VNode,
-    web_sys::{Request, RequestInit, RequestMode, Response},
-};
+use yew::web_sys::{Request, RequestInit, RequestMode, Response};
 use serde_json::{Value, from_str};
 
 use crate::util::constant::CFG;
@@ -64,48 +60,4 @@ pub async fn gql_uri() -> String {
     let path = CFG.get("gql.path").unwrap();
 
     format!("{}/{}", addr, path)
-}
-
-pub fn random_wish_node(wish_val: &Value) -> VNode {
-    html! {
-        <div class="ta-center mt16 mx64">
-            <b>
-                <a href={ format!("/{}", wish_val["user"]["username"].as_str().unwrap()) }
-                    target="_blank">
-                    { wish_val["user"]["nickname"].as_str().unwrap() }
-                    { "@" }
-                    { wish_val["user"]["blogName"].as_str().unwrap() }
-                </a>
-                { " shared the aphorism: " }
-            </b>
-            { wish_val["aphorism"].as_str().unwrap() }
-            { " -- " }
-            { wish_val["author"].as_str().unwrap() }
-        </div>
-    }
-}
-
-pub fn topic_tags_node(topic: &Value) -> VNode {
-    let topic_quotes = topic["quotes"].as_i64().unwrap();
-    let tag_size = if topic_quotes >= 100 {
-        "s-tag__lg fw-bold"
-    } else if topic_quotes < 100 && topic_quotes >= 60 {
-        "s-tag__md fw-bold"
-    } else if topic_quotes < 60 && topic_quotes >= 30 {
-        "s-tag"
-    } else if topic_quotes < 30 && topic_quotes >= 10 {
-        "s-tag__sm"
-    } else {
-        "s-tag__xs"
-    };
-
-    html! {
-        <a class={ classes!("s-tag", tag_size, "m8") }
-            href={ topic["uri"].as_str().unwrap().to_string() } target="_blank">
-            { topic["name"].as_str().unwrap() }
-            { "（" }
-            { topic_quotes }
-            { "）" }
-        </a>
-    }
 }

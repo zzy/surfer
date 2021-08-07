@@ -318,9 +318,9 @@ dependencies = [
 
 [[package]]
 name = "async-process"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8f38756dd9ac84671c428afbf7c9f7495feff9ec5b0710f17100098e5b354ac"
+checksum = "b21b63ab5a0db0369deb913540af2892750e42d949faacc7a61495ac418a1692"
 dependencies = [
  "async-io",
  "blocking",
@@ -597,9 +597,9 @@ checksum = "cfa8873f51c92e232f9bac4065cddef41b714152812bfc5f7672ba16d6ef8cd9"
 
 [[package]]
 name = "bson"
-version = "2.0.0-beta.2"
+version = "2.0.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b02bc64b55fdb0d2b0833c0d1370ea4a814c15ada4740543a164c5158c0c03a"
+checksum = "6ae99d761c932e2c26fa783d8672d9d4ef601b04a7ecc621509cdb27ff6ce9e4"
 dependencies = [
  "ahash",
  "base64 0.13.0",
@@ -609,6 +609,7 @@ dependencies = [
  "lazy_static",
  "rand 0.7.3",
  "serde",
+ "serde_bytes",
  "serde_json",
  "uuid",
 ]
@@ -1911,9 +1912,9 @@ dependencies = [
 
 [[package]]
 name = "mongodb"
-version = "2.0.0-beta.2"
+version = "2.0.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a21067b394508fd75179faee57ae1e21148e2faab21acb97ebc90e1d47fe0e8"
+checksum = "0f543071f6567bcfc896fa96d50fea9b10f3445af64a8d69b8edba7afd0d1a38"
 dependencies = [
  "async-std",
  "async-std-resolver",
@@ -2400,9 +2401,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ab49abadf3f9e1c4bc499e8845e152ad87d2ad2d30371841171169e9d75feee"
+checksum = "8383f39639269cde97d255a32bdb68c047337295414940c68bdd30c2e13203ff"
 dependencies = [
  "bitflags",
 ]
@@ -2593,6 +2594,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16ae07dd2f88a366f15bd0632ba725227018c69a1c8550a927324f8eb8368bb9"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2747,9 +2757,9 @@ dependencies = [
 
 [[package]]
 name = "slab"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
+checksum = "c307a32c1c5c437f38c7fd45d753050587732ba8628319fbdf12a7e289ccc590"
 
 [[package]]
 name = "sluice"

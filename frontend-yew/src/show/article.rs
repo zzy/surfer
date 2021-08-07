@@ -4,8 +4,9 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data, random_wish_node},
+    common::{FetchState, fetch_gql_data},
 };
+use crate::components::nodes::random_wish_node;
 
 #[derive(GraphQLQuery)]
 #[graphql(

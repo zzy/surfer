@@ -20,9 +20,9 @@ impl Component for Explore {
 
     fn view(&self) -> Html {
         html! {
-            <>
-                <h1>{ "--- Explore ---" }</h1>
-            </>
+            <div class="m24 p8 fs-subheading bg-blue-100 bg-confetti-animated">
+                <h1>{ "--- Explore, Work In Progress ---" }</h1>
+            </div>
         }
     }
 }

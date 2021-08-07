@@ -30,9 +30,13 @@ fn nav_global() -> Html {
                 route={ Routes::Topics }>
                 { "Topics" }
             </Link<Routes>>
+            <Link<Routes> classes={ classes!("nav-global-explore", "s-navigation--item") }
+                route={ Routes::Explore }>
+                { "Explore" }
+            </Link<Routes>>
             <a class="s-navigation--item" href="//budshome.com/books.html"
                 target="_blank">
-                { "Explore" }
+                { "Learning" }
             </a>
         </>
     }

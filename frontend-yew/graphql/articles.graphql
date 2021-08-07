@@ -19,7 +19,12 @@ query ArticlesData {
     summary
     uri
     updatedAt
-
+    
+    user {
+      username
+      nickname
+      blogName
+    }
     category {
       name
       uri
@@ -28,12 +33,6 @@ query ArticlesData {
     topics {
       name
       uri
-    }
-    
-    user {
-      username
-      nickname
-      blogName
     }
   }
 }

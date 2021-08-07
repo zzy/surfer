@@ -28,6 +28,12 @@ query AuthorData(
       summary
       uri
       updatedAt
+    
+      user {
+        username
+        nickname
+        blogName
+      }
 
       category {
         name

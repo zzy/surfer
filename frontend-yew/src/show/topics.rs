@@ -4,8 +4,9 @@ use serde_json::{Value, json};
 
 use crate::util::{
     constant::CFG,
-    common::{FetchState, fetch_gql_data, random_wish_node, topic_tags_node},
+    common::{FetchState, fetch_gql_data},
 };
+use crate::components::nodes::{random_wish_node, topic_tag_node};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -95,7 +96,7 @@ fn view_topics(topics_data: &Value) -> Html {
     let random_wish = random_wish_node(wish_val);
 
     let topics_vec = topics_data["topics"].as_array().unwrap();
-    let topics = topics_vec.iter().map(|topic| topic_tags_node(topic));
+    let topics = topics_vec.iter().map(|topic| topic_tag_node(topic));
 
     html! {
         <>

@@ -20,9 +20,9 @@ impl Component for Register {
 
     fn view(&self) -> Html {
         html! {
-            <>
-                <h1>{ "--- register ---" }</h1>
-            </>
+            <div class="m24 p8 fs-subheading bg-blue-100 bg-confetti-animated">
+                <h1>{ "--- Register, Work In Progress ---" }</h1>
+            </div>
         }
     }
 }

@@ -18,7 +18,6 @@ query CategoryData(
     slug: $slug
   ) {
     name
-    uri
     quotes
     
     articles {
@@ -27,15 +26,20 @@ query CategoryData(
       uri
       updatedAt
 
-      topics {
-        name
-        uri
-      }
-
       user {
         username
         nickname
         blogName
+      }
+
+      category {
+        name
+        uri
+      }
+
+      topics {
+        name
+        uri
       }
     }
   }

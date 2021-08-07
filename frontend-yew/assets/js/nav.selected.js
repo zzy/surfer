@@ -4,6 +4,7 @@ $(document).ready(function () {
     var navGlobalArticles = $(".nav-global-articles");
     var navGlobalCategories = $(".nav-global-categories");
     var navGlobalTopics = $(".nav-global-topics");
+    var navGlobalExplore = $(".nav-global-explore");
     var navSignSignin = $(".nav-sign-signin");
     var navSignRegister = $(".nav-sign-register");
     var logo = $(".js-logo");
@@ -30,6 +31,14 @@ $(document).ready(function () {
 
         navSelectedClean();
         navGlobalTopics.toggleClass(isSelected, true);
+    });
+
+    navGlobalExplore.click(function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        navSelectedClean();
+        navGlobalExplore.toggleClass(isSelected, true);
     });
 
     navSignSignin.click(function (e) {
@@ -59,6 +68,7 @@ $(document).ready(function () {
         navGlobalArticles.toggleClass(isSelected, false);
         navGlobalCategories.toggleClass(isSelected, false);
         navGlobalTopics.toggleClass(isSelected, false);
+        navGlobalExplore.toggleClass(isSelected, false);
         navSignSignin.toggleClass(isSelected, false);
         navSignRegister.toggleClass(isSelected, false);
     }

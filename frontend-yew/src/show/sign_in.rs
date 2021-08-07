@@ -20,9 +20,9 @@ impl Component for SignIn {
 
     fn view(&self) -> Html {
         html! {
-            <>
-                <h1>{ "--- sign in ---" }</h1>
-            </>
+            <div class="m24 p8 fs-subheading bg-blue-100 bg-confetti-animated">
+                <h1>{ "--- Sign in, Work In Progress ---" }</h1>
+            </div>
         }
     }
 }
