@@ -14,6 +14,8 @@ Demo site:
 - [https://blog.rusthub.top](https://blog.rusthub.top) with frontend-yew.
 - [https://blog.budshome.com](https://blog.budshome.com) with frontend-handlebars.
 
+See also: https://github.com/zzy/tide-async-graphql-mongodb
+
 ## MongoDB data
 
 MongoDB data(include structure & documents) file is `/data/surfer-dev.sql`.

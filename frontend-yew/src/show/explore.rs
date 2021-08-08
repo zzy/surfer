@@ -20,8 +20,14 @@ impl Component for Explore {
 
     fn view(&self) -> Html {
         html! {
-            <div class="m24 p8 fs-subheading bg-blue-100 bg-confetti-animated">
-                <h1>{ "--- Explore, Work In Progress ---" }</h1>
+            <div class="m24 p8 fs-subheading bg-blue-100">
+                { "--- Explore, Work In Progress ---" }
+                <div class="mt12 fw-bold">
+                    { "See also: " }
+                    <a href="https://blog.budshome.com" target="_blank">
+                        { "Rust 技术博客（graphql + handlebars）" }
+                    </a>
+                </div>
             </div>
         }
     }
