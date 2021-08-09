@@ -155,12 +155,12 @@ fn view_article(article_data: &Value) -> Html {
                     <b class="mr2">{ "Topics:" }</b>
                     { for article_topics }
                 </p>
-                <p class="my6">
+                <p class="my6 p4 bg-bronze-lighter">
                     { "💥" }
                     <b class="fc-danger">{ "内容涉及著作权，均归属作者本人。" }</b>
                     { "若非作者注明，默认欢迎转载：请注明出处，及相关链接。" }
                 </p>
-                <p class="fs-body1 my6 p4 bg-gold-lighter">
+                <p class="fs-body1 my6 p6 bg-gold-lighter">
                     <b class="mr2">{ "Summary:" }</b>
                     { article["summary"].as_str().unwrap() }
                 </p>
