@@ -155,6 +155,11 @@ fn view_article(article_data: &Value) -> Html {
                     <b class="mr2">{ "Topics:" }</b>
                     { for article_topics }
                 </p>
+                <p class="my6">
+                    { "💥" }
+                    <b class="fc-danger">{ "内容涉及著作权，均归属作者本人。" }</b>
+                    { "若非作者注明，默认欢迎转载：请注明出处，及相关链接。" }
+                </p>
                 <p class="fs-body1 my6 p4 bg-gold-lighter">
                     <b class="mr2">{ "Summary:" }</b>
                     { article["summary"].as_str().unwrap() }
@@ -162,6 +167,7 @@ fn view_article(article_data: &Value) -> Html {
                 <link href="/css/night-owl.min.css" rel="stylesheet" />
                 { content_html_node }
                 <script src="/js/hl.js?132689068675031052"></script>
+                <img class="my6" src="/imgs/rust-shijian.png" alt={ "Rust 生态与实践" } />
             </article>
         </>
     }
