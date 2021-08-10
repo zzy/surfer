@@ -167,7 +167,7 @@ fn view_article(article_data: &Value) -> Html {
                 <link href="/css/night-owl.min.css" rel="stylesheet" />
                 { content_html_node }
                 <script src="/js/hl.js?132689068675031052"></script>
-                <img class="my6" src="/imgs/rust-shijian.png" alt={ "Rust 生态与实践" } />
+                <img class="mt12" src="/imgs/rust-shijian.png" alt={ "Rust 生态与实践" } />
             </article>
         </>
     }
