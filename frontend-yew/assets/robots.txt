@@ -1,4 +1,4 @@
-User-agent: *
-Allow: /
+User-agent: * 
+Allow: / 
 
-Sitemap: https://blog.rusthub.top/sitemap.txt
+Sitemap: https://blog.rusthub.top/sitemap.txt 

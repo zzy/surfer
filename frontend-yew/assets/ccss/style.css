@@ -18,8 +18,9 @@ article code {
 }
 
 article img {
+  margin: 6px auto;
   display: block;
-  margin: 0 auto;
+  max-width: 100%;
 }
 
 article > section > p {
