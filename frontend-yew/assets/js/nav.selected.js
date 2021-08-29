@@ -10,57 +10,36 @@ $(document).ready(function () {
     var logo = $(".js-logo");
 
     navGlobalArticles.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navGlobalArticles.toggleClass(isSelected, true);
     });
 
     navGlobalCategories.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navGlobalCategories.toggleClass(isSelected, true);
     });
 
     navGlobalTopics.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navGlobalTopics.toggleClass(isSelected, true);
     });
 
     navGlobalExplore.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navGlobalExplore.toggleClass(isSelected, true);
     });
 
     navSignSignin.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navSignSignin.toggleClass(isSelected, true);
     });
 
     navSignRegister.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
         navSignRegister.toggleClass(isSelected, true);
     });
 
     logo.click(function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
         navSelectedClean();
     });
 
