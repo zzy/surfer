@@ -37,20 +37,18 @@ pub struct Props {
 }
 
 pub struct Article {
-    props: Props,
     data: FetchState<Value>,
-    link: ComponentLink<Self>,
 }
 
 impl Component for Article {
     type Message = Msg;
     type Properties = Props;
 
-    fn create(props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self { props, data: FetchState::NotFetching, link }
+    fn create(_ctx: &Context<Self>) -> Self {
+        Self { data: FetchState::NotFetching }
     }
 
-    fn view(&self) -> Html {
+    fn view(&self, _ctx: &Context<Self>) -> Html {
         match &self.data {
             FetchState::NotFetching => html! { "NotFetching" },
             FetchState::Fetching => html! { "Fetching" },
@@ -59,13 +57,13 @@ impl Component for Article {
         }
     }
 
-    fn rendered(&mut self, first_render: bool) {
+    fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
         if first_render {
-            self.link.send_message(Msg::GetData);
+            ctx.link().send_message(Msg::GetData);
         }
     }
 
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::SetState(fetch_state) => {
                 self.data = fetch_state;
@@ -73,8 +71,8 @@ impl Component for Article {
                 true
             }
             Msg::GetData => {
-                let props = self.props.clone();
-                self.link.send_future(async {
+                let props = ctx.props().clone();
+                ctx.link().send_future(async {
                     match fetch_gql_data(
                         &query_str(props.username, props.article_slug).await,
                     )
@@ -85,15 +83,11 @@ impl Component for Article {
                     }
                 });
 
-                self.link.send_message(Msg::SetState(FetchState::Fetching));
+                ctx.link().send_message(Msg::SetState(FetchState::Fetching));
 
                 false
             }
         }
-    }
-
-    fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        false
     }
 }
 
