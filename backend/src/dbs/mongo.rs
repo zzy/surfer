@@ -4,7 +4,7 @@ use mongodb::{Client, options::ClientOptions, Database};
 
 pub struct DataSource {
     client: Client,
-    pub db_blog: Database,
+    pub db: Database,
 }
 
 #[allow(dead_code)]
@@ -28,9 +28,9 @@ impl DataSource {
             .expect("Failed to initialize database!");
 
         // Get a handle to a database.
-        let db_blog = client.database(CFG.get("MONGODB_BLOG").unwrap());
+        let db = client.database(CFG.get("MONGODB_NAME").unwrap());
 
         // return mongodb datasource.
-        DataSource { client: client, db_blog }
+        DataSource { client: client, db }
     }
 }

@@ -21,7 +21,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         id: ObjectId,
     ) -> GqlResult<User> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::user_by_id(db, &id).await
     }
 
@@ -31,7 +31,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         email: String,
     ) -> GqlResult<User> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::user_by_email(db, &email).await
     }
 
@@ -41,7 +41,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         username: String,
     ) -> GqlResult<User> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::user_by_username(db, &username).await
     }
 
@@ -51,7 +51,7 @@ impl QueryRoot {
         signature: String,
         password: String,
     ) -> GqlResult<SignInfo> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::user_sign_in(db, &signature, &password).await
     }
 
@@ -61,7 +61,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         token: String,
     ) -> GqlResult<Vec<User>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::users(db, &token).await
     }
 
@@ -72,7 +72,7 @@ impl QueryRoot {
         username: String,
         slug: String,
     ) -> GqlResult<Article> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::article_by_slug(db, &username, &slug).await
     }
 
@@ -82,7 +82,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles(db, &published).await
     }
 
@@ -93,7 +93,7 @@ impl QueryRoot {
         position: String,
         limit: i64,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles_in_position(
             db, &username, &position, limit,
         )
@@ -107,7 +107,7 @@ impl QueryRoot {
         user_id: ObjectId,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles_by_user_id(db, &user_id, &published).await
     }
 
@@ -118,7 +118,7 @@ impl QueryRoot {
         username: String,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles_by_username(db, &username, &published)
             .await
     }
@@ -130,7 +130,7 @@ impl QueryRoot {
         category_id: ObjectId,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles_by_category_id(
             db,
             &category_id,
@@ -146,14 +146,14 @@ impl QueryRoot {
         topic_id: ObjectId,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles::services::articles_by_topic_id(db, &topic_id, &published)
             .await
     }
 
     // Get all categories
     async fn categories(&self, ctx: &Context<'_>) -> GqlResult<Vec<Category>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::categories(db).await
     }
 
@@ -163,7 +163,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         user_id: ObjectId,
     ) -> GqlResult<Vec<Category>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::categories_by_user_id(db, &user_id).await
     }
 
@@ -173,7 +173,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         username: String,
     ) -> GqlResult<Vec<Category>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::categories_by_username(db, &username).await
     }
 
@@ -183,7 +183,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         id: ObjectId,
     ) -> GqlResult<Category> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::category_by_id(db, &id).await
     }
 
@@ -193,13 +193,13 @@ impl QueryRoot {
         ctx: &Context<'_>,
         slug: String,
     ) -> GqlResult<Category> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::category_by_slug(db, &slug).await
     }
 
     // get all topics
     async fn topics(&self, ctx: &Context<'_>) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics(db).await
     }
 
@@ -209,7 +209,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         id: ObjectId,
     ) -> GqlResult<Topic> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topic_by_id(db, &id).await
     }
 
@@ -219,7 +219,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         slug: String,
     ) -> GqlResult<Topic> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topic_by_slug(db, &slug).await
     }
 
@@ -229,7 +229,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         article_id: ObjectId,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics_by_article_id(db, &article_id).await
     }
 
@@ -239,7 +239,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         user_id: ObjectId,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics_by_user_id(db, &user_id).await
     }
 
@@ -249,7 +249,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         username: String,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics_by_username(db, &username).await
     }
 
@@ -260,7 +260,7 @@ impl QueryRoot {
         category_id: ObjectId,
         published: i32,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics_by_category_id(db, &category_id, &published)
             .await
     }
@@ -271,7 +271,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         published: i32,
     ) -> GqlResult<Vec<Wish>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::wishes(db, &published).await
     }
 
@@ -281,7 +281,7 @@ impl QueryRoot {
         ctx: &Context<'_>,
         username: String,
     ) -> GqlResult<Wish> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::random_wish(db, &username).await
     }
 }

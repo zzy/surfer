@@ -1,5 +1,5 @@
 [package]
-name = "frontend-handlebars"
+name = "surfer-frontend-handlebars"
 version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
@@ -16,7 +16,7 @@ serde_json = "1.0.67"
 
 surf = "2.3.1"
 graphql_client = "0.10.0"
-handlebars = { version = "4.1.2", features = ["script_helper"] }
+handlebars = { version = "4.1.3", features = ["script_helper"] }
 
 [dev-dependencies]
-rhai = "1.0.2"
+rhai = "1.0.4"

@@ -81,7 +81,7 @@ impl User {
         ctx: &async_graphql::Context<'_>,
         published: i32,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles_by_user_id(db, &self._id, &published).await
     }
 }
@@ -175,7 +175,7 @@ impl Wish {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<User> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         super::services::user_by_id(db, &self.user_id).await
     }
 }

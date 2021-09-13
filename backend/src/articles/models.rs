@@ -109,7 +109,7 @@ impl Article {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<User> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         users::services::user_by_id(db, &self.user_id).await
     }
 
@@ -117,7 +117,7 @@ impl Article {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Category> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         categories::services::category_by_id(db, &self.category_id).await
     }
 
@@ -125,7 +125,7 @@ impl Article {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics::services::topics_by_article_id(db, &self._id).await
     }
 }

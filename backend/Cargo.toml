@@ -1,11 +1,11 @@
 [package]
-name = "backend"
+name = "surfer-backend"
 version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
 [dependencies]
-futures = "0.3.16"
+futures = "0.3.17"
 async-std = { version = "1.10.0", features = ["attributes"] }
 tide = "0.16.0"
 
@@ -13,8 +13,8 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.5.4"
 
-async-graphql = { version = "2.9.12", features = ["bson", "chrono"] }
-mongodb = { version = "2.0.0-beta.3", default-features = false, features = [
+async-graphql = { version = "2.9.15", features = ["bson", "chrono"] }
+mongodb = { version = "2.0.0", default-features = false, features = [
   "async-std-runtime",
 ] }
 

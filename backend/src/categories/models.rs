@@ -67,7 +67,7 @@ impl Category {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles_by_category_id(db, &self._id, &1).await
     }
 
@@ -75,7 +75,7 @@ impl Category {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Topic>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         topics_by_category_id(db, &self._id, &1).await
     }
 }

@@ -30,7 +30,7 @@ GQL_VER=v1
 GIQL_VER=v1i
 
 MONGODB_URI=mongodb://mongo:mongo@127.0.0.1:27017
-MONGODB_BLOG=blog
+MONGODB_NAME=blog
 ```
 
 Then, build & run:

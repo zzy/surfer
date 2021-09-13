@@ -59,7 +59,7 @@ impl Topic {
         &self,
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
-        let db = ctx.data_unchecked::<DataSource>().db_blog.clone();
+        let db = ctx.data_unchecked::<DataSource>().db.clone();
         articles_by_topic_id(db, &self._id, &1).await
     }
 }
