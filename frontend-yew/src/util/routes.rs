@@ -7,6 +7,7 @@ use crate::show::{
     article::Article, category::Category, topic::Topic, explore::Explore,
 };
 use crate::manage::manage_index::ManageIndex;
+use crate::components::nodes::page_not_found;
 
 #[derive(Routable, PartialEq, Clone, Debug)]
 pub enum Routes {
@@ -43,6 +44,12 @@ pub enum Routes {
     ////////////
     #[at("/manage")]
     ManageIndex,
+    ////////////
+    // erros //
+    ////////////
+    #[not_found]
+    #[at("/404")]
+    NotFound,
 }
 
 pub fn switch(goal: &Routes) -> Html {
@@ -92,5 +99,9 @@ pub fn switch(goal: &Routes) -> Html {
         Routes::ManageIndex => {
             html! { <ManageIndex /> }
         }
+        ////////////
+        // erros //
+        ////////////
+        Routes::NotFound => page_not_found(),
     }
 }

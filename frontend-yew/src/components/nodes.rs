@@ -86,3 +86,20 @@ pub fn topic_tag_node(topic: &Value) -> VNode {
         </a>
     }
 }
+
+pub fn page_not_found() -> VNode {
+    html! {
+        <div class="ta-center mt16 mx64">
+            <h1>
+               { "无此页面" }
+               <br/>
+                { "Page not found" }
+            </h1>
+            <h3>
+                { "似乎不存在此页面" }
+                <br/>
+                { "Page page does not seem to exist" }
+            </h3>
+        </div>
+    }
+}
