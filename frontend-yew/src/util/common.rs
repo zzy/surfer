@@ -4,7 +4,7 @@ use std::{
 };
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
-use yew::web_sys::{Request, RequestInit, RequestMode, Response};
+use web_sys::{Request, RequestInit, RequestMode, Response};
 use serde_json::{Value, from_str};
 
 use crate::util::constant::CFG;

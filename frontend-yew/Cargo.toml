@@ -12,6 +12,12 @@ console_error_panic_hook = "0.1.6"
 
 yew = { path = "../../../tmp/yew/packages/yew" }
 yew-router = { path = "../../../tmp/yew/packages/yew-router" }
+web-sys = { version = "0.3.55", features = [
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "Response",
+] }
 gloo = "0.3.0"
 
 toml = "0.5.8"
