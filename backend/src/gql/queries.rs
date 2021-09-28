@@ -22,7 +22,7 @@ impl QueryRoot {
         id: ObjectId,
     ) -> GqlResult<User> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        users::services::user_by_id(db, &id).await
+        users::services::user_by_id(db, id).await
     }
 
     // get user info by email
@@ -83,7 +83,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles::services::articles(db, &published).await
+        articles::services::articles(db, published).await
     }
 
     async fn articles_in_position(
@@ -108,7 +108,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles::services::articles_by_user_id(db, &user_id, &published).await
+        articles::services::articles_by_user_id(db, user_id, published).await
     }
 
     // Get all articles of one user by username
@@ -119,8 +119,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles::services::articles_by_username(db, &username, &published)
-            .await
+        articles::services::articles_by_username(db, &username, published).await
     }
 
     // Get all articles by category_id
@@ -131,12 +130,8 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles::services::articles_by_category_id(
-            db,
-            &category_id,
-            &published,
-        )
-        .await
+        articles::services::articles_by_category_id(db, category_id, published)
+            .await
     }
 
     // Get all articles by topic_id
@@ -147,8 +142,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles::services::articles_by_topic_id(db, &topic_id, &published)
-            .await
+        articles::services::articles_by_topic_id(db, topic_id, published).await
     }
 
     // Get all categories
@@ -164,7 +158,7 @@ impl QueryRoot {
         user_id: ObjectId,
     ) -> GqlResult<Vec<Category>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        categories::services::categories_by_user_id(db, &user_id).await
+        categories::services::categories_by_user_id(db, user_id).await
     }
 
     // Get all categories by username
@@ -184,7 +178,7 @@ impl QueryRoot {
         id: ObjectId,
     ) -> GqlResult<Category> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        categories::services::category_by_id(db, &id).await
+        categories::services::category_by_id(db, id).await
     }
 
     // Get category by its slug
@@ -210,7 +204,7 @@ impl QueryRoot {
         id: ObjectId,
     ) -> GqlResult<Topic> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        topics::services::topic_by_id(db, &id).await
+        topics::services::topic_by_id(db, id).await
     }
 
     // get topic info by slug
@@ -230,7 +224,7 @@ impl QueryRoot {
         article_id: ObjectId,
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        topics::services::topics_by_article_id(db, &article_id).await
+        topics::services::topics_by_article_id(db, article_id).await
     }
 
     // get topics by user_id
@@ -240,7 +234,7 @@ impl QueryRoot {
         user_id: ObjectId,
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        topics::services::topics_by_user_id(db, &user_id).await
+        topics::services::topics_by_user_id(db, user_id).await
     }
 
     // get topics by username
@@ -261,7 +255,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        topics::services::topics_by_category_id(db, &category_id, &published)
+        topics::services::topics_by_category_id(db, category_id, published)
             .await
     }
 
@@ -272,7 +266,7 @@ impl QueryRoot {
         published: i32,
     ) -> GqlResult<Vec<Wish>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        users::services::wishes(db, &published).await
+        users::services::wishes(db, published).await
     }
 
     // get random wish

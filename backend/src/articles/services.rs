@@ -1,9 +1,10 @@
 use futures::stream::StreamExt;
-use async_graphql::{Error, ErrorExtensions};
 use mongodb::{
     Database,
     options::FindOptions,
-    bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
+    bson::{
+        oid::ObjectId, DateTime, Document, doc, to_document, from_document,
+    },
 };
 
 use crate::util::{constant::GqlResult, common::slugify};
@@ -20,7 +21,7 @@ pub async fn article_new(
 
     let exist_document = coll
         .find_one(
-            doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            doc! {"user_id": article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
@@ -30,9 +31,8 @@ pub async fn article_new(
     } else {
         let slug = slugify(&article_new.subject).await;
 
-        let user =
-            users::services::user_by_id(db.clone(), &article_new.user_id)
-                .await?;
+        let user = users::services::user_by_id(db.clone(), article_new.user_id)
+            .await?;
         let uri = format!("/{}/{}", &user.username, &slug);
 
         article_new.slug = slug;
@@ -41,34 +41,27 @@ pub async fn article_new(
         article_new.top = true; // false;
         article_new.recommended = true; // false;
 
-        let article_new_bson = to_bson(&article_new).unwrap();
+        let mut article_new_document = to_document(&article_new)?;
+        let now = DateTime::now();
+        article_new_document.insert("created_at", now);
+        article_new_document.insert("updated_at", now);
 
-        if let Bson::Document(mut document) = article_new_bson {
-            let now = DateTime::now();
-            document.insert("created_at", now);
-            document.insert("updated_at", now);
-
-            // Insert into a MongoDB collection
-            coll.insert_one(document, None)
-                .await
-                .expect("Failed to insert into a MongoDB collection!");
-        } else {
-            println!(
-                "Error converting the BSON object into a MongoDB document"
-            );
-        };
+        // Insert into a MongoDB collection
+        coll.insert_one(article_new_document, None)
+            .await
+            .expect("Failed to insert into a MongoDB collection!");
     }
 
     let article_document = coll
         .find_one(
-            doc! {"user_id": &article_new.user_id,  "subject": &article_new.subject},
+            doc! {"user_id": article_new.user_id,  "subject": &article_new.subject},
             None,
         )
         .await
         .expect("Document not found")
         .unwrap();
 
-    let article: Article = from_bson(Bson::Document(article_document)).unwrap();
+    let article: Article = from_document(article_document)?;
     Ok(article)
 }
 
@@ -86,18 +79,15 @@ pub async fn article_by_slug(
         .expect("Document not found")
         .unwrap();
 
-    let article: Article = from_bson(Bson::Document(article_document)).unwrap();
+    let article: Article = from_document(article_document)?;
     Ok(article)
 }
 
-pub async fn articles(
-    db: Database,
-    published: &i32,
-) -> GqlResult<Vec<Article>> {
+pub async fn articles(db: Database, published: i32) -> GqlResult<Vec<Article>> {
     let mut find_doc = doc! {};
-    if published > &0 {
+    if published > 0 {
         find_doc.insert("published", true);
-    } else if published < &0 {
+    } else if published < 0 {
         find_doc.insert("published", false);
     }
     let coll = db.collection::<Document>("articles");
@@ -110,7 +100,7 @@ pub async fn articles(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = from_bson(Bson::Document(document)).unwrap();
+                let article = from_document(document)?;
                 articles.push(article);
             }
             Err(error) => {
@@ -119,12 +109,7 @@ pub async fn articles(
         }
     }
 
-    if articles.len() > 0 {
-        Ok(articles)
-    } else {
-        Err(Error::new("7-all-articles")
-            .extend_with(|_, e| e.set("details", "No records")))
-    }
+    Ok(articles)
 }
 
 pub async fn articles_in_position(
@@ -137,7 +122,7 @@ pub async fn articles_in_position(
     if "".ne(username.trim()) && "-".ne(username.trim()) {
         let user =
             users::services::user_by_username(db.clone(), username).await?;
-        find_doc.insert("user_id", &user._id);
+        find_doc.insert("user_id", user._id);
     }
     if "top".eq(position.trim()) {
         find_doc.insert("top", true);
@@ -158,7 +143,7 @@ pub async fn articles_in_position(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = from_bson(Bson::Document(document))?;
+                let article = from_document(document)?;
                 articles.push(article);
             }
             Err(error) => {
@@ -172,13 +157,13 @@ pub async fn articles_in_position(
 
 pub async fn articles_by_user_id(
     db: Database,
-    user_id: &ObjectId,
-    published: &i32,
+    user_id: ObjectId,
+    published: i32,
 ) -> GqlResult<Vec<Article>> {
     let mut find_doc = doc! {"user_id": user_id};
-    if published > &0 {
+    if published > 0 {
         find_doc.insert("published", true);
-    } else if published < &0 {
+    } else if published < 0 {
         find_doc.insert("published", false);
     }
     let find_options =
@@ -191,7 +176,7 @@ pub async fn articles_by_user_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = from_bson(Bson::Document(document))?;
+                let article = from_document(document)?;
                 articles.push(article);
             }
             Err(error) => {
@@ -206,22 +191,22 @@ pub async fn articles_by_user_id(
 pub async fn articles_by_username(
     db: Database,
     username: &str,
-    published: &i32,
+    published: i32,
 ) -> GqlResult<Vec<Article>> {
     let user = users::services::user_by_username(db.clone(), username).await?;
-    self::articles_by_user_id(db, &user._id, published).await
+    self::articles_by_user_id(db, user._id, published).await
 }
 
 // Get all articles by category_id
 pub async fn articles_by_category_id(
     db: Database,
-    category_id: &ObjectId,
-    published: &i32,
+    category_id: ObjectId,
+    published: i32,
 ) -> GqlResult<Vec<Article>> {
     let mut find_doc = doc! {"category_id": category_id};
-    if published > &0 {
+    if published > 0 {
         find_doc.insert("published", true);
-    } else if published < &0 {
+    } else if published < 0 {
         find_doc.insert("published", false);
     }
     let find_options =
@@ -234,7 +219,7 @@ pub async fn articles_by_category_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = from_bson(Bson::Document(document))?;
+                let article = from_document(document)?;
                 articles.push(article);
             }
             Err(error) => {
@@ -249,8 +234,8 @@ pub async fn articles_by_category_id(
 // Get all articles by topic_id
 pub async fn articles_by_topic_id(
     db: Database,
-    topic_id: &ObjectId,
-    published: &i32,
+    topic_id: ObjectId,
+    published: i32,
 ) -> GqlResult<Vec<Article>> {
     let topics_articles =
         self::topics_articles_by_topic_id(db.clone(), topic_id).await;
@@ -263,9 +248,9 @@ pub async fn articles_by_topic_id(
     article_ids.dedup();
 
     let mut find_doc = doc! {"_id": {"$in": article_ids}};
-    if published > &0 {
+    if published > 0 {
         find_doc.insert("published", true);
-    } else if published < &0 {
+    } else if published < 0 {
         find_doc.insert("published", false);
     }
     let find_options =
@@ -278,7 +263,7 @@ pub async fn articles_by_topic_id(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let article = from_bson(Bson::Document(document))?;
+                let article = from_document(document)?;
                 articles.push(article);
             }
             Err(error) => {
@@ -293,7 +278,7 @@ pub async fn articles_by_topic_id(
 // get all TopicArticle list by topic_id
 async fn topics_articles_by_topic_id(
     db: Database,
-    topic_id: &ObjectId,
+    topic_id: ObjectId,
 ) -> Vec<TopicArticle> {
     let coll_topics_articles = db.collection::<Document>("topics_articles");
     let mut cursor_topics_articles = coll_topics_articles
@@ -307,7 +292,7 @@ async fn topics_articles_by_topic_id(
         match result {
             Ok(document) => {
                 let topic_article: TopicArticle =
-                    from_bson(Bson::Document(document)).unwrap();
+                    from_document(document).unwrap();
                 topics_articles.push(topic_article);
             }
             Err(error) => {

@@ -1,7 +1,9 @@
 use futures::stream::StreamExt;
 use mongodb::{
     Database,
-    bson::{oid::ObjectId, Bson, Document, DateTime, doc, to_bson, from_bson},
+    bson::{
+        oid::ObjectId, DateTime, Document, doc, to_document, from_document,
+    },
 };
 use async_graphql::{Error, ErrorExtensions};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
@@ -15,7 +17,7 @@ use crate::util::{
 use super::models::{User, UserNew, SignInfo, Wish, WishNew};
 
 // get user info by id
-pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
+pub async fn user_by_id(db: Database, id: ObjectId) -> GqlResult<User> {
     let coll = db.collection::<Document>("users");
 
     let user_document = coll
@@ -24,7 +26,7 @@ pub async fn user_by_id(db: Database, id: &ObjectId) -> GqlResult<User> {
         .expect("Document not found")
         .unwrap();
 
-    let user: User = from_bson(Bson::Document(user_document)).unwrap();
+    let user: User = from_document(user_document)?;
     Ok(user)
 }
 
@@ -36,15 +38,16 @@ pub async fn user_by_email(db: Database, email: &str) -> GqlResult<User> {
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
-            let user: User = from_bson(Bson::Document(user_document)).unwrap();
+            let user: User = from_document(user_document)?;
             Ok(user)
         } else {
-            Err(Error::new("2-email")
-                .extend_with(|_, e| e.set("details", "Email not found")))
+            Err(Error::new("Email not found").extend_with(|err, eev| {
+                eev.set("details", err.message.as_str())
+            }))
         }
     } else {
-        Err(Error::new("1-email")
-            .extend_with(|_, e| e.set("details", "Error searching mongodb")))
+        Err(Error::new("Error searching mongodb")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -56,15 +59,16 @@ pub async fn user_by_username(db: Database, username: &str) -> GqlResult<User> {
 
     if let Ok(user_document_exist) = exist_document {
         if let Some(user_document) = user_document_exist {
-            let user: User = from_bson(Bson::Document(user_document)).unwrap();
+            let user: User = from_document(user_document)?;
             Ok(user)
         } else {
-            Err(Error::new("4-username")
-                .extend_with(|_, e| e.set("details", "Username not found")))
+            Err(Error::new("Username not found").extend_with(|err, eev| {
+                eev.set("details", err.message.as_str())
+            }))
         }
     } else {
-        Err(Error::new("3-username")
-            .extend_with(|_, e| e.set("details", "Error searching mongodb")))
+        Err(Error::new("Error searching mongodb")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -79,38 +83,28 @@ pub async fn user_register(
 
     if self::user_by_email(db.clone(), &user_new.email).await.is_ok() {
         Err(Error::new("email exists")
-            .extend_with(|_, e| e.set("details", "1_EMAIL_EXIStS")))
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     } else if self::user_by_username(db.clone(), &user_new.username)
         .await
         .is_ok()
     {
         Err(Error::new("username exists")
-            .extend_with(|_, e| e.set("details", "2_USERNAME_EXISTS")))
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     } else {
         user_new.cred = cred_encode(&user_new.username, &user_new.cred).await;
         user_new.banned = false;
 
-        let user_new_bson = to_bson(&user_new).unwrap();
+        let mut user_new_document = to_document(&user_new)?;
+        let now = DateTime::now();
+        user_new_document.insert("created_at", now);
+        user_new_document.insert("updated_at", now);
 
-        if let Bson::Document(mut document) = user_new_bson {
-            let now = DateTime::now();
-            document.insert("created_at", now);
-            document.insert("updated_at", now);
+        // Insert into a MongoDB collection
+        coll.insert_one(user_new_document, None)
+            .await
+            .expect("Failed to insert into a MongoDB collection!");
 
-            // Insert into a MongoDB collection
-            coll.insert_one(document, None)
-                .await
-                .expect("Failed to insert into a MongoDB collection!");
-
-            self::user_by_email(db.clone(), &user_new.email).await
-        } else {
-            Err(Error::new("5-register").extend_with(|_, e| {
-                e.set(
-                    "details",
-                    "Error converting the BSON object into a MongoDB document",
-                )
-            }))
-        }
+        self::user_by_email(db.clone(), &user_new.email).await
     }
 }
 
@@ -152,15 +146,10 @@ pub async fn user_sign_in(
                 &EncodingKey::from_secret(site_key),
             ) {
                 Ok(t) => t,
-                Err(error) => {
-                    Err(Error::new("7-user-sign-in").extend_with(|_, e| {
-                        e.set(
-                            "details",
-                            format!("Error to encode token: {}", error),
-                        )
-                    }))
-                    .unwrap()
-                }
+                Err(error) => Err(Error::new("Error to encode token")
+                    .extend_with(|_, e| {
+                        e.set("details", format!("{}", error))
+                    }))?,
             };
 
             let sign_info = SignInfo {
@@ -170,12 +159,13 @@ pub async fn user_sign_in(
             };
             Ok(sign_info)
         } else {
-            Err(Error::new("user_sign_in")
-                .extend_with(|_, e| e.set("details", "Invalid credential")))
+            Err(Error::new("Invalid credential").extend_with(|err, eev| {
+                eev.set("details", err.message.as_str())
+            }))
         }
     } else {
-        Err(Error::new("user_sign_in")
-            .extend_with(|_, e| e.set("details", "User not exist")))
+        Err(Error::new("User not exist")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -188,36 +178,27 @@ pub async fn users(db: Database, token: &str) -> GqlResult<Vec<User>> {
 
         // Query all documents in the collection.
         let mut cursor = coll.find(None, None).await.unwrap();
-
         // Iterate over the results of the cursor.
         while let Some(result) = cursor.next().await {
             match result {
                 Ok(document) => {
-                    let user = from_bson(Bson::Document(document)).unwrap();
+                    let user = from_document(document)?;
                     users.push(user);
                 }
-                Err(error) => {
-                    Err(Error::new("6-all-users").extend_with(|_, e| {
+                Err(error) => Err(Error::new("Error to find doc")
+                    .extend_with(|_, e| {
                         e.set(
                             "details",
                             format!("Error to find doc: {}", error),
                         )
-                    }))
-                    .unwrap()
-                }
+                    }))?,
             }
         }
 
-        if users.len() > 0 {
-            Ok(users)
-        } else {
-            Err(Error::new("6-all-users")
-                .extend_with(|_, e| e.set("details", "No records")))
-        }
+        Ok(users)
     } else {
-        Err(Error::new("6-all-users").extend_with(|_, e| {
-            e.set("details", format!("{}", token_data.err().unwrap()))
-        }))
+        Err(Error::new("No token")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -252,13 +233,13 @@ pub async fn user_change_password(
                 }))
             }
         } else {
-            Err(Error::new("user_change_password")
-                .extend_with(|_, e| e.set("details", "User not exist")))
+            Err(Error::new("User not exist").extend_with(|err, eev| {
+                eev.set("details", err.message.as_str())
+            }))
         }
     } else {
-        Err(Error::new("user_change_password").extend_with(|_, e| {
-            e.set("details", format!("{}", token_data.err().unwrap()))
-        }))
+        Err(Error::new("No token")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -278,22 +259,24 @@ pub async fn user_update_profile(
             user.email = user_new.email.to_lowercase();
             user.username = user_new.username.to_lowercase();
 
-            let user_bson = to_bson(&user).unwrap();
-            let user_doc = user_bson.as_document().unwrap().to_owned();
-
-            coll.find_one_and_replace(doc! {"_id": &user._id}, user_doc, None)
-                .await
-                .expect("Failed to replace a MongoDB collection!");
+            let user_document = to_document(&user)?;
+            coll.find_one_and_replace(
+                doc! {"_id": &user._id},
+                user_document,
+                None,
+            )
+            .await
+            .expect("Failed to replace a MongoDB collection!");
 
             Ok(user)
         } else {
-            Err(Error::new("user_update_profile")
-                .extend_with(|_, e| e.set("details", "User not exist")))
+            Err(Error::new("User not exist").extend_with(|err, eev| {
+                eev.set("details", err.message.as_str())
+            }))
         }
     } else {
-        Err(Error::new("user_update_profile").extend_with(|_, e| {
-            e.set("details", format!("{}", token_data.err().unwrap()))
-        }))
+        Err(Error::new("No token")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }
 
@@ -310,22 +293,15 @@ pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let wish_new_bson = to_bson(&wish_new)?;
+        let mut wish_new_document = to_document(&wish_new)?;
+        let now = DateTime::now();
+        wish_new_document.insert("created_at", now);
+        wish_new_document.insert("updated_at", now);
 
-        if let Bson::Document(mut document) = wish_new_bson {
-            let now = DateTime::now();
-            document.insert("created_at", now);
-            document.insert("updated_at", now);
-
-            // Insert into a MongoDB collection
-            coll.insert_one(document, None)
-                .await
-                .expect("Failed to insert into a MongoDB collection!");
-        } else {
-            println!(
-                "Error converting the BSON object into a MongoDB document"
-            );
-        };
+        // Insert into a MongoDB collection
+        coll.insert_one(wish_new_document, None)
+            .await
+            .expect("Failed to insert into a MongoDB collection!");
     }
 
     let wish_document = coll
@@ -337,16 +313,16 @@ pub async fn wish_new(db: Database, wish_new: WishNew) -> GqlResult<Wish> {
         .expect("Document not found")
         .unwrap();
 
-    let wish: Wish = from_bson(Bson::Document(wish_document))?;
+    let wish: Wish = from_document(wish_document)?;
     Ok(wish)
 }
 
 // get all wishes
-pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
+pub async fn wishes(db: Database, published: i32) -> GqlResult<Vec<Wish>> {
     let mut find_doc = doc! {};
-    if published > &0 {
+    if published > 0 {
         find_doc.insert("published", true);
-    } else if published < &0 {
+    } else if published < 0 {
         find_doc.insert("published", false);
     }
     let coll = db.collection::<Document>("wishes");
@@ -356,7 +332,7 @@ pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let wish = from_bson(Bson::Document(document)).unwrap();
+                let wish = from_document(document)?;
                 wishes.push(wish);
             }
             Err(error) => {
@@ -365,12 +341,7 @@ pub async fn wishes(db: Database, published: &i32) -> GqlResult<Vec<Wish>> {
         }
     }
 
-    if wishes.len() > 0 {
-        Ok(wishes)
-    } else {
-        Err(Error::new("9-all-wishes")
-            .extend_with(|_, e| e.set("details", "No records")))
-    }
+    Ok(wishes)
 }
 
 // get random wish
@@ -397,10 +368,10 @@ async fn one_wish(db: Database, match_doc: Document) -> GqlResult<Wish> {
         .await?;
 
     if let Some(result) = cursor.next().await {
-        let wish = from_bson(Bson::Document(result?))?;
+        let wish = from_document(result?)?;
         Ok(wish)
     } else {
-        Err(Error::new("9-find-one-wish")
-            .extend_with(|_, e| e.set("details", "No records")))
+        Err(Error::new("No records")
+            .extend_with(|err, eev| eev.set("details", err.message.as_str())))
     }
 }

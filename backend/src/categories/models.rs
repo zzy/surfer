@@ -68,7 +68,7 @@ impl Category {
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Article>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        articles_by_category_id(db, &self._id, &1).await
+        articles_by_category_id(db, self._id, 1).await
     }
 
     pub async fn topics(
@@ -76,7 +76,7 @@ impl Category {
         ctx: &async_graphql::Context<'_>,
     ) -> GqlResult<Vec<Topic>> {
         let db = ctx.data_unchecked::<DataSource>().db.clone();
-        topics_by_category_id(db, &self._id, &1).await
+        topics_by_category_id(db, self._id, 1).await
     }
 }
 

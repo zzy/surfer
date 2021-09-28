@@ -1,9 +1,10 @@
 use futures::stream::StreamExt;
-use async_graphql::{Error, ErrorExtensions};
 use mongodb::{
     Database,
     options::FindOptions,
-    bson::{oid::ObjectId, DateTime, Bson, Document, doc, to_bson, from_bson},
+    bson::{
+        oid::ObjectId, DateTime, Document, doc, to_document, from_document,
+    },
 };
 
 use crate::util::{constant::GqlResult, common::slugify};
@@ -29,22 +30,15 @@ pub async fn category_new(
         category_new.slug = slug;
         category_new.uri = uri;
 
-        let category_new_bson = to_bson(&category_new).unwrap();
+        let mut category_new_document = to_document(&category_new)?;
+        let now = DateTime::now();
+        category_new_document.insert("created_at", now);
+        category_new_document.insert("updated_at", now);
 
-        if let Bson::Document(mut document) = category_new_bson {
-            let now = DateTime::now();
-            document.insert("created_at", now);
-            document.insert("updated_at", now);
-
-            // Insert into a MongoDB collection
-            coll.insert_one(document, None)
-                .await
-                .expect("Failed to insert into a MongoDB collection!");
-        } else {
-            println!(
-                "Error converting the BSON object into a MongoDB document"
-            );
-        };
+        // Insert into a MongoDB collection
+        coll.insert_one(category_new_document, None)
+            .await
+            .expect("Failed to insert into a MongoDB collection!");
     }
 
     let category_document = coll
@@ -53,8 +47,7 @@ pub async fn category_new(
         .expect("Document not found")
         .unwrap();
 
-    let category: Category =
-        from_bson(Bson::Document(category_document)).unwrap();
+    let category: Category = from_document(category_document)?;
     Ok(category)
 }
 
@@ -72,18 +65,11 @@ pub async fn category_user_new(
     if let Some(_document) = exist_document {
         println!("MongoDB document is exist!");
     } else {
-        let category_user_new_bson = to_bson(&category_user_new).unwrap();
-
-        if let Bson::Document(document) = category_user_new_bson {
-            // Insert into a MongoDB collection
-            coll.insert_one(document, None)
-                .await
-                .expect("Failed to insert into a MongoDB collection!");
-        } else {
-            println!(
-                "Error converting the BSON object into a MongoDB document"
-            );
-        };
+        let category_user_new_document = to_document(&category_user_new)?;
+        // Insert into a MongoDB collection
+        coll.insert_one(category_user_new_document, None)
+            .await
+            .expect("Failed to insert into a MongoDB collection!");
     }
 
     let category_user_document = coll
@@ -92,8 +78,7 @@ pub async fn category_user_new(
         .expect("Document not found")
         .unwrap();
 
-    let category_user: CategoryUser =
-        from_bson(Bson::Document(category_user_document)).unwrap();
+    let category_user: CategoryUser = from_document(category_user_document)?;
     Ok(category_user)
 }
 
@@ -110,7 +95,7 @@ pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
     while let Some(result) = cursor.next().await {
         match result {
             Ok(document) => {
-                let category = from_bson(Bson::Document(document)).unwrap();
+                let category = from_document(document)?;
                 categories.push(category);
             }
             Err(error) => {
@@ -119,18 +104,13 @@ pub async fn categories(db: Database) -> GqlResult<Vec<Category>> {
         }
     }
 
-    if categories.len() > 0 {
-        Ok(categories)
-    } else {
-        Err(Error::new("8-all-categories")
-            .extend_with(|_, e| e.set("details", "No records")))
-    }
+    Ok(categories)
 }
 
 // get all categories by user_id
 pub async fn categories_by_user_id(
     db: Database,
-    user_id: &ObjectId,
+    user_id: ObjectId,
 ) -> GqlResult<Vec<Category>> {
     let categories_users =
         self::categories_users_by_user_id(db.clone(), user_id).await;
@@ -148,7 +128,7 @@ pub async fn categories_by_user_id(
     while let Some(result) = cursor_categories.next().await {
         match result {
             Ok(document) => {
-                let category: Category = from_bson(Bson::Document(document))?;
+                let category: Category = from_document(document)?;
                 categories.push(category);
             }
             Err(error) => {
@@ -167,14 +147,11 @@ pub async fn categories_by_username(
 ) -> GqlResult<Vec<Category>> {
     let user =
         crate::users::services::user_by_username(db.clone(), username).await?;
-    self::categories_by_user_id(db, &user._id).await
+    self::categories_by_user_id(db, user._id).await
 }
 
 // get category by its slug
-pub async fn category_by_id(
-    db: Database,
-    id: &ObjectId,
-) -> GqlResult<Category> {
+pub async fn category_by_id(db: Database, id: ObjectId) -> GqlResult<Category> {
     let coll = db.collection::<Document>("categories");
 
     let category_document = coll
@@ -183,8 +160,7 @@ pub async fn category_by_id(
         .expect("Document not found")
         .unwrap();
 
-    let category: Category =
-        from_bson(Bson::Document(category_document)).unwrap();
+    let category: Category = from_document(category_document)?;
     Ok(category)
 }
 
@@ -198,15 +174,14 @@ pub async fn category_by_slug(db: Database, slug: &str) -> GqlResult<Category> {
         .expect("Document not found")
         .unwrap();
 
-    let category: Category =
-        from_bson(Bson::Document(category_document)).unwrap();
+    let category: Category = from_document(category_document)?;
     Ok(category)
 }
 
 // get all CategoryUser list by user_id
 async fn categories_users_by_user_id(
     db: Database,
-    user_id: &ObjectId,
+    user_id: ObjectId,
 ) -> Vec<CategoryUser> {
     let coll_categories_users = db.collection::<Document>("categories_users");
     let mut cursor_categories_users = coll_categories_users
@@ -220,7 +195,7 @@ async fn categories_users_by_user_id(
         match result {
             Ok(document) => {
                 let category_user: CategoryUser =
-                    from_bson(Bson::Document(document)).unwrap();
+                    from_document(document).unwrap();
                 categories_users.push(category_user);
             }
             Err(error) => {
