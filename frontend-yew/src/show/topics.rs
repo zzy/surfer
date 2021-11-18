@@ -84,7 +84,7 @@ impl Component for Topics {
 }
 
 fn view_topics(topics_data: &Value) -> Html {
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         "Topics",

@@ -100,7 +100,7 @@ fn view_article(article_data: &Value) -> Html {
 
         let article = &article_data["articleBySlug"];
         let subject = article["subject"].as_str().unwrap();
-        let document = yew::utils::document();
+        let document = gloo_utils::document();
         document.set_title(&format!(
             "{} - {}",
             subject,
@@ -119,7 +119,7 @@ fn view_article(article_data: &Value) -> Html {
 
         let content_html = article["contentHtml"].as_str().unwrap();
         let content_html_section =
-            yew::utils::document().create_element("section").unwrap();
+            gloo_utils::document().create_element("section").unwrap();
         content_html_section.set_class_name("fs-body2 mt24");
         content_html_section.set_inner_html(content_html);
         let content_html_node = Html::VRef(content_html_section.into());

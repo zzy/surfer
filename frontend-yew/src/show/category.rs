@@ -93,7 +93,7 @@ fn view_category(category_data: &Value) -> Html {
 
     let category = &category_data["categoryBySlug"];
     let category_name = category["name"].as_str().unwrap();
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         category_name,

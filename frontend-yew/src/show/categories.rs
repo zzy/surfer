@@ -87,7 +87,7 @@ impl Component for Categories {
 }
 
 fn view_categories(categories_data: &Value) -> Html {
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         "Categories",

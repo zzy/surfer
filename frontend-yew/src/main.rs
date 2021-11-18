@@ -27,17 +27,17 @@ impl Component for App {
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
-            <>
+            <BrowserRouter>
                 <Header />
 
                 <main class="ps-relative t64">
-                    <Router<Routes> render={ Router::render(switch) } />
+                    <Switch<Routes> render={ Switch::render(switch) } />
                 </main>
 
                 <Copyright />
 
                 <LoadJs />
-            </>
+            </BrowserRouter>
         }
     }
 }

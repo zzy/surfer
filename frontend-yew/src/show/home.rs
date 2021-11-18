@@ -84,7 +84,7 @@ impl Component for Home {
 }
 
 fn view_home(home_data: &Value) -> Html {
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         "Home",

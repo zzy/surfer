@@ -98,7 +98,7 @@ fn view_author(author_data: &Value) -> Html {
         let username = user["username"].as_str().unwrap();
         let nickname = user["nickname"].as_str().unwrap();
         let blog_name = user["blogName"].as_str().unwrap();
-        let document = yew::utils::document();
+        let document = gloo_utils::document();
         document.set_title(&format!(
             "{} ({}) - {} - {}",
             nickname,

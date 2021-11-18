@@ -92,7 +92,7 @@ fn view_topic(topic_data: &Value) -> Html {
 
     let topic = &topic_data["topicBySlug"];
     let topic_name = topic["name"].as_str().unwrap();
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         topic_name,

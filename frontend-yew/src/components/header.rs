@@ -19,19 +19,19 @@ fn nav_global() -> Html {
     html! {
         <>
             <Link<Routes> classes={ classes!("nav-global-articles", "s-navigation--item") }
-                route={ Routes::Articles }>
+                to={ Routes::Articles }>
                 { "Articles" }
             </Link<Routes>>
             <Link<Routes> classes={ classes!("nav-global-categories", "s-navigation--item") }
-                route={ Routes::Categories }>
+            to={ Routes::Categories }>
                 { "Categories" }
             </Link<Routes>>
             <Link<Routes> classes={ classes!("nav-global-topics", "s-navigation--item") }
-                route={ Routes::Topics }>
+            to={ Routes::Topics }>
                 { "Topics" }
             </Link<Routes>>
             <Link<Routes> classes={ classes!("nav-global-explore", "s-navigation--item") }
-                route={ Routes::Explore }>
+            to={ Routes::Explore }>
                 { "Explore" }
             </Link<Routes>>
             <a class="s-navigation--item" href="//budshome.com/books.html"
@@ -47,11 +47,11 @@ fn sign() -> Html {
     html! {
         <>
             <Link<Routes> classes={ classes!("nav-sign-signin", "s-btn", "p6") }
-                route={ Routes::SignIn }>
+                to={ Routes::SignIn }>
                 { "Sign in" }
             </Link<Routes>>
             <Link<Routes> classes={ classes!("nav-sign-register", "s-btn", "p6") }
-                route={ Routes::Register }>
+                to={ Routes::Register }>
                 { "Register" }
             </Link<Routes>>
         </>
@@ -77,7 +77,7 @@ fn nav() -> Html {
                 </svg>
             </a>
 
-            <Link<Routes> classes={ classes!("flex--item", "js-logo") } route={ Routes::Home }>
+            <Link<Routes> classes={ classes!("flex--item", "js-logo") } to={ Routes::Home }>
                 <span class="fs-title fw-bold">
                     <span class="ff-sans">{ "锈毂" }</span>
                     <img class="va-sub" src="/imgs/logos/rusthub.png"

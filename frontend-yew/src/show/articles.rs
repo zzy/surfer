@@ -84,7 +84,7 @@ impl Component for Articles {
 }
 
 fn view_articles(articles_data: &Value) -> Html {
-    let document = yew::utils::document();
+    let document = gloo_utils::document();
     document.set_title(&format!(
         "{} - {}",
         "Articles",
