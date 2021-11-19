@@ -103,9 +103,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.45"
+version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee10e43ae4a853c0a3591d4e2ada1719e553be18199d9da9d4a83f5927c2f5c7"
+checksum = "38d9ff5d688f1c13395289f67db01d4826b46dd694e7580accdc3e8430f2d98e"
 
 [[package]]
 name = "arrayref"
@@ -188,9 +188,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "3.0.3"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3630dd481103006c5f46ecb788312a927a2dad2af6362c0e0584fc342a1209f7"
+checksum = "bfd801b296478ae16a104380e16b983b4e99979da08359806e6f265c49de952b"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -219,9 +219,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "3.0.3"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c7d8430cfba5c4a15d18ffe55a1752b28817e2b3ba5d613d9a1a0b477fbb0ca"
+checksum = "04d033964216cef820e3d016d2aac90db61d7c911b61283c1c0589a8b98dd7f3"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -235,9 +235,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "3.0.3"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b7a3ce1a790e538ee7065a5e036ee5194f8b7b17f6cead9d1baa66f2a4e193"
+checksum = "b408bef95c09a0e7f119de4de4ca2ed5950d87935acbb9fc1bd53885165a9451"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -248,9 +248,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "3.0.3"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7edeedc5ea5b5979a426688d39c86d1f999b3cb0943d2ba7842f85331d67c936"
+checksum = "90f437a62bcc57e107886f0731273a4539526ddadadedb3b080c07bfdcdb8237"
 dependencies = [
  "bytes 1.1.0",
  "indexmap",
@@ -2405,9 +2405,9 @@ dependencies = [
 
 [[package]]
 name = "rhai_codegen"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2a81e59b9782e8b85052aaed305d71dfcdec1bfa53e774c19ac1085307cbf39"
+checksum = "b14fd9df9de7895cb7e79ba593a9d8eb00a769178476480c26703b97b500a726"
 dependencies = [
  "proc-macro2",
  "quote",

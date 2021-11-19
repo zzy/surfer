@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.10.0", features = ["attributes"] }
-tide = { path = "../../../tmp/tide" }
+tide = { path = "../../../crates/tide" }
 
 dotenv = "0.15.0"
 lazy_static = "1.4.0"

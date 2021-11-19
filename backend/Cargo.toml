@@ -7,13 +7,13 @@ edition = "2018"
 [dependencies]
 futures = "0.3.17"
 async-std = { version = "1.10.0", features = ["attributes"] }
-tide = { path = "../../../tmp/tide" }
+tide = { path = "../../../crates/tide" }
 
 dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.5.4"
 
-async-graphql = { version = "3.0.3", features = ["bson", "chrono"] }
+async-graphql = { version = "3.0.5", features = ["bson", "chrono"] }
 mongodb = { version = "2.0.2", default-features = false, features = [
   "async-std-runtime",
 ] }
