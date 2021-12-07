@@ -5,7 +5,7 @@ authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
 [dependencies]
-futures = "0.3.17"
+futures = "0.3.18"
 async-std = { version = "1.10.0", features = ["attributes"] }
 tide = { path = "../../../crates/tide" }
 
@@ -13,7 +13,7 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 regex = "1.5.4"
 
-async-graphql = { version = "3.0.5", features = ["bson", "chrono"] }
+async-graphql = { version = "3.0.12", features = ["bson", "chrono"] }
 mongodb = { version = "2.0.2", default-features = false, features = [
   "async-std-runtime",
 ] }
