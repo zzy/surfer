@@ -1,6 +1,6 @@
 # Web Application Server - yew
 
-Demo site: [https://blog.rusthub.top](https://blog.rusthub.top)
+Demo site: [https://blog2.ruonou.com](https://blog2.ruonou.com)
 
 ## Build & Run:
 

@@ -16,7 +16,7 @@ impl Component for Explore {
                 { "--- Explore, Work In Progress ---" }
                 <div class="mt12 fw-bold">
                     { "See also: " }
-                    <a href="https://blog.budshome.com" target="_blank">
+                    <a href="https://blog.ruonou.com" target="_blank">
                         { "Rust 技术博客（graphql + handlebars）" }
                     </a>
                 </div>

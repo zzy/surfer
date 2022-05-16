@@ -15,6 +15,7 @@ mutation ArticleNewData(
     }
   ) {
     id
+    slug
     uri
   }
 }

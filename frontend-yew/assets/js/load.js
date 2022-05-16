@@ -10,8 +10,8 @@ sequential("/js/library.jquery.js",
         random("/js/stacks.min.js?132689068675031052");
         random("/js/feature.darkmode.js?132689068675031052");
         // These can be removed
-        random("//static.budshome.com/js/bdtj-bh.js");
-        random("//static.budshome.com/js/bdts.js");
+        random("//static.ruonou.com/js/bdtj-bh.js");
+        random("//static.ruonou.com/js/bdts.js");
     }
 );
 

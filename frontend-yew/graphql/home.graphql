@@ -19,7 +19,7 @@ query HomeData {
   ) {
     subject
     summary
-    uri
+    slug
     updatedAt
 
     user {
@@ -46,7 +46,7 @@ query HomeData {
   ) {
     subject
     summary
-    uri
+    slug
     updatedAt
     
     user {

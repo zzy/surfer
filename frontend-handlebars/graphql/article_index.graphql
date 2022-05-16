@@ -16,7 +16,7 @@ query ArticleIndexData(
   ) {
     subject
     summary
-    uri
+    slug
     contentHtml
     updatedAt
 
@@ -63,7 +63,7 @@ query ArticleIndexData(
     published: 1
   ) {
     subject
-    uri
+    slug
 
     category {
       name

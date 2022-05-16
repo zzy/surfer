@@ -2,8 +2,8 @@
 <html lang="zh">
 
   <head>
-    <title>芽之家博客 - blog.budshome.com</title>
-    <meta name="description" content="芽之家，纯粹 Rust 技术栈开发的博客。budshome, the Blog built on pure Rust stack.">
+    <title>若耨博客 - blog.ruonou.com</title>
+    <meta name="description" content="若耨，纯粹 Rust 技术栈开发的博客。budshome, the Blog built on pure Rust stack.">
     {{> head }}
   </head>
 
@@ -21,7 +21,8 @@
             <p class="lead my-3">{{ top_article.summary }}</p>
             <div class="row lead mb-0">
               <div class="col-md-6">
-                <a href="{{ top_article.uri }}" class="text-white fw-bold" target="_blank">Continue reading...</a>
+                <a href="{{ top_article.user.username }}/{{ top_article.slug }}" class="text-white fw-bold"
+                  target="_blank">Continue reading...</a>
               </div>
               <div class="col-md-6 text-end">{{ top_article.updatedAt }}</div>
             </div>
@@ -44,7 +45,8 @@
                 <p class="card-text mb-auto">
                   {{ str-trc recommended_article.summary 50 }}
                 </p>
-                <a href="{{ recommended_article.uri }}" target="_blank">Continue reading</a>
+                <a href="{{ recommended_article.user.username }}/{{ recommended_article.slug }}"
+                  target="_blank">Continue reading</a>
               </div>
 
               <div class="col-auto d-none d-lg-block">
@@ -76,7 +78,7 @@
                 <a href="/{{ article.user.username }}" target="_blank">{{ article.user.nickname }}</a>
               </p>
               <p>{{ article.summary }}</p>
-              <a href="{{ article.uri }}" target="_blank">Continue reading</a>
+              <a href="{{ article.user.username }}/{{ article.slug }}" target="_blank">Continue reading</a>
             </article>
           {{/each}}
 

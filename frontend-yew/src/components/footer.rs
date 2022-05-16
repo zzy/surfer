@@ -7,14 +7,14 @@ pub fn copyright() -> Html {
         <footer class="ps-relative t96 py32 ta-center fc-black-300 bg-black-025">
             <p>
                 { "Powered by "}
-                <a href="//github.com/zzy/rusthub" target="_blank">{ "zzy/rusthub" }</a>
+                <a href="//github.com/zzy/surfer" target="_blank">{ "zzy/surfer" }</a>
             </p>
             <p>
                 { "~ 版权所有（" }
-                <a href="mailto:linshi@budshome.com">{ "linshi@budshome.com" }</a>
+                <a href="mailto:ask@ruonou.com">{ "ask@ruonou.com" }</a>
                 { "）~" }<br />
                 { "~ " }
-                <a href="//rusthub.top" target="_blank">{ "锈毂 - RustHub.top" }</a>
+                <a href="//ruonou.com" target="_blank">{ "若耨 - RuoNou.top" }</a>
                 { " ~"}
             </p>
         </footer>

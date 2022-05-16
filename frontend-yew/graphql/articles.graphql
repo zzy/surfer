@@ -17,7 +17,7 @@ query ArticlesData {
   ) {
     subject
     summary
-    uri
+    slug
     updatedAt
     
     user {

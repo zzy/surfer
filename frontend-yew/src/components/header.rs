@@ -34,7 +34,7 @@ fn nav_global() -> Html {
             to={ Routes::Explore }>
                 { "Explore" }
             </Link<Routes>>
-            <a class="s-navigation--item" href="//budshome.com/books.html"
+            <a class="s-navigation--item" href="//ruonou.com/books.html"
                 target="_blank">
                 { "Learning" }
             </a>
@@ -79,11 +79,11 @@ fn nav() -> Html {
 
             <Link<Routes> classes={ classes!("flex--item", "js-logo") } to={ Routes::Home }>
                 <span class="fs-title fw-bold">
-                    <span class="ff-sans">{ "锈毂" }</span>
-                    <img class="va-sub" src="/imgs/logos/rusthub.png"
-                        alt={ "RustHub - 锈毂" } title={ "RustHub - 锈毂" }
-                        aria-label={ "RustHub - 锈毂" } />
-                    <span class="ff-serif">{ "RustHub" }</span>
+                    <span class="ff-sans">{ "若耨" }</span>
+                    <img class="va-sub" src="/imgs/logos/logo.png"
+                        alt={ "RuoNou -- 若耨" } title={ "RuoNou -- 若耨" }
+                        aria-label={ "RuoNou -- 若耨" } />
+                    <span class="ff-serif">{ "RuoNou" }</span>
                 </span>
             </Link<Routes>>
 
@@ -120,7 +120,7 @@ fn nav() -> Html {
 
             <div class="flex--item ps-relative ml16 w100 wmx3 sm:wmx-initial sm:ml0 sm:d-none js-search">
                 <input id="searchbox" class="s-input s-input__search bar-md js-stacks-search-bar"
-                    type="text" placeholder={ "Search RustHub …" } />
+                    type="text" placeholder={ "Search RuoNou …" } />
                 <svg aria-hidden="true" class="svg-icon iconSearch s-input-icon s-input-icon__search"
                     width="18" height="18" viewBox="0 0 18 18">
                     <path

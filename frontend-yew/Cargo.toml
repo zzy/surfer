@@ -2,29 +2,29 @@
 name = "surfer-frontend-yew"
 version = "0.0.1"
 authors = ["zzy <9809920@qq.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-wasm-bindgen = "0.2.78"
-wasm-bindgen-futures = "0.4.28"
-wee_alloc = "0.4.5"
-console_error_panic_hook = "0.1.7"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+wee_alloc = "0.4"
+console_error_panic_hook = "0.1"
 
-yew = { path = "../../../crates/yew/packages/yew" }
-yew-router = { path = "../../../crates/yew/packages/yew-router" }
-web-sys = { version = "0.3.55", features = [
+yew = "0.19"
+yew-router = "0.16"
+web-sys = { version = "0.3", features = [
   "Request",
   "RequestInit",
   "RequestMode",
   "Response",
 ] }
-gloo = "0.5.0"
-gloo-utils = "0.1.1"
+gloo = "0.7"
+gloo-utils = "0.1"
 
-toml = "0.5.8"
-lazy_static = "1.4.0"
+toml = "0.5"
+lazy_static = "1.4"
 
-graphql_client = "0.10.0"
-serde = { version = "1.0.130", features = ["derive"] }
-serde_json = "1.0.72"
-anyhow = "1.0.51"
+graphql_client = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"

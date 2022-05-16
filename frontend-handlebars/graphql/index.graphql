@@ -29,7 +29,7 @@ query IndexData(
       uri
     }
     summary
-    uri
+    slug
     updatedAt
     topics {
       name
@@ -53,7 +53,7 @@ query IndexData(
       uri
     }
     summary
-    uri
+    slug
     updatedAt
     topics {
       name
@@ -88,7 +88,7 @@ query IndexData(
       uri
     }
     summary
-    uri
+    slug
     updatedAt
     topics {
       name

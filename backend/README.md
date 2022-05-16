@@ -4,7 +4,7 @@
 
 MongoDB data(include structure & documents) file is `/data/surfer-dev.sql`.
 
-If you need mongodb cloud count, email to me or wechat(微信): yupen-com, please.
+If you need mongodb cloud count, please send email to me.
 
 ## Build & run
 
