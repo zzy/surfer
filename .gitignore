@@ -2,7 +2,7 @@
 *~
 *.swp
 
-# Cargo.lock
+Cargo.lock
 target
 *.rs.bk
 
@@ -10,3 +10,5 @@ target
 .env.toml
 examples
 dist
+
+__pycache__

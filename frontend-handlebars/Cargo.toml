@@ -5,18 +5,18 @@ authors = ["zzy <9809920@qq.com>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version = "1.10.0", features = ["attributes"] }
-tide = { path = "../../../crates/tide" }
+async-std = { path = "../../../crates/async-std", features = ["attributes"] }
+tide = { path = "../../../crates/tide", features = ["logger", "cookies"] }
 
-dotenv = "0.15.0"
-lazy_static = "1.4.0"
+dotenv = "0.15"
+lazy_static = "1.4"
 
-serde = { version = "1.0.130", features = ["derive"] }
-serde_json = "1.0.72"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
-surf = "2.3.2"
-graphql_client = "0.10.0"
-handlebars = { version = "4.1.6", features = ["script_helper"] }
+surf = "2.3"
+graphql_client = "0.10"
+handlebars = { version = "4.2", features = ["script_helper"] }
 
 [dev-dependencies]
-rhai = "1.2.1"
+rhai = "1.7"

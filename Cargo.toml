@@ -1,5 +1,5 @@
 [workspace]
-members = ["./backend", "./frontend-handlebars", "./frontend-yew"]
+members = ["./backend", "./frontend-handlebars"] # , "./frontend-yew"
 resolver = "2"
 
 [profile.dev]
