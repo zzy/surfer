@@ -11,8 +11,8 @@ There are two options for web frontend:
 ## Features
 
 Demo site:
-- [https://blog2.ruonou.com](https://blog2.ruonou.com) with frontend-yew.
-- [https://blog.ruonou.com](https://blog.ruonou.com) with frontend-handlebars.
+- [niqin.com - NiQin Books Platform | 泥芹书馆](https://niqin.com)
+- [gaidun.com - Project Matchmaking | 项目对接](https://gaidun.com)
 
 See also: https://github.com/zzy/tide-async-graphql-mongodb
 
@@ -24,14 +24,14 @@ If you need mongodb cloud count, please send email to me.
 
 ## Stacks
 
-- [Rust](https://github.com/rust-lang/rust) - [Rust By Example](https://rust-by-example.ruonou.com) and [Cargo Book](https://cargo.ruonou.com)
-- [Tide](https://crates.io/crates/tide) - [Tide Book](https://tide.ruonou.com)
-- [rhai](https://crates.io/crates/rhai) - [Embedded Scripting for Rust](https://rhai.ruonou.com)
-- [async-graphql](https://crates.io/crates/async-graphql) - [async-graphql docs](https://async-graphql.ruonou.com)
+- [Rust](https://github.com/rust-lang/rust) - [Rust By Example](https://rust-by-example.niqin.com) and [Cargo Book](https://cargo.niqin.com)
+- [Tide](https://crates.io/crates/tide) - [Tide Book](https://tide-book.niqin.com)
+- [rhai](https://crates.io/crates/rhai) - [Embedded Scripting for Rust](https://rhai-script.niqin.com)
+- [async-graphql](https://crates.io/crates/async-graphql) - [async-graphql docs](https://async-graphql.niqin.com)
 - [mongodb & mongo-rust-driver](https://crates.io/crates/mongodb)
 - [Surf](https://crates.io/crates/surf)
 - [graphql_client](https://crates.io/crates/graphql_client)
-- [yew](https://yew.ruonou.com)
+- [yew](https://yew.niqin.com)
 - [handlebars-rust](https://crates.io/crates/handlebars)
 - [jsonwebtoken](https://crates.io/crates/jsonwebtoken)
 - [cookie-rs](https://crates.io/crates/cookie)
