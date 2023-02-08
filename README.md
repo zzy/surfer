@@ -12,9 +12,11 @@ There are two options for web frontend:
 
 Demo site:
 - [niqin.com - NiQin Books Platform | 泥芹书馆](https://niqin.com)
-- [gaidun.com - Project Matchmaking | 项目对接](https://gaidun.com)
+- [piexue.com - Project Matchmaking | 项目对接](https://piexue.com)
 
-See also: https://github.com/zzy/tide-async-graphql-mongodb
+See also: 
+- https://github.com/zzy/tide-async-graphql-mongodb - Clean boilerplate for graphql services, wasm/yew & handlebars frontend. 
+- https://github.com/piexue/piexue.com - Multi-language CMS based on the Rust web stacks.
 
 ## MongoDB data
 
