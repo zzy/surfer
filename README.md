@@ -8,15 +8,15 @@ There are two options for web frontend:
 - Frontend-yew for web application using yew, graphql_client, cookie and so on.
 - Frontend-handlebars for web application using tide, yew, rhai, surf, graphql_client, handlebars-rust, cookie and so on.
 
+See also: 
+- https://github.com/zzy/tide-async-graphql-mongodb - Clean boilerplate for graphql services, wasm/yew & handlebars frontend. 
+- https://github.com/piexue/piexue.com - Multi-language CMS based on the Rust web stacks.
+
 ## Features
 
 Demo site:
 - [niqin.com - NiQin Books Platform | 泥芹书馆](https://niqin.com)
 - [piexue.com - Project Matchmaking | 项目对接](https://piexue.com)
-
-See also: 
-- https://github.com/zzy/tide-async-graphql-mongodb - Clean boilerplate for graphql services, wasm/yew & handlebars frontend. 
-- https://github.com/piexue/piexue.com - Multi-language CMS based on the Rust web stacks.
 
 ## MongoDB data
 
