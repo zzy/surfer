@@ -1,6 +1,6 @@
 # surfer
 
-The **Blog** built on *pure Rust stack*. 
+The simple **WIP Blog** built on *pure Rust stack*, with upcoming upgrades.
 
 Backend for graphql services using tide, async-graphql, jsonwebtoken, mongodb and so on. 
 
